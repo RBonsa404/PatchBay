@@ -39,7 +39,7 @@ function renderOne(profile: DeviceProfile, ifc: InterfaceConfig, env: LinkEnviro
   lines.push(
     `  MTU 1500 bytes, BW ${bw} Kbit, DLY ${delay} usec,`,
     '     reliability 255/255, txload 1/255, rxload 1/255',
-    `  Encapsulation ${group?.kind === 'serial' ? 'HDLC' : group?.kind === 'svi' ? 'ARPA' : 'ARPA'}, loopback not set`,
+    `  Encapsulation ${group?.kind === 'serial' ? 'HDLC' : 'ARPA'}, loopback not set`,
   );
   if (group?.kind === 'ethernet') {
     lines.push(state.status === 'up' ? `  Full-duplex, ${bw / 1000}Mb/s` : '  Auto-duplex, Auto-speed');

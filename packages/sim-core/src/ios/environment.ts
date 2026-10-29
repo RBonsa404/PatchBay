@@ -60,6 +60,8 @@ export interface LinkEnvironment {
   natTranslations(): NatEntry[];
   natCounters(): { hits: number; misses: number };
   clearNat(): void;
+  /** Forget dynamic state (ARP, MAC table, NAT translations, ACL counters): the device has just rebooted. */
+  reset(): void;
   /** Re-evaluate the links after a state change; returns the syslog lines this device must print now. */
   commit(): string[];
   /** Syslog lines queued for this device by events elsewhere (remote shutdown, cable plugged…). */
@@ -88,6 +90,7 @@ export function createIsolatedEnvironment(getConfig: () => DeviceConfig): LinkEn
     natTranslations: () => [],
     natCounters: () => ({ hits: 0, misses: 0 }),
     clearNat: () => undefined,
+    reset: () => undefined,
     commit: () => [],
     drain: () => [],
   };

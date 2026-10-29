@@ -35,7 +35,10 @@ export const globalCommands: CommandDef[] = [
     paramHelp: { name: 'This system\'s network name' },
     negatable: true,
     run: (ctx, args) => {
-      ctx.config.hostname = ctx.negate ? ctx.profile.defaultHostname : (args.name as string);
+      const name = args.name as string;
+      // Letters, digits and hyphens only, up to 63 characters (RFC 1123 host names).
+      if (!ctx.negate && !/^[A-Za-z0-9-]{1,63}$/.test(name)) return '% Hostname contains one or more illegal characters.';
+      ctx.config.hostname = ctx.negate ? ctx.profile.defaultHostname : name;
     },
   },
   {

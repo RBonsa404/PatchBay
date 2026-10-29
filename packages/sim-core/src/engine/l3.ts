@@ -215,6 +215,14 @@ export class L3 {
     return { ...(this.natCount.get(deviceId) ?? { hits: 0, misses: 0 }) };
   }
 
+  /** Drop every piece of dynamic state of a device (reboot or removal). */
+  forget(deviceId: string): void {
+    this.arp.delete(deviceId);
+    this.nat.delete(deviceId);
+    this.natCount.delete(deviceId);
+    this.clearAclHits(deviceId);
+  }
+
   /** `clear ip nat translation *`: dynamic entries only. */
   clearNat(deviceId: string): void {
     this.nat.delete(deviceId);

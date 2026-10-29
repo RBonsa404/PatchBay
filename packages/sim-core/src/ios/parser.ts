@@ -141,6 +141,22 @@ export function match(pool: CompiledCommand[], line: string, env: ParseEnv): Mat
 
 const NO_HELP = 'Negate a command or set its defaults';
 
+const IFACE_HELP: Record<string, string> = {
+  FastEthernet: 'FastEthernet IEEE 802.3',
+  GigabitEthernet: 'GigabitEthernet IEEE 802.3z',
+  Serial: 'Serial',
+  Vlan: 'Catalyst Vlans',
+};
+
+/** When the next parameter is an interface, the interface types of this device are valid next words. */
+function interfaceTypes(states: State[], env: ParseEnv): string[] {
+  const wantsIface = states.some((s) => {
+    const nd = s.nodes[s.n];
+    return nd?.kind === 'param' && nd.type === 'iface';
+  });
+  return wantsIface ? env.profile.groups.map((g) => g.type) : [];
+}
+
 function nextWords(states: State[]): LiteralNode[] {
   const words = new Map<string, LiteralNode>();
   for (const s of states) {
@@ -163,8 +179,9 @@ export function help(pool: CompiledCommand[], body: string, env: ParseEnv, allow
     const words = nextWords(states)
       .map((n) => n.word)
       .concat(allowNo && walked.length === 0 ? ['no'] : [])
-      .filter((w) => w.startsWith(prefix))
-      .sort();
+      .concat(interfaceTypes(states, env))
+      .filter((w) => w.toLowerCase().startsWith(prefix))
+      .sort((a, b) => a.localeCompare(b));
     return words.length > 0 ? words.join('  ') : '% Unrecognized command';
   }
 
@@ -179,6 +196,8 @@ export function help(pool: CompiledCommand[], body: string, env: ParseEnv, allow
         .map((x) => (x.kind === 'literal' ? x.word : '*'))
         .join(' ');
       rows.set(nd.word, last ? s.cmd.def.help : (env.groupHelp[path] ?? ''));
+    } else if (nd?.kind === 'param' && nd.type === 'iface') {
+      for (const g of env.profile.groups) rows.set(g.type, IFACE_HELP[g.type] ?? g.type);
     } else if (nd?.kind === 'param') {
       const label = paramLabel(nd);
       if (!rows.has(label)) rows.set(label, s.cmd.def.paramHelp?.[nd.name] ?? nd.name);
@@ -205,7 +224,8 @@ export function complete(pool: CompiledCommand[], line: string, env: ParseEnv, a
   const words = nextWords(states)
     .map((n) => n.word)
     .concat(allowNo && tokens.length === 1 ? ['no'] : [])
-    .filter((w) => w.startsWith(prefix));
+    .concat(interfaceTypes(states, env))
+    .filter((w) => w.toLowerCase().startsWith(prefix));
   const unique = [...new Set(words)];
   return unique.length === 1 ? `${line.slice(0, last.start)}${unique[0]} ` : null;
 }

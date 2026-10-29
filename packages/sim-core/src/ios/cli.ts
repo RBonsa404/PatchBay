@@ -339,6 +339,7 @@ export class Cli {
 
   private restart(): string {
     this.config = this.startup ? cloneConfig(this.startup) : createDefaultConfig(this.profile);
+    this.env.reset();
     this.mode = 'user';
     this.selection = {};
     const header = '%SYS-5-RELOAD: Reload requested by console. Reload Reason: Reload Command.';

@@ -4,6 +4,8 @@ import { Cli } from '../ios/cli.js';
 import { parentOf } from '../ios/interfaces.js';
 import type { LinkEnvironment, LinkState, PingResult } from '../ios/environment.js';
 import { groupOf } from '../ios/profiles.js';
+import { isIpv4 } from '../ios/syntax.js';
+import { maskToPrefix } from '../protocols/l3/ip.js';
 import { canPlug, copperLinkWorks, type CableType } from '../physical/rules.js';
 import { catalog, type DeviceModel, type PortSpec } from './catalog.js';
 import { cloneConfig, vlanExists, type DeviceConfig } from './config.js';
@@ -50,7 +52,7 @@ export type ConnectResult = { ok: true; cable: Cable } | { ok: false; error: Con
 
 export interface NetworkSnapshot {
   options: NetworkOptions;
-  devices: { id: string; model: string; running?: DeviceConfig; startup?: DeviceConfig | null; host?: HostConfig }[];
+  devices: { id: string; model: string; index?: number; running?: DeviceConfig; startup?: DeviceConfig | null; host?: HostConfig }[];
   cables: Cable[];
 }
 
@@ -68,21 +70,38 @@ export class Network {
 
   private readonly lastLinks = new Map<string, LinkState>();
   private readonly syslog = new Map<string, string[]>();
+  /** Never reused, so MAC addresses stay unique after a device is removed. */
+  private nextIndex = 0;
 
   constructor(readonly options: NetworkOptions = { strictMdix: true }) {}
 
-  addDevice(id: string, modelId: string): Device {
+  /** Add a device. `index` is only given when restoring a snapshot (it seeds the device's MAC addresses). */
+  addDevice(id: string, modelId: string, index?: number): Device {
     const model = catalog[modelId];
     if (!model) throw new Error(`Unknown device model: ${modelId}`);
     if (this.devices.has(id)) throw new Error(`Duplicate device id: ${id}`);
 
-    const device: Device = { id, model, index: this.devices.size };
+    const device: Device = { id, model, index: index ?? this.nextIndex };
+    this.nextIndex = Math.max(this.nextIndex, device.index + 1);
     if (model.profile) device.cli = new Cli({ profile: model.profile, env: this.environmentFor(device) });
     else device.host = {};
     this.devices.set(id, device);
     this.syslog.set(id, []);
     this.reconcile(); // seeds the link table; the new device has no cables so nothing is printed
     return device;
+  }
+
+  /** Take a device out of the network: its cables are unplugged (neighbours see their links go down). */
+  removeDevice(id: string): boolean {
+    if (!this.devices.has(id)) return false;
+    this.cables = this.cables.filter((c) => c.a.device !== id && c.b.device !== id);
+    this.devices.delete(id);
+    this.syslog.delete(id);
+    this.macTables.clear(id);
+    this.l3.forget(id);
+    for (const key of [...this.lastLinks.keys()]) if (key.startsWith(`${id}|`)) this.lastLinks.delete(key);
+    this.settle();
+    return true;
   }
 
   device(id: string): Device {
@@ -124,6 +143,10 @@ export class Network {
   configureHost(deviceId: string, config: HostConfig): void {
     const device = this.device(deviceId);
     if (!device.host) throw new Error(`${deviceId} is not a host`);
+    for (const [field, value] of [['ip', config.ip], ['mask', config.mask], ['gateway', config.gateway]] as const) {
+      if (value !== undefined && !isIpv4(value)) throw new Error(`${deviceId}: invalid ${field} "${value}"`);
+    }
+    if (config.mask !== undefined && maskToPrefix(config.mask) === null) throw new Error(`${deviceId}: non-contiguous mask "${config.mask}"`);
     device.host = { ...config };
   }
 
@@ -233,6 +256,7 @@ export class Network {
       devices: [...this.devices.values()].map((d) => ({
         id: d.id,
         model: d.model.id,
+        index: d.index,
         ...(d.cli ? { running: cloneConfig(d.cli.config), startup: d.cli.startup ? cloneConfig(d.cli.startup) : null } : {}),
         ...(d.host ? { host: { ...d.host } } : {}),
       })),
@@ -243,7 +267,7 @@ export class Network {
   static restore(snapshot: NetworkSnapshot): Network {
     const net = new Network(snapshot.options);
     for (const d of snapshot.devices) {
-      const device = net.addDevice(d.id, d.model);
+      const device = net.addDevice(d.id, d.model, d.index);
       if (device.cli && d.running) device.cli.config = cloneConfig(d.running);
       if (device.cli) device.cli.startup = d.startup ? cloneConfig(d.startup) : null;
       if (d.host) device.host = { ...d.host };
@@ -268,7 +292,6 @@ export class Network {
         if (cable?.type !== 'serial') return null;
         return sameEnd(cable.a, { device: device.id, port: name }) ? 'dce' : 'dte';
       },
-      // SVIs are not ports: they share the switch's base address (port index 0).
       macAddress: (name) => this.macOf(device.id, name),
       macTable: () => this.macTables.list(device.id),
       clearMacTable: () => this.macTables.clear(device.id),
@@ -281,6 +304,10 @@ export class Network {
       natTranslations: () => this.l3.natTranslations(device.id),
       natCounters: () => this.l3.natCounters(device.id),
       clearNat: () => this.l3.clearNat(device.id),
+      reset: () => {
+        this.macTables.clear(device.id);
+        this.l3.forget(device.id);
+      },
       commit: () => this.settle(device.id),
       drain: () => this.drainSyslog(device.id),
     };

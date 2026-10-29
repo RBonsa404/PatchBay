@@ -117,8 +117,7 @@ function paint(): void {
   const screen = $('screen');
   screen.textContent = (screens.get(active) ?? []).join('\n');
   screen.scrollTop = screen.scrollHeight;
-  const last = cli.execute === undefined ? '' : cli.prompt;
-  $('prompt').textContent = last;
+  $('prompt').textContent = cli.prompt;
   $<HTMLInputElement>('cmd').type = hidden ? 'password' : 'text';
 }
 
@@ -194,11 +193,18 @@ cmd.addEventListener('keydown', (ev) => {
 });
 
 $('apply').addEventListener('click', () => {
-  net.configureHost(active, {
-    ip: $<HTMLInputElement>('h-ip').value || undefined,
-    mask: $<HTMLInputElement>('h-mask').value || undefined,
-    gateway: $<HTMLInputElement>('h-gw').value || undefined,
-  } as never);
+  const field = (id: string): string | undefined => $<HTMLInputElement>(id).value.trim() || undefined;
+  const settings: { ip?: string; mask?: string; gateway?: string } = {};
+  for (const [key, id] of [['ip', 'h-ip'], ['mask', 'h-mask'], ['gateway', 'h-gw']] as const) {
+    const value = field(id);
+    if (value !== undefined) settings[key] = value;
+  }
+  try {
+    net.configureHost(active, settings);
+    $('h-out').textContent = 'Configuration appliquée.';
+  } catch (err) {
+    $('h-out').textContent = `Erreur : ${(err as Error).message}`;
+  }
   renderAll();
 });
 $('ping').addEventListener('click', () => {
