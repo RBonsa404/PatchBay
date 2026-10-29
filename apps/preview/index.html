@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PatchBay Aperçu</title>
+  <style>
+    :root {
+      --bg: #f6f7f9; --panel: #ffffff; --ink: #1c2330; --muted: #5b6678; --line: #d6dbe3;
+      --accent: #1a6fd1; --up: #1f9d55; --down: #d64545; --shut: #8b94a3;
+      --term-bg: #0f141b; --term-ink: #d7e2f0; --node: #eef2f8;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #12161d; --panel: #1a2029; --ink: #e6ebf3; --muted: #9aa6b8; --line: #2b3441;
+        --accent: #5aa2ff; --up: #3ecf7a; --down: #ff6b6b; --shut: #7c8696; --term-bg: #0a0d12; --term-ink: #d7e2f0; --node: #232b37;
+      }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, "Segoe UI", sans-serif; }
+    header { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
+    header h1 { font-size: 17px; margin: 0; }
+    header .tag { color: var(--muted); font-size: 13px; }
+    select, button, input { font: inherit; color: inherit; }
+    select, .btn { padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); cursor: pointer; }
+    main { display: grid; gap: 14px; padding: 14px 16px; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); max-width: 1400px; margin: 0 auto; }
+    @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+    section { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; min-width: 0; }
+    h2 { font-size: 14px; margin: 0 0 8px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+    #brief { margin: 0 0 10px; }
+    svg { width: 100%; height: auto; display: block; }
+    .link { stroke-width: 3; stroke-linecap: round; }
+    .link.up { stroke: var(--up); } .link.down { stroke: var(--down); } .link.shut { stroke: var(--shut); stroke-dasharray: 6 5; }
+    .port { font-size: 11px; fill: var(--muted); } .cable { font-size: 10px; fill: var(--muted); font-style: italic; }
+    .node { cursor: pointer; } .node:focus { outline: none; }
+    .box { fill: var(--node); stroke: var(--line); stroke-width: 1.5; }
+    .box.rt { stroke: var(--accent); } .box.sw { stroke: #b57a1a; }
+    .node.active .box { stroke-width: 3; }
+    .name { font-weight: 700; font-size: 14px; fill: var(--ink); } .sub { font-size: 11px; fill: var(--muted); }
+    .legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); margin-top: 6px; flex-wrap: wrap; }
+    .legend i { display: inline-block; width: 18px; height: 3px; vertical-align: middle; margin-right: 5px; border-radius: 2px; }
+    #tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+    .tab { border: 1px solid var(--line); background: var(--panel); padding: 4px 12px; border-radius: 999px; cursor: pointer; }
+    .tab.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+    #screen { background: var(--term-bg); color: var(--term-ink); font: 13px/1.4 ui-monospace, Consolas, monospace; padding: 10px; border-radius: 8px 8px 0 0; height: 360px; overflow: auto; white-space: pre-wrap; margin: 0; }
+    #form { display: flex; background: var(--term-bg); border-radius: 0 0 8px 8px; padding: 0 10px 10px; font: 13px ui-monospace, Consolas, monospace; color: var(--term-ink); }
+    #prompt { white-space: pre; padding-right: 2px; }
+    #cmd { flex: 1; min-width: 0; background: transparent; border: 0; outline: none; color: inherit; font: inherit; }
+    .hint { color: var(--muted); font-size: 12px; margin-top: 6px; }
+    .row { display: grid; grid-template-columns: 110px 1fr; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .row input { padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+    #h-out { white-space: pre-wrap; font: 13px ui-monospace, Consolas, monospace; background: var(--term-bg); color: var(--term-ink); padding: 10px; border-radius: 8px; min-height: 60px; margin-top: 8px; }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>PatchBay <span class="tag">aperçu du moteur · M0 à M4</span></h1>
+    <label>Scénario <select id="scenario"></select></label>
+    <button class="btn" id="reset" type="button">Réinitialiser</button>
+  </header>
+  <main>
+    <section>
+      <h2>Scénario</h2>
+      <p id="brief"></p>
+      <svg id="topo" viewBox="0 0 640 330" role="img" aria-label="Topologie réseau"></svg>
+      <div class="legend">
+        <span><i style="background: var(--up)"></i>lien actif</span>
+        <span><i style="background: var(--down)"></i>lien coupé (câble ou configuration)</span>
+        <span><i style="background: var(--shut)"></i>interface désactivée</span>
+      </div>
+    </section>
+    <section>
+      <h2>Console</h2>
+      <div id="tabs"></div>
+      <div id="terminal">
+        <pre id="screen" aria-live="polite"></pre>
+        <form id="form" autocomplete="off"><span id="prompt"></span><input id="cmd" spellcheck="false" aria-label="Commande IOS" /></form>
+        <div class="hint">Entrée exécute · ? aide · Tab complète · ↑/↓ historique · cliquez un équipement pour changer de console</div>
+      </div>
+      <div id="host" hidden>
+        <h2 id="host-title"></h2>
+        <div class="row"><label for="h-ip">Adresse IP</label><input id="h-ip" /></div>
+        <div class="row"><label for="h-mask">Masque</label><input id="h-mask" /></div>
+        <div class="row"><label for="h-gw">Passerelle</label><input id="h-gw" /></div>
+        <button class="btn" id="apply" type="button">Appliquer</button>
+        <div class="row" style="margin-top: 14px"><label for="h-dst">Ping vers</label><input id="h-dst" placeholder="172.16.1.10" /></div>
+        <button class="btn primary" id="ping" type="button">Ping</button>
+        <pre id="h-out"></pre>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="dist/main.js"></script>
+</body>
+</html>

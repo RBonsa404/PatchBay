@@ -1,0 +1,11 @@
+{
+  "name": "@patchbay/preview",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "preview": "node serve.mjs",
+    "build": "esbuild main.ts --bundle --format=esm --outdir=dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

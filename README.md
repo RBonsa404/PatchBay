@@ -13,6 +13,9 @@ Jeu web de formation réseau : reproduire sur le « terrain » une configuration
 ```bash
 npm install
 npm test
+npm run preview -w @patchbay/preview   # aperçu du moteur sur http://127.0.0.1:5173
 ```
+
+L'aperçu (`apps/preview`) fait tourner le vrai moteur dans le navigateur : topologie avec l'état des liens, console IOS par équipement, panneau pour configurer et pinguer les PC. Ce n'est pas l'interface finale (prévue en M7).
 
 Le projet est développé avec Claude Code : ouvrir ce dossier dans Claude Code, il lit `CLAUDE.md` et la roadmap, puis continue à la « Prochaine étape ».
