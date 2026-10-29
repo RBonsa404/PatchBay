@@ -1,0 +1,58 @@
+import type { InterfaceConfig } from '../../model/config.js';
+import { groupOf } from '../profiles.js';
+import type { CommandContext, CommandDef } from '../types.js';
+
+const current = (ctx: CommandContext): InterfaceConfig =>
+  ctx.config.interfaces.find((i) => i.name === ctx.selection.interface) as InterfaceConfig;
+
+export const interfaceCommands: CommandDef[] = [
+  {
+    modes: ['config-if'],
+    syntax: 'ip address <address:ip> <mask:mask>',
+    help: 'Set the IP address of an interface',
+    paramHelp: { address: 'IP address', mask: 'IP subnet mask' },
+    negatable: true,
+    run: (ctx, args) => {
+      const ifc = current(ctx);
+      // Layer-2 switch ports have no IP address command.
+      if (groupOf(ctx.profile, ifc.name)?.layer === 2) ctx.invalid(0);
+      if (ctx.negate) delete ifc.ip;
+      else ifc.ip = { address: args.address as string, mask: args.mask as string };
+    },
+  },
+  {
+    modes: ['config-if'],
+    syntax: 'shutdown',
+    help: 'Shutdown the selected interface',
+    negatable: true,
+    run: (ctx) => {
+      current(ctx).shutdown = !ctx.negate;
+    },
+  },
+  {
+    modes: ['config-if'],
+    syntax: 'description <text:text>',
+    help: 'Interface specific description',
+    paramHelp: { text: 'Up to 240 characters describing this interface' },
+    negatable: true,
+    run: (ctx, args) => {
+      const ifc = current(ctx);
+      if (ctx.negate) delete ifc.description;
+      else ifc.description = args.text as string;
+    },
+  },
+  {
+    // Serial/DCE semantics (clock rate only valid on the DCE end) arrive with the physical layer in M2.
+    modes: ['config-if'],
+    syntax: 'clock rate <rate:int:1200-8000000>',
+    help: 'Configure serial interface clock',
+    paramHelp: { rate: 'Speed (bits per second)' },
+    negatable: true,
+    run: (ctx, args) => {
+      const ifc = current(ctx);
+      if (groupOf(ctx.profile, ifc.name)?.kind !== 'serial') ctx.invalid(0);
+      if (ctx.negate) delete ifc.clockRate;
+      else ifc.clockRate = Number(args.rate);
+    },
+  },
+];

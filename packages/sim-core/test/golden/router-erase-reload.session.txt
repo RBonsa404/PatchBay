@@ -1,0 +1,15 @@
+# profile: cisco-1841
+# source: docs/references/CONFIG base ROUTER.pdf, task 2 (erase startup-config, reload)
+Router>enable
+Router#erase startup-config
+Erasing the nvram filesystem will remove all files! Continue? [confirm]
+[OK]
+Erase of nvram: complete
+Router#reload
+Proceed with reload? [confirm]
+%SYS-5-RELOAD: Reload requested by console. Reload Reason: Reload Command.
+Would you like to enter the initial configuration dialog? [yes/no]: no
+
+Press RETURN to get started!
+
+Router>

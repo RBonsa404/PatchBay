@@ -1,0 +1,14 @@
+# profile: catalyst-2960
+# source: docs/references/Config de base d'un Switch.pdf, step 7 (startup-config is not present, hostname, copy run start)
+Switch>enable
+Switch#show startup-config
+startup-config is not present
+Switch#configure terminal
+Enter configuration commands, one per line.  End with CNTL/Z.
+Switch(config)#hostname Comm1
+Comm1(config)#exit
+Comm1#copy run start
+Destination filename [startup-config]?
+Building configuration...
+[OK]
+Comm1#
