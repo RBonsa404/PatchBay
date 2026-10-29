@@ -3,22 +3,39 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { Cli, profiles } from '../src/index.js';
+import { fixtures } from './fixtures.js';
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), 'golden');
 
+/** Headers: `# profile: <id>` for a lone device, or `# fixture: <name>` + `# device: <id>` to sit inside a network. */
 interface Session {
-  profile: string;
+  profile?: string;
+  fixture?: string;
+  device?: string;
   lines: string[];
 }
 
 function parse(text: string): Session {
   const raw = text.replace(/\r\n/g, '\n').split('\n');
-  const headers = raw.filter((l) => l.startsWith('# '));
-  const profile = headers.map((h) => /^# profile: (.+)$/.exec(h)?.[1]).find(Boolean);
-  if (!profile) throw new Error('golden session needs a "# profile: <id>" header');
+  const header = (key: string): string | undefined =>
+    raw.map((h) => new RegExp(`^# ${key}: (.+)$`).exec(h)?.[1]).find(Boolean);
+  const session: Session = { profile: header('profile'), fixture: header('fixture'), device: header('device'), lines: [] };
+  if (!session.profile && !(session.fixture && session.device)) {
+    throw new Error('golden session needs "# profile: <id>" or "# fixture: <name>" + "# device: <id>"');
+  }
   const lines = raw.filter((l) => !l.startsWith('# '));
   while (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
-  return { profile, lines };
+  session.lines = lines;
+  return session;
+}
+
+function cliFor(session: Session): Cli {
+  if (session.fixture) {
+    const cli = fixtures[session.fixture]!().device(session.device!).cli;
+    if (!cli) throw new Error(`${session.device} has no CLI`);
+    return cli;
+  }
+  return new Cli({ profile: profiles[session.profile!]! });
 }
 
 /**
@@ -26,7 +43,7 @@ function parse(text: string): Session {
  * follow an input are skipped (they are compared at the end). The last line must be the final prompt.
  */
 function replay(session: Session): string[] {
-  const cli = new Cli({ profile: profiles[session.profile]! });
+  const cli = cliFor(session);
   const actual: string[] = [];
   const { lines } = session;
   let i = 0;

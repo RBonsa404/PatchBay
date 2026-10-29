@@ -1,6 +1,12 @@
 export { Cli } from './ios/cli.js';
 export type { CliOptions, CliResult } from './ios/cli.js';
 export type { CliMode, CommandDef, CommandContext } from './ios/types.js';
+export type { LinkEnvironment, LinkState, LineStatus } from './ios/environment.js';
 export { profiles } from './ios/profiles.js';
 export type { DeviceProfile } from './ios/profiles.js';
 export type { DeviceConfig, InterfaceConfig, LineConfig } from './model/config.js';
+export { catalog } from './model/catalog.js';
+export type { DeviceKind, DeviceModel, PortKind, PortSpec } from './model/catalog.js';
+export { Network } from './model/network.js';
+export type { Cable, CableEnd, ConnectError, ConnectResult, Device, NetworkOptions, NetworkSnapshot } from './model/network.js';
+export type { CableType } from './physical/rules.js';

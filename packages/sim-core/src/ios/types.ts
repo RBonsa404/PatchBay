@@ -1,4 +1,5 @@
 import type { DeviceConfig } from '../model/config.js';
+import type { LinkEnvironment } from './environment.js';
 import type { DeviceProfile } from './profiles.js';
 
 export type CliMode =
@@ -41,6 +42,8 @@ export interface PendingPrompt {
 
 export interface CommandContext {
   readonly profile: DeviceProfile;
+  /** Link state, cabling and MAC addresses as seen from this device. */
+  readonly env: LinkEnvironment;
   readonly config: DeviceConfig;
   readonly startup: DeviceConfig | null;
   readonly mode: CliMode;

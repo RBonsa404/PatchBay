@@ -65,6 +65,15 @@ Règles (avec drapeau de difficulté par niveau : `strictMdix: true|false`) :
 - Série : DCE/DTE, `clock rate` obligatoire côté DCE.
 - Un lien est `up/up` seulement si câble compatible **et** deux extrémités `no shutdown`.
 
+### Réseau, liens et syslog (implémenté en M2)
+
+- `Network` (`model/network.ts`) possède les appareils (`Device`) et les câbles. Les routeurs/switches ont un `Cli` ; les PC/serveurs n'en ont pas.
+- Un `Cli` ne connaît jamais le `Network` : il reçoit un `LinkEnvironment` (`ios/environment.ts`) qui répond à `linkState`, `serialEnd`, `macAddress` et publie les changements via `commit()` / `drain()`. Seul, un `Cli` utilise un environnement isolé (aucun câble).
+- **L'état de lien est dérivé, jamais stocké** : il se recalcule à partir des câbles et des configs (`Network.linkState`). `Network.reconcile()` compare à l'état précédent et fabrique les messages syslog : ceux de l'appareil qui vient d'exécuter une commande sont imprimés juste après la commande (précédés d'une ligne vide), ceux des voisins sont mis en file et lus par l'interface avec `drainSyslog(id)`.
+- Câble série : `connect('serial', dce, dte)` — le premier bout est le DCE.
+- Console : `consoleTarget(pcId)` donne l'équipement derrière le câble console d'un PC ; c'est ce que le terminal de l'interface ouvrira.
+- `snapshot()` / `Network.restore()` (JSON) : base des sauvegardes et des tests de replay.
+
 ### CLI IOS
 
 - Machine à états par équipement : `user → privileged → config → config-if / config-line / config-router / config-std-nacl / config-ext-nacl / config-subif…`.

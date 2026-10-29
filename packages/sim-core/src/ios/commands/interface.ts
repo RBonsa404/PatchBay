@@ -42,7 +42,6 @@ export const interfaceCommands: CommandDef[] = [
     },
   },
   {
-    // Serial/DCE semantics (clock rate only valid on the DCE end) arrive with the physical layer in M2.
     modes: ['config-if'],
     syntax: 'clock rate <rate:int:1200-8000000>',
     help: 'Configure serial interface clock',
@@ -51,6 +50,8 @@ export const interfaceCommands: CommandDef[] = [
     run: (ctx, args) => {
       const ifc = current(ctx);
       if (groupOf(ctx.profile, ifc.name)?.kind !== 'serial') ctx.invalid(0);
+      // Only the DCE end of a cable provides the clock; with no cable attached IOS accepts the command.
+      if (!ctx.negate && ctx.env.serialEnd(ifc.name) === 'dte') return '%Error: This command applies only to DCE interfaces';
       if (ctx.negate) delete ifc.clockRate;
       else ifc.clockRate = Number(args.rate);
     },

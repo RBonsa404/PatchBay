@@ -1,0 +1,29 @@
+# fixture: lab-1-5-2-r1-done
+# device: R2
+# source: docs/references/CONFIG base ROUTER.pdf, task 4 (R1 already configured); R2 is the DTE end of the serial cable
+Router>enable
+Router#configure terminal
+Enter configuration commands, one per line.  End with CNTL/Z.
+Router(config)#hostname R2
+R2(config)#interface serial 0/0/0
+R2(config-if)#ip address 192.168.2.2 255.255.255.0
+R2(config-if)#clock rate 64000
+%Error: This command applies only to DCE interfaces
+R2(config-if)#no shutdown
+
+%LINK-5-CHANGED: Interface Serial0/0/0, changed state to up
+%LINEPROTO-5-UPDOWN: Line protocol on Interface Serial0/0/0, changed state to up
+R2(config-if)#interface fastethernet 0/0
+R2(config-if)#ip address 192.168.3.1 255.255.255.0
+R2(config-if)#no shutdown
+
+%LINK-5-CHANGED: Interface FastEthernet0/0, changed state to up
+%LINEPROTO-5-UPDOWN: Line protocol on Interface FastEthernet0/0, changed state to up
+R2(config-if)#end
+R2#show ip interface brief
+Interface              IP-Address      OK? Method Status                Protocol
+FastEthernet0/0        192.168.3.1     YES manual up                    up
+FastEthernet0/1        unassigned      YES unset  administratively down down
+Serial0/0/0            192.168.2.2     YES manual up                    up
+Serial0/0/1            unassigned      YES unset  administratively down down
+R2#

@@ -4,6 +4,7 @@ import { globalCommands } from './global.js';
 import { interfaceCommands } from './interface.js';
 import { lineCommands } from './line.js';
 import { sessionCommands } from './session.js';
+import { showCommands } from './show.js';
 
 export const allCommands: CommandDef[] = [
   ...sessionCommands,
@@ -11,6 +12,7 @@ export const allCommands: CommandDef[] = [
   ...lineCommands,
   ...interfaceCommands,
   ...fileCommands,
+  ...showCommands,
 ];
 
 /** `?` descriptions for words that begin several commands (key = literal path, `*` for parameters). */
@@ -25,6 +27,8 @@ export const groupHelp: Record<string, string> = {
   exit: 'Exit from the EXEC',
   ip: 'Global IP configuration subcommands',
   'ip domain': 'Domain Name System',
+  'show ip': 'IP information',
+  'show ip interface': 'IP interface status and configuration',
   line: 'Configure a terminal line',
   logging: 'Modify message logging facilities',
   service: 'Modify use of network based services',

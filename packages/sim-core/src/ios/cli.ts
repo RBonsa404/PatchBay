@@ -1,5 +1,6 @@
 import { cloneConfig, createDefaultConfig, sameConfig, type DeviceConfig } from '../model/config.js';
 import { allCommands, groupHelp } from './commands/index.js';
+import { createIsolatedEnvironment, type LinkEnvironment } from './environment.js';
 import { complete, compileCommands, help, match, tokenize, type CompiledCommand, type ParseEnv } from './parser.js';
 import type { DeviceProfile } from './profiles.js';
 import { SUB_CONFIG_MODES, type CliMode, type CommandContext, type PendingPrompt, type Selection } from './types.js';
@@ -7,6 +8,8 @@ import { SUB_CONFIG_MODES, type CliMode, type CommandContext, type PendingPrompt
 export interface CliOptions {
   profile: DeviceProfile;
   hostname?: string;
+  /** Link state and cabling provider. Defaults to an isolated device with no cables. */
+  env?: LinkEnvironment;
 }
 
 export interface CliResult {
@@ -55,11 +58,18 @@ export class Cli {
   private phase: 'active' | 'press-return' = 'active';
   private pending: PendingPrompt | null = null;
   private readonly commands: CompiledCommand[] = compileCommands(allCommands);
+  private readonly env: LinkEnvironment;
 
   constructor(options: CliOptions) {
     this.profile = options.profile;
     this.config = createDefaultConfig(options.profile);
     if (options.hostname) this.config.hostname = options.hostname;
+    this.env = options.env ?? createIsolatedEnvironment(() => this.config);
+  }
+
+  /** Syslog lines queued by events elsewhere in the network (a neighbour shut down, a cable was plugged…). */
+  drainSyslog(): string[] {
+    return this.env.drain();
   }
 
   get prompt(): string {
@@ -74,7 +84,10 @@ export class Cli {
   }
 
   execute(line: string): CliResult {
-    return this.result(this.dispatch(line));
+    const output = this.dispatch(line);
+    // Link changes caused by this command are printed right after it, preceded by a blank line, as on a console.
+    const syslog = this.env.commit();
+    return this.result(syslog.length === 0 ? output : [...(output === '' ? [''] : [output, '']), ...syslog].join('\n'));
   }
 
   /** Tab completion for the word being typed; null when there is no unique completion. */
@@ -196,6 +209,7 @@ export class Cli {
     const live = (): Cli => this;
     return {
       profile: this.profile,
+      env: this.env,
       get config() {
         return live().config;
       },
