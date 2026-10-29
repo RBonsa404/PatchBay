@@ -66,6 +66,8 @@ type ProbeType = IcmpMessage['type'] | 'tcp-open' | 'tcp-refused' | 'udp-reply';
 interface ProbeReply {
   type: ProbeType;
   from: string;
+  /** TTL left in the answer when it arrived (ICMP only). */
+  ttl?: number;
 }
 
 /**
@@ -415,12 +417,14 @@ export class L3 {
   // ---- local delivery --------------------------------------------------------------------------------------------
 
   private deliverLocal(deviceId: string, packet: IpPacket): void {
-    const reply = (p: Pick<IpPacket, 'icmp' | 'tcp' | 'udp'>): void => this.originate(deviceId, { src: packet.dst, dst: packet.src, ttl: 255, ...p });
+    // Initial TTL of answers: 128 for PCs and servers (Windows), 255 for Cisco gear. Students read it in ping output.
+    const initialTtl = this.net.device(deviceId).host ? 128 : 255;
+    const reply = (p: Pick<IpPacket, 'icmp' | 'tcp' | 'udp'>): void => this.originate(deviceId, { src: packet.dst, dst: packet.src, ttl: initialTtl, ...p });
 
     if (packet.icmp) {
       const { icmp } = packet;
       if (icmp.type === 'echo-request') reply({ icmp: { type: 'echo-reply', id: icmp.id, seq: icmp.seq } });
-      else this.probes.set(`${deviceId}|${icmp.id}|${icmp.seq}`, { type: icmp.type, from: packet.src });
+      else this.probes.set(`${deviceId}|${icmp.id}|${icmp.seq}`, { type: icmp.type, from: packet.src, ttl: packet.ttl });
       return;
     }
 
@@ -527,13 +531,16 @@ export class L3 {
   ping(deviceId: string, destination: string, count = 5): PingResult {
     let symbols = '';
     let received = 0;
+    const replies: NonNullable<PingResult['replies']> = [];
+    const initialTtl = this.net.device(deviceId).host ? 128 : 255;
     for (let i = 0; i < count; i++) {
-      const r = this.probe(deviceId, destination, this.echo(destination, 255));
+      const r = this.probe(deviceId, destination, this.echo(destination, initialTtl));
       const symbol = r === 'timeout' ? '.' : r.type === 'echo-reply' ? '!' : r.type === 'unreachable' ? 'U' : '&';
       if (symbol === '!') received++;
       symbols += symbol;
+      replies.push(r === 'timeout' ? { symbol } : { symbol, from: r.from, ...(r.ttl !== undefined ? { ttl: r.ttl } : symbol === '!' ? { ttl: initialTtl } : {}) });
     }
-    return { symbols, sent: count, received };
+    return { symbols, sent: count, received, replies };
   }
 
   traceroute(deviceId: string, destination: string, maxHops = 30): TraceHop[] {

@@ -173,3 +173,6 @@ h1, h2, h3 { font-family: var(--font-heading); margin: 0; line-height: 1.2; }
 .coach footer { display: flex; justify-content: flex-end; gap: 8px; }
 .pulse-ui { outline: 2px solid var(--amber); outline-offset: 3px; animation: pulse-ui 1.2s ease-in-out infinite; }
 @keyframes pulse-ui { 50% { outline-color: rgba(251, 191, 36, 0.25); } }
+
+.host-settings .field { margin-bottom: 6px; }
+.host-settings .field input { padding: 6px 10px; }

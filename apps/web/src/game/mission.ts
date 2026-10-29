@@ -5,9 +5,10 @@ import { t, tx } from '../i18n.js';
 import { Coach, type CoachView } from './coach.js';
 import { CableLayer, portFrame } from '../scene/cables.js';
 import { buildDevice, highlightSocket, setLed, type DeviceView, type PortView } from '../scene/devices.js';
+import { buildWhiteboard } from '../scene/details.js';
 import type { Quality, Stage } from '../scene/stage.js';
 import { Hud } from '../ui/hud.js';
-import { closePanel, Consoles, openPanelKey, showHostPanel, showNotice } from '../ui/panels.js';
+import { closePanel, Consoles, openPanelKey, resetHostShells, showHostPanel, showNotice } from '../ui/panels.js';
 
 const HOME = { position: new THREE.Vector3(0, 1.78, 2.45), target: new THREE.Vector3(0, 0.86, 0.02) };
 const ACCEPTS: Record<CableType, PortSpec['kind'][]> = {
@@ -62,6 +63,7 @@ export class Mission {
 
   constructor(private readonly stage: Stage, readonly level: Level, private readonly events: MissionEvents) {
     stage.clearLevel();
+    resetHostShells();
     this.net = buildLevel(level);
     for (const d of level.devices) {
       const host = this.net.device(d.id).host;
@@ -72,7 +74,7 @@ export class Mission {
       this.picks.push(...view.body, ...[...view.ports.values()].map((p) => p.hit));
     }
     this.cables = new CableLayer(stage);
-    stage.level.add(this.cables.group);
+    stage.level.add(this.cables.group, buildWhiteboard(level));
     stage.controls.enabled = true;
     void stage.flyTo(HOME.position, HOME.target, 1.4);
 

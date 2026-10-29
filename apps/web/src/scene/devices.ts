@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { DeviceModel, PortSpec } from '@patchbay/sim-core';
 import { BENCH_TOP } from './room.js';
+import { addFeet, addRackEars, addVents, powerButton, roundedChassis } from './details.js';
 import { screenTexture, textTexture } from './textures.js';
 
 export type LedState = 'off' | 'green' | 'amber';
@@ -31,6 +32,7 @@ export interface DeviceView {
   /** Height of the object above its base, to frame the camera. */
   height: number;
   width: number;
+  depth: number;
 }
 
 const SOCKET: Record<string, [w: number, h: number]> = {
@@ -136,12 +138,14 @@ const ROUTER_SIZE: Record<string, [w: number, h: number, d: number, label: strin
 
 function buildRouter(id: string, model: DeviceModel, m: Materials, view: DeviceView): void {
   const [w, h, d, name] = ROUTER_SIZE[model.id] ?? [0.4, 0.06, 0.3, model.label];
-  const chassis = mesh(new THREE.BoxGeometry(w, h, d), m.chassis);
+  const chassis = roundedChassis(w, h, d, m.chassis);
   chassis.position.y = h / 2;
   const front = mesh(new THREE.BoxGeometry(w - 0.004, h - 0.004, 0.003), m.panel, false);
   front.position.set(0, h / 2, d / 2 + 0.0005);
   view.root.add(chassis, front);
   view.body.push(chassis, front);
+  addVents(view.root, w, h, d);
+  view.depth = d;
   const face = d / 2 + 0.002;
   const y = h / 2 - (h > 0.06 ? 0.012 : 0.002);
 
@@ -185,12 +189,14 @@ function buildRouter(id: string, model: DeviceModel, m: Materials, view: DeviceV
 
 function buildSwitch(id: string, model: DeviceModel, m: Materials, view: DeviceView): void {
   const [w, h, d] = [0.445, 0.044, 0.236];
-  const chassis = mesh(new THREE.BoxGeometry(w, h, d), m.chassis);
+  const chassis = roundedChassis(w, h, d, m.chassis);
   chassis.position.y = h / 2;
   const front = mesh(new THREE.BoxGeometry(w - 0.004, h - 0.004, 0.003), m.panel, false);
   front.position.set(0, h / 2, d / 2 + 0.0005);
   view.root.add(chassis, front);
   view.body.push(chassis, front);
+  addVents(view.root, w, h, d);
+  view.depth = d;
   const face = d / 2 + 0.002;
   label(view.root, `${id} · 2960`, -w / 2 + 0.045, h / 2 + 0.008, face, 0.07, 0.012, '#e2e8f0');
   powerLed(view.root, -w / 2 + 0.015, h / 2 - 0.006, face);
@@ -224,7 +230,7 @@ function buildSwitch(id: string, model: DeviceModel, m: Materials, view: DeviceV
 
 function buildDesktop(id: string, model: DeviceModel, m: Materials, view: DeviceView, caption: string): void {
   // Tower on the right, monitor on the left; the tower's ports face the player.
-  const tower = mesh(new THREE.BoxGeometry(0.17, 0.36, 0.34), m.plastic);
+  const tower = roundedChassis(0.17, 0.36, 0.34, m.plastic);
   tower.position.set(0.2, 0.18, 0);
   const stripe = mesh(new THREE.BoxGeometry(0.004, 0.28, 0.002), new THREE.MeshStandardMaterial({ color: '#38bdf8', emissive: '#38bdf8', emissiveIntensity: 1.6 }), false);
   stripe.position.set(0.15, 0.2, 0.171);
@@ -238,7 +244,11 @@ function buildDesktop(id: string, model: DeviceModel, m: Materials, view: Device
   base.position.set(-0.12, 0.005, -0.02);
   const keyboard = mesh(new THREE.BoxGeometry(0.34, 0.015, 0.11), m.plastic);
   keyboard.position.set(-0.12, 0.0075, 0.16);
-  view.root.add(tower, stripe, screenFrame, screen, stand, base, keyboard);
+  const bay = mesh(new THREE.BoxGeometry(0.12, 0.004, 0.002), m.chassis, false);
+  bay.position.set(0.21, 0.29, 0.171);
+  view.root.add(tower, stripe, screenFrame, screen, stand, base, keyboard, bay);
+  powerButton(view.root, 0.21, 0.25, 0.172);
+  view.depth = 0.34;
   view.body.push(tower, screenFrame, screen, keyboard);
   const face = 0.17;
   const nic = model.ports.find((p) => p.kind === 'ethernet');
@@ -269,7 +279,10 @@ function buildLaptop(id: string, model: DeviceModel, m: Materials, view: DeviceV
   lid.add(lidShell, screen);
   lid.position.set(0, 0.02, -0.115);
   lid.rotation.x = -0.28;
-  view.root.add(base, keys, lid);
+  const pad = mesh(new THREE.BoxGeometry(0.1, 0.001, 0.06), new THREE.MeshStandardMaterial({ color: '#1e293b', metalness: 0.3, roughness: 0.35 }), false);
+  pad.position.set(0, 0.0205, 0.075);
+  view.root.add(base, keys, lid, pad);
+  view.depth = 0.23;
   view.body.push(base, keys, lidShell, screen);
   const face = 0.115;
   const rs232 = model.ports.find((p) => p.kind === 'rs232');
@@ -288,7 +301,7 @@ export function buildDevice(id: string, model: DeviceModel, position: [number, n
   const m = materials();
   const shape: DeviceShape =
     model.kind === 'router' ? 'router' : model.kind === 'switch' ? 'switch' : model.kind === 'server' ? 'server' : id.toUpperCase().startsWith('ADMIN') ? 'laptop' : 'pc';
-  const view: DeviceView = { id, shape, root: new THREE.Group(), ports: new Map(), body: [], height: 0.1, width: 0.4 };
+  const view: DeviceView = { id, shape, root: new THREE.Group(), ports: new Map(), body: [], height: 0.1, width: 0.4, depth: 0.3 };
   view.root.name = id;
 
   if (shape === 'router') buildRouter(id, model, m, view);
@@ -299,7 +312,10 @@ export function buildDevice(id: string, model: DeviceModel, position: [number, n
   const [x, y, z] = position ?? [0, BENCH_TOP, 0];
   // Rack-mounted gear keeps its height; everything else stands on the bench.
   const inRack = (shape === 'router' || shape === 'switch') && Math.abs(x) < 0.3 && z < -0.15;
-  view.root.position.set(x, inRack ? y : BENCH_TOP, z);
+  if (inRack) addRackEars(view.root, view.width, view.height, view.depth);
+  else if (shape === 'router' || shape === 'switch') addFeet(view.root, view.width, view.depth);
+  // Desktop units stand on their feet, 4 mm above the bench.
+  view.root.position.set(x, inRack ? y : BENCH_TOP + (shape === 'router' || shape === 'switch' ? 0.004 : 0), z);
   for (const b of view.body) b.userData.device = id;
   return view;
 }

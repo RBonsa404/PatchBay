@@ -4,12 +4,11 @@ Règle : un milestone est terminé quand ses critères sont verts (tests, typech
 
 ## Prochaine étape
 
-**M0 à M6 sont faits, M7 a une première version jouable** : `apps/web` (Three.js) fait jouer les 2 missions du MVP de bout en bout dans une salle technique en 3D (testé par de vrais clics simulés : 100/100 sur les deux missions). Ajouté ensuite : paquets animés sur les câbles (ARP ambre, requête cyan, réponse verte, erreur rouge) rejoués dans l'ordre réel après chaque commande ou ping (`Network.onWire`), sons synthétisés (Web Audio, coupure mémorisée), tutoriel guidé de la mission 1 (bulle coach, anneau sur le port à viser, étapes validées par l'état réel). Prochaines étapes de M7 : modèles plus détaillés (ou GLB sous licence libre, `apps/web/ASSETS.md`), tutoriel guidé des premières actions, terminal des PC (`ipconfig`, `ping` en ligne de commande), mode manette/tactile, PWA hors ligne et moteur dans un Web Worker.
+**M0 à M6 sont faits, M7 a une première version jouable** : `apps/web` (Three.js) fait jouer les 2 missions du MVP de bout en bout dans une salle technique en 3D (testé par de vrais clics simulés : 100/100 sur les deux missions). Ajouté ensuite : paquets animés sur les câbles (ARP ambre, requête cyan, réponse verte, erreur rouge) rejoués dans l'ordre réel après chaque commande ou ping (`Network.onWire`), sons synthétisés (Web Audio, coupure mémorisée), tutoriel guidé de la mission 1 (bulle coach, anneau sur le port à viser, étapes validées par l'état réel). Puis : invite de commandes des PC (`ipconfig [/all]`, `ping [-n N]`, `tracert`, `arp -a`, sorties d'un Windows français, TTL réels 128/255 : `host/shell.ts`), châssis arrondis avec grilles d'aération, oreilles de baie vissées, pieds en caoutchouc, bouton d'alimentation, pavé tactile, et un **tableau blanc** qui dessine le plan de la mission (appareils, liaisons, ports ; pas les types de câble). Reste dans M7 : mode manette/tactile, PWA hors ligne, moteur dans un Web Worker. Ensuite, **M8 : refonte visuelle complète** demandée par le porteur de projet (liste ci-dessous).
 
 À faire en parallèle (outillage) : passer Vitest en version 5 (alertes `npm audit` sur Vitest 2 / esbuild, outils de développement uniquement).
 
 Dettes connues de M4 :
-- Pas de commandes sur les PC (`ipconfig`, `ping` depuis un terminal de PC) : seulement l'API `Network.configureHost` / `Network.ping`. À prévoir avec l'interface (M7).
 - RTT fixé à 1 ms, âge ARP toujours 0 : le moteur n'a pas encore d'horloge logique (`tick`). Pas de timeout ARP, pas de proxy ARP, pas de file d'attente ARP (le paquet qui déclenche l'ARP est abandonné, comme IOS : d'où le `.!!!!`).
 - Une route statique n'est installée que si son saut suivant est dans un réseau directement connecté (pas de récursivité). Pas d'ECMP, pas de `ip classless`, pas de résumé automatique.
 - ICMP seulement (echo, time-exceeded, unreachable). `ping` simple (pas de ping étendu), `traceroute` par ICMP (le vrai utilise UDP).
@@ -97,7 +96,19 @@ Réalisé (première version) : `apps/web` avec Vite + Three.js (ADR 0001 : inte
 - **Design de l'interface** : maquettes et système visuel (menus, HUD, écrans de mission) faits avec les outils de design disponibles (Claude Design / artefacts de type Design) avant intégration.
 - **Ce que le moteur fournit déjà** : `catalog` (ports par modèle, polarité), `canPlug`/`connect`/`disconnect`, `linkState` (voyants), `drainSyslog`, `consoleTarget`, `snapshot`/`restore`, `sendFrame`/`ping` (trafic). Aucune logique réseau ne doit être réimplémentée côté 3D.
 
-## M8 — Finition MVP
+## M8 — Finition MVP et refonte visuelle
+
+Retours du porteur de projet après la première version jouable (à traiter quand M7 est fini ; les 2 niveaux doivent être « incroyables » avant d'en ajouter d'autres) :
+- **Interface** : jugée « pas jolie, fait trop IA ». Refaire un système visuel professionnel (menus, HUD, panneaux, consoles) avec une vraie identité de jeu plutôt que des cartes en verre génériques : typographie et hiérarchie soignées, moins d'effets lumineux décoratifs, iconographie cohérente. Passer par des maquettes (Claude Design) avant d'intégrer.
+- **Logos** : créer un logo PatchBay ; intégrer le logo du Club Informatique de l'IST et la charte (`docs/06-charte-club-ist.md`) dans l'écran titre, les crédits et la salle.
+- **Salle** : plus réaliste et immersive (les plantes en pot font « jouet ») : vrais matériaux (béton, faux plancher technique, chemins de câbles au plafond, éclairage néon, baie avec panneau de brassage, poussière/variations), éventuellement modèles CC0 (`apps/web/ASSETS.md`).
+- **Équipements posés** : le routeur semble flotter. Contact au sol : ombres de contact (AO), pieds visibles, aucune lame d'air, objets ancrés sur l'établi ou dans la baie.
+- **Câbles** : quand plusieurs sont branchés, ils s'emmêlent. Trajets plus propres : courbes avec gravité, passage par des guides/peignes, écartement entre câbles voisins, couleurs par type.
+- **Tutoriel incarné** : un personnage (mentor du club) qui présente la mission et guide le tutoriel, avec bulles ou voix ; éventuellement un assistant intégré qui répond aux questions de l'élève.
+- Garder et développer le **tableau blanc** (apprécié).
+- Notes de Claude : animation d'entrée dans la salle, son d'ambiance (ventilateurs), retour visuel au survol des ports, écran de résultats plus spectaculaire, captures pour la présentation.
+
+Autres points :
 - Accessibilité (clavier, contrastes), didacticiel intégré, mode examen.
 - Import `running-config` → niveau (outil formateur).
 - Performance, packaging, documentation utilisateur.

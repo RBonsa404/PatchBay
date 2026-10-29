@@ -1,4 +1,4 @@
-import type { Cli, Network } from '@patchbay/sim-core';
+import { runHostCommand, SHELL_PROMPT, type Cli, type Network, type ShellResult } from '@patchbay/sim-core';
 import { t } from '../i18n.js';
 import { h, ui } from './dom.js';
 
@@ -143,7 +143,17 @@ export class Consoles {
   }
 }
 
-/** IP settings and ping of a PC, plus a shortcut to the console it is cabled to. */
+/** Scrollback and history of each PC's command prompt, kept while the mission lasts. */
+const hostScreens = new Map<string, string[]>();
+const hostHistory = new Map<string, string[]>();
+
+/** Forget the PCs' prompts (a new mission starts). */
+export function resetHostShells(): void {
+  hostScreens.clear();
+  hostHistory.clear();
+}
+
+/** IP settings and command prompt of a PC, plus a shortcut to the console it is cabled to. */
 export function showHostPanel(net: Network, deviceId: string, onChange: () => void, openConsole: (() => void) | null, around: Around = (a) => a()): void {
   const host = net.device(deviceId).host ?? {};
   const field = (label: string, value: string | undefined): [HTMLElement, HTMLInputElement] => {
@@ -153,8 +163,7 @@ export function showHostPanel(net: Network, deviceId: string, onChange: () => vo
   const [ipRow, ip] = field(t('host.ip'), host.ip);
   const [maskRow, mask] = field(t('host.mask'), host.mask);
   const [gwRow, gw] = field(t('host.gateway'), host.gateway);
-  const [dstRow, dst] = field(t('host.pingTo'), '');
-  const output = h('div', { class: 'cmd-output' });
+  const status = h('div', { class: 'help' });
 
   const apply = (): void => {
     const settings: { ip?: string; mask?: string; gateway?: string; services?: { tcp?: number[]; udp?: number[] } } = {};
@@ -164,41 +173,73 @@ export function showHostPanel(net: Network, deviceId: string, onChange: () => vo
     if (host.services) settings.services = host.services;
     try {
       net.configureHost(deviceId, settings);
-      output.textContent = t('host.applied');
+      status.textContent = t('host.applied');
       onChange();
     } catch (err) {
-      output.textContent = (err as Error).message;
+      status.textContent = (err as Error).message;
     }
   };
-  const ping = (): void => {
-    const target = dst.value.trim();
-    if (!target) return;
-    let r = { symbols: '', sent: 0, received: 0 };
+
+  // The command prompt: ipconfig, ping, tracert, arp -a, as on a French Windows.
+  const lines = hostScreens.get(deviceId) ?? [t('host.shellBanner'), ''];
+  hostScreens.set(deviceId, lines);
+  const screen = h('pre', { 'aria-live': 'polite' });
+  const input: HTMLInputElement = h('input', { 'aria-label': 'Commande', spellcheck: 'false', autocomplete: 'off' });
+  const history = hostHistory.get(deviceId) ?? [];
+  hostHistory.set(deviceId, history);
+  let position = history.length;
+  const paint = (): void => {
+    screen.textContent = lines.join('\n');
+    screen.scrollTop = screen.scrollHeight;
+  };
+  const run = (line: string): void => {
+    let result: ShellResult = { output: '' };
     around(() => {
-      r = net.ping(deviceId, target, 4);
+      result = runHostCommand(net, deviceId, line);
     });
-    const lost = r.sent - r.received;
-    output.textContent = [
-      `${t('host.pingSending')} ${target}`,
-      '',
-      r.symbols,
-      '',
-      t('host.pingStats', { sent: r.sent, received: r.received, lost }),
-      '',
-      t('host.pingLegend'),
-    ].join('\n');
+    if (result.clear) lines.length = 0;
+    else lines.push(SHELL_PROMPT + line, ...(result.output ? result.output.split('\n') : []), '');
+    if (line.trim()) {
+      history.push(line);
+      position = history.length;
+    }
+    paint();
     onChange();
   };
-  dst.addEventListener('keydown', (e) => e.key === 'Enter' && ping());
+  const form = h(
+    'form',
+    {
+      onsubmit: (e: Event) => {
+        e.preventDefault();
+        const line = input.value;
+        input.value = '';
+        run(line);
+      },
+    },
+    h('span', { class: 'prompt' }, SHELL_PROMPT),
+    input,
+  );
+  input.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      position = Math.max(0, Math.min(history.length, position + (e.key === 'ArrowUp' ? -1 : 1)));
+      input.value = history[position] ?? '';
+    }
+    e.stopPropagation();
+  });
 
   panel(`${t('host.title')} ${deviceId}`, [
-    ipRow,
-    maskRow,
-    gwRow,
-    h('div', { class: 'title-actions', style: { justifyContent: 'flex-start' } }, h('button', { class: 'btn small', onclick: apply }, t('host.apply')), openConsole ? h('button', { class: 'btn small', onclick: openConsole }, t('host.openConsole')) : null),
-    h('div', { style: { height: '14px' } }),
-    dstRow,
-    h('button', { class: 'btn small primary', onclick: ping }, t('host.ping')),
-    output,
+    h('div', { class: 'host-settings' }, ipRow, maskRow, gwRow),
+    h(
+      'div',
+      { class: 'title-actions', style: { justifyContent: 'flex-start', marginBottom: '10px' } },
+      h('button', { class: 'btn small', onclick: apply }, t('host.apply')),
+      openConsole ? h('button', { class: 'btn small', onclick: openConsole }, t('host.openConsole')) : null,
+      status,
+    ),
+    h('div', { class: 'terminal', onclick: () => input.focus() }, screen, form),
+    h('div', { class: 'help' }, t('host.shellHelp')),
   ], `host:${deviceId}`);
+  paint();
+  input.focus();
 }

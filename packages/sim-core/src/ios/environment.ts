@@ -20,6 +20,8 @@ export interface PingResult {
   symbols: string;
   sent: number;
   received: number;
+  /** Per echo: who answered and the TTL left (absent on timeouts). Used by the PCs' `ping` output. */
+  replies?: { symbol: string; from?: string; ttl?: number }[];
 }
 
 export interface TraceHop {

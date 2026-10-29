@@ -20,3 +20,5 @@ export type { RouteCode } from './protocols/l3/routing.js';
 export { canPlug } from './physical/rules.js';
 export type { EthernetFrame } from './engine/l2.js';
 export type { IpPacket, L3Payload } from './engine/l3.js';
+export { runHostCommand, SHELL_PROMPT } from './host/shell.js';
+export type { ShellResult } from './host/shell.js';
