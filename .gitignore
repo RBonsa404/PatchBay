@@ -4,3 +4,8 @@ coverage/
 *.log
 .DS_Store
 .env
+
+# Course material (Cisco copyright): kept locally, never published
+course/
+docs/references/*
+!docs/references/INDEX.md

@@ -73,10 +73,18 @@ Réalisé : `protocols/l3/ip.ts` et `routing.ts` (table de routage pure : connec
 - Schéma Zod des niveaux, chargeur, 15 niveaux de la campagne MVP (`docs/02-mvp-spec.md`).
 - Solutions de référence rejouables (scripts de commandes) → chaque niveau est testé automatiquement : la solution passe, l'état initial échoue.
 
-## M7 — Interface web
-- Vite + React, scène 2D PixiJS, glisser-déposer des câbles, terminal xterm.js, HUD objectifs.
-- Moteur dans un Web Worker, sauvegarde IndexedDB, i18n fr/en.
-- PWA hors ligne, test sur PC 4 Go.
+## M7 — Le jeu en 3D (interface finale)
+
+**C'est l'objectif réel du projet** : le moteur (M0–M6) n'en est que la base. Le joueur doit *voir* le matériel, prendre un câble à la souris, chercher le bon port (Ethernet, série, console) sur la face avant ou arrière, brancher, et voir les voyants réagir. Un simulateur 2D de type Packet Tracer ne suffit pas. L'aperçu `apps/preview` n'est qu'un outil de vérification du moteur.
+
+- **M7a — Scène 3D** (Three.js) : salle/atelier avec établi et baie ; modèles basse définition des équipements (routeur 1841/2911, switch 2960, PC portable/tour, serveur) avec **ports réels modélisés** (position, type, orientation) dérivés de `model/catalog.ts` ; caméra orbitale, vue face avant/arrière, zoom sur un port. Au départ modèles procéduraux (boîtiers + ports), remplaçables par des modèles GLB sans toucher à la logique.
+- **M7b — Câblage physique** : inventaire de câbles (droit, croisé, console, série DCE/DTE) ; saisir un câble, le déplacer (le câble suit la souris avec une courbe), l'approcher d'un port (surbrillance, refus visuel si le connecteur ne rentre pas : `canPlug`), le brancher (`Network.connect`), le débrancher (`disconnect`). Mauvais câble = il se branche mais le voyant reste éteint (`linkState`). Support tactile et, plus tard, manette.
+- **M7c — Voyants et retours** : LED de lien vert/orange/éteint par port d'après `linkState`, activité lors du passage de trames, sons de branchement, indicateurs d'alimentation ; messages syslog affichés en console.
+- **M7d — Console et poste de travail** : s'asseoir devant un PC portable, brancher le câble console, ouvrir le terminal (xterm.js) branché sur `Network.consoleTarget` ; terminal PC (ipconfig, ping) ; HUD d'objectifs, indices, chronomètre.
+- **M7e — Animations** : câbles qui se déroulent, paquets qui circulent (visualisation des trames à partir de `FrameTrace`/ICMP), transitions de caméra, mode « visualiser le trafic ».
+- **Plomberie** : Vite + React pour l'interface autour de la scène ; moteur dans un Web Worker ; sauvegarde IndexedDB ; i18n fr/en ; PWA hors ligne.
+- **Contraintes de performance** : PC de 4 Go, WebGL2, modèles légers (budget de triangles par scène), éclairage simple (pas de ray-tracing ni de post-traitement lourd), qualité réglable, repli en rendu simplifié.
+- **Ce que le moteur fournit déjà** : `catalog` (ports par modèle, polarité), `canPlug`/`connect`/`disconnect`, `linkState` (voyants), `drainSyslog`, `consoleTarget`, `snapshot`/`restore`, `sendFrame`/`ping` (trafic). Aucune logique réseau ne doit être réimplémentée côté 3D.
 
 ## M8 — Finition MVP
 - Accessibilité (clavier, contrastes), didacticiel intégré, mode examen.
@@ -84,7 +92,7 @@ Réalisé : `protocols/l3/ip.ts` et `routing.ts` (table de routage pure : connec
 - Performance, packaging, documentation utilisateur.
 
 ## Après le MVP
-DHCP, STP/EtherChannel, EIGRP/RIP, switch L3/SVI, port-security, IPv6, éditeur de niveaux pour formateurs, 3D, manette. VR seulement si demandé plus tard.
+DHCP, STP/EtherChannel, EIGRP/RIP, switch L3/SVI, port-security, IPv6, éditeur de niveaux pour formateurs, manette, mode multijoueur/classe. VR seulement si demandé plus tard (la 3D de M7 est déjà au cœur du jeu).
 
 ## Risques
 - **Fidélité IOS** : dériver des PDF + tests golden ; ne pas inventer.

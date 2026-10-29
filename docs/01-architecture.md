@@ -21,7 +21,7 @@ Le **moteur est le cœur du projet**. Il est indépendant de l'interface : on po
 | Tests | Vitest | Rapide, TS natif |
 | Validation | Zod | Niveaux et sauvegardes validés aux frontières |
 | UI | Vite + React | Léger, build statique offline |
-| Rendu | PixiJS (2D) puis éventuellement Three.js | 2D d'abord : plus rapide, plus léger |
+| Rendu | Three.js (WebGL2, 3D) | Le jeu est en 3D : voir les équipements, saisir et brancher les câbles port par port |
 | Terminal | xterm.js | Console IOS crédible |
 | Hors ligne | PWA (service worker) | Usage sans connexion |
 
@@ -109,7 +109,7 @@ Un niveau déclare des **objectifs** (voir `docs/04-level-format.md`) : tests de
 
 ## Interface `apps/web` (milestone M6+)
 
-- Scène 2D : baie/salle, équipements, câbles à glisser-déposer entre ports ; vue « face arrière » avec ports lisibles.
+- Scène 3D (Three.js) : salle/baie, équipements avec leurs ports modélisés d'après le catalogue, câbles saisis à la souris et branchés port par port, voyants pilotés par `linkState`, animations (voir M7a–M7e de la roadmap). La scène ne contient aucune logique réseau : elle lit l'état du moteur et lui envoie des actions (`connect`, `disconnect`, commandes de console).
 - Panneau terminal par équipement (xterm.js) branché sur `sim-core`.
 - HUD : objectifs, indices, chronomètre, score.
 - État du jeu dans un store (Zustand) ; le moteur est instancié dans un Web Worker pour ne pas bloquer le rendu.

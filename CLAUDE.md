@@ -44,7 +44,8 @@ npm run test -w @patchbay/sim-core   # un seul package
 ## Structure
 
 ```
-apps/web/            interface (Vite + React + PixiJS 2D ; 3D ultérieur)  [milestone M6+]
+apps/preview/        page de vérification du moteur (topologie 2D + consoles) : outil de dev, PAS l'interface finale
+apps/web/            LE JEU : scène 3D Three.js (équipements, ports, câbles à saisir/brancher, voyants, animations) + Vite/React  [M7]
 packages/sim-core/   moteur : modèle physique, mini-IOS, protocoles, validation
 packages/content/    niveaux (JSON) + schémas Zod + outils d'import de running-config [M7]
 docs/                vision, architecture, specs, roadmap, ADR, references/ (PDF de cours)

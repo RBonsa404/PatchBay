@@ -18,6 +18,10 @@ Au Burkina Faso (et ailleurs), les cours CCNA se limitent à Cisco Packet Tracer
 - Formateurs : ils fournissent ou écrivent des niveaux (JSON, puis éditeur).
 - Contexte : PC modestes, connexion limitée → application web légère, installable, **100 % hors ligne**.
 
+## L'expérience visée : un jeu 3D, pas un Packet Tracer
+
+Le joueur est dans une salle technique. Il **voit** le routeur, tourne autour, **saisit un câble à la souris**, cherche le bon port sur la face arrière (Ethernet, série, console), l'enfiche, et regarde les voyants s'allumer ou non. Il s'assoit devant un PC, branche le câble console, ouvre le terminal et configure. Les animations (câbles, paquets, caméra) et le retour visuel font partie du cœur du jeu. Le moteur de simulation (déjà en place) garantit que ce qu'il voit est *vrai* : un mauvais câble ne s'allume pas, un VLAN erroné isole vraiment les PC.
+
 ## Principes produit
 
 - **Réalisme pédagogique** avant réalisme graphique : la fidélité du CLI et des règles de câblage prime sur la 3D.
