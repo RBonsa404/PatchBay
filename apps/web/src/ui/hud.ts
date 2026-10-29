@@ -107,7 +107,7 @@ export class Hud {
         h('span', { class: 'count' }, `${count} ${t('cable.left')}`),
       );
     });
-    this.inventory.replaceChildren(...slots, h('span', { class: 'tool-hint' }, t('hud.toolHint')));
+    this.inventory.replaceChildren(...slots, h('span', { class: 'tool-hint' }, t(matchMedia('(pointer: coarse)').matches ? 'hud.toolHintTouch' : 'hud.toolHint')));
   }
 
   showTooltip(text: string | null, x = 0, y = 0, bad = false): void {

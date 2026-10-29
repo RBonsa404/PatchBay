@@ -162,6 +162,27 @@ h1, h2, h3 { font-family: var(--font-heading); margin: 0; line-height: 1.2; }
   .panel { left: 16px; width: auto; top: auto; height: 55vh; }
   .inventory { flex-wrap: wrap; justify-content: center; width: calc(100vw - 32px); }
 }
+@media (max-width: 600px) {
+  .hud-top { flex-direction: column; }
+  .mission-tag { display: none; }
+  .hud-actions { justify-content: flex-start; }
+  .objectives { top: auto; bottom: 150px; max-height: 22vh; font-size: 13px; }
+  .cable-slot { min-width: 0; padding: 6px 10px 6px 8px; }
+  .inventory .tool-hint { display: none; }
+  .coach { top: 104px; bottom: auto; }
+}
+@media (pointer: coarse) {
+  .btn.small { min-height: 40px; }
+}
+
+/* ---- controller --------------------------------------------------------------------------------------------------- */
+.pad-cursor {
+  position: fixed; left: -11px; top: -11px; width: 22px; height: 22px; border-radius: 50%; z-index: 100; pointer-events: none;
+  border: 2px solid var(--amber); box-shadow: 0 0 12px rgba(251, 191, 36, 0.6), inset 0 0 0 4px rgba(7, 13, 30, 0.6);
+}
+.pad-cursor::after { content: ''; position: absolute; inset: 8px; border-radius: 50%; background: var(--amber); }
+.pad-hover { outline: 2px solid var(--amber); outline-offset: 2px; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }

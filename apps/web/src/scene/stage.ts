@@ -8,6 +8,9 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 
 export type Quality = 'low' | 'medium' | 'high';
 
+/** Vertical field of view on a wide screen, in degrees. */
+const BASE_FOV = 48;
+
 const easeInOut = (t: number): number => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 
 /** A guess good enough to start with; the player can change it from the HUD. */
@@ -47,7 +50,7 @@ export class Stage {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(this.renderer.domElement);
 
-    this.camera = new THREE.PerspectiveCamera(48, 1, 0.02, 60);
+    this.camera = new THREE.PerspectiveCamera(BASE_FOV, 1, 0.02, 60);
     this.camera.position.set(0, 1.62, 2.15);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -157,6 +160,11 @@ export class Stage {
     const w = this.container.clientWidth || window.innerWidth;
     const h = this.container.clientHeight || window.innerHeight;
     this.camera.aspect = w / h;
+    // Keep the bench's width in frame on narrow screens (phone in portrait): widen the vertical angle instead of
+    // cropping the sides.
+    const minAspect = 1.5;
+    const halfWidth = Math.tan(THREE.MathUtils.degToRad(BASE_FOV / 2)) * minAspect;
+    this.camera.fov = this.camera.aspect >= minAspect ? BASE_FOV : Math.min(90, THREE.MathUtils.radToDeg(2 * Math.atan(halfWidth / this.camera.aspect)));
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
     this.composer.setSize(w, h);

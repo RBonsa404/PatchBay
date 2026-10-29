@@ -8,10 +8,12 @@ import * as THREE from 'three';
 import { campaign } from '@patchbay/content';
 import { catalog, type Level } from '@patchbay/sim-core';
 import { sound } from './audio.js';
+import { startGamepad } from './game/gamepad.js';
 import { Mission } from './game/mission.js';
 import { buildDevice } from './scene/devices.js';
 import { buildRoom } from './scene/room.js';
 import { detectQuality, Stage } from './scene/stage.js';
+import { h } from './ui/dom.js';
 import { progress, showBriefing, showMissions, showResults, showTitle } from './ui/screens.js';
 
 // A soft tick on every button of the interface.
@@ -21,6 +23,20 @@ document.addEventListener('click', (e) => {
 
 const stage = new Stage(document.getElementById('stage') as HTMLElement, detectQuality());
 stage.scene.add(buildRoom());
+
+/** A message on top of whatever screen is shown (outside missions, which have their own toasts). */
+function notify(text: string): void {
+  const el = h('div', { class: 'toast glass' }, text);
+  const box = document.querySelector('.toasts') ?? document.body.appendChild(h('div', { class: 'toasts', 'aria-live': 'polite' }));
+  box.append(el);
+  setTimeout(() => el.remove(), 4200);
+}
+startGamepad(stage, notify);
+
+// Installable and playable offline once loaded (production builds only: the dev server reloads modules itself).
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => void navigator.serviceWorker.register('./sw.js').catch(() => undefined));
+}
 
 let mission: Mission | null = null;
 let stopShowcase: (() => void) | null = null;

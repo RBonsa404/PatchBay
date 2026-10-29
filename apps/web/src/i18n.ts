@@ -3,7 +3,7 @@ import type { Text } from '@patchbay/sim-core';
 /** Interface strings. French is the reference; an English table can be added with the same keys. */
 const fr = {
   'app.club': "Club Informatique de l'IST",
-  'title.tagline': 'Branche, configure, dépanne. Le réseau comme sur le terrain, sans Packet Tracer.',
+  'title.tagline': 'Branche, configure, dépanne. Le réseau comme sur le terrain.',
   'title.play': 'Jouer',
   'title.missions': 'Missions',
   'title.credit': "Un projet du Club Informatique de l'IST · Burkina Faso",
@@ -23,6 +23,7 @@ const fr = {
   'hud.quality': 'Qualité',
   'hud.view': 'Vue d’ensemble',
   'hud.toolHint': 'Choisis un câble, puis clique sur deux ports. Clic droit sur un port : débrancher.',
+  'hud.toolHintTouch': 'Choisis un câble, puis touche deux ports. Appui long sur un port : débrancher.',
   'hud.points': 'pts',
   'cable.straight': 'Câble droit',
   'cable.crossover': 'Câble croisé',

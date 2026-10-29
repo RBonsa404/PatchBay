@@ -3,6 +3,7 @@ import { buildLevel, canPlug, catalog, evaluate, type CableEnd, type CableType, 
 import { sound } from '../audio.js';
 import { t, tx } from '../i18n.js';
 import { Coach, type CoachView } from './coach.js';
+import { setGameTarget, type GameTarget } from './gamepad.js';
 import { CableLayer, portFrame } from '../scene/cables.js';
 import { buildDevice, highlightSocket, setLed, type DeviceView, type PortView } from '../scene/devices.js';
 import { buildWhiteboard } from '../scene/details.js';
@@ -33,6 +34,8 @@ function packetColour(frame: EthernetFrame): string {
 /** Seconds between two animated hops, and the most hops replayed for one action. */
 const HOP_GAP = 0.16;
 const MAX_HOPS = 90;
+/** How long a finger must stay down to unplug (the touch version of the right click). */
+const LONG_PRESS_MS = 550;
 
 export interface MissionEvents {
   complete(evaluation: Evaluation): void;
@@ -139,28 +142,88 @@ export class Mission {
 
   // ---- input -----------------------------------------------------------------------------------------------------
 
+  /**
+   * Mouse, touch and pen go through pointer events. On a touch screen there is no hover and no right button: a tap
+   * aims and acts at once, a long press unplugs, a double tap zooms (the browser turns it into `dblclick`).
+   */
   private listen(): void {
     const canvas = this.stage.renderer.domElement;
-    let down: { x: number; y: number } | null = null;
+    let down: { x: number; y: number; id: number } | null = null;
+    let press: ReturnType<typeof setTimeout> | null = null;
+    let pressed = false;
+    const cancelPress = (): void => {
+      if (press) clearTimeout(press);
+      press = null;
+    };
     const on = <K extends keyof HTMLElementEventMap>(target: HTMLElement | Window, type: K, fn: (e: HTMLElementEventMap[K]) => void): void => {
       target.addEventListener(type, fn as EventListener);
       this.cleanup.push(() => target.removeEventListener(type, fn as EventListener));
     };
-    on(canvas, 'pointermove', (e) => this.onMove(e));
-    on(canvas, 'pointerdown', (e) => (down = { x: e.clientX, y: e.clientY }));
+    on(canvas, 'pointermove', (e) => {
+      if (down && down.id === e.pointerId && Math.hypot(e.clientX - down.x, e.clientY - down.y) >= 6) cancelPress();
+      if (e.pointerType === 'touch' && down) return; // a finger dragging moves the camera, not the aim
+      this.aim(e.clientX, e.clientY);
+    });
+    on(canvas, 'pointerdown', (e) => {
+      if (down) {
+        // A second finger: pinch or pan, never a tap.
+        cancelPress();
+        down = null;
+        return;
+      }
+      down = { x: e.clientX, y: e.clientY, id: e.pointerId };
+      pressed = false;
+      if (e.pointerType === 'touch') {
+        this.aim(e.clientX, e.clientY);
+        press = setTimeout(() => {
+          pressed = true;
+          this.onUnplug();
+          navigator.vibrate?.(30);
+        }, LONG_PRESS_MS);
+      }
+    });
     on(canvas, 'pointerup', (e) => {
-      // A click, not the end of a camera drag.
-      if (down && e.button === 0 && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 6) this.onClick();
+      cancelPress();
+      // A click, not the end of a camera drag nor a long press.
+      if (down && down.id === e.pointerId && !pressed && e.button === 0 && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 6) {
+        if (e.pointerType === 'touch') this.aim(e.clientX, e.clientY);
+        this.onClick();
+        if (e.pointerType === 'touch') this.hud.showTooltip(null);
+      }
+      down = null;
+    });
+    on(canvas, 'pointercancel', () => {
+      cancelPress();
       down = null;
     });
     on(canvas, 'contextmenu', (e) => {
       e.preventDefault();
-      this.onUnplug();
+      if (!pressed) this.onUnplug();
     });
     on(canvas, 'dblclick', () => this.onFocus());
     on(window, 'keydown', (e) => {
       if (e.key === 'Escape') this.select(null);
     });
+    this.cleanup.push(cancelPress, setGameTarget(this.gameTarget()));
+  }
+
+  /** What a gamepad drives while this mission is on screen. */
+  private gameTarget(): GameTarget {
+    return {
+      canvas: this.stage.renderer.domElement,
+      aim: (x, y) => this.aim(x, y),
+      act: () => this.onClick(),
+      unplug: () => this.onUnplug(),
+      focus: () => this.onFocus(),
+      overview: () => void this.stage.flyTo(HOME.position, HOME.target),
+      cancel: () => (openPanelKey() ? closePanel() : this.select(null)),
+      cycleCable: (step) => {
+        const types = (Object.keys(ACCEPTS) as CableType[]).filter((type) => this.left(type) > 0);
+        if (types.length === 0) return;
+        const at = this.selected ? types.indexOf(this.selected) : -1;
+        this.select(types[(at + step + types.length) % types.length] ?? null);
+      },
+    };
   }
 
   private pick(): { port?: PortView; device?: string } {
@@ -174,9 +237,11 @@ export class Mission {
     return {};
   }
 
-  private onMove(e: PointerEvent): void {
+  /** Point at screen position (x, y): hover feedback, tooltip, and the cable in hand following. */
+  private aim(x: number, y: number): void {
     const rect = this.stage.renderer.domElement.getBoundingClientRect();
-    this.pointer.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+    this.pointer.set(((x - rect.left) / rect.width) * 2 - 1, -((y - rect.top) / rect.height) * 2 + 1);
+    const e = { clientX: x, clientY: y };
     const { port, device } = this.pick();
     if (this.hovered && this.hovered !== port) highlightSocket(this.hovered, 'none');
     this.hovered = port ?? null;
