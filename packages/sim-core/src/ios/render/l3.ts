@@ -18,19 +18,30 @@ export function renderRoutes(config: DeviceConfig, env: LinkEnvironment): string
     const s = env.linkState(name);
     return s.status === 'up' && s.protocol === 'up';
   };
-  const table = buildRoutingTable(config, up);
-  const gateway = table.find((r) => r.code === 'S' && isDefaultRoute(r));
+  const table = buildRoutingTable(config, up, env.ospf()?.routes ?? []);
+  const gateway = table.find(isDefaultRoute);
+
+  const lines: string[] = [];
+  for (const r of table) {
+    const code = isDefaultRoute(r) && r.code === 'S' ? 'S*' : isDefaultRoute(r) && r.code === 'O E2' ? 'O*E2' : r.code;
+    const head = `${code.padEnd(5)}${r.network}/${r.prefix} `;
+    if (r.code === 'C' || !r.nextHop) {
+      lines.push(`${head}is directly connected, ${r.iface}`);
+    } else if (r.code === 'S') {
+      lines.push(`${head}[${r.ad}/${r.metric}] via ${r.nextHop}`);
+    } else {
+      // Learned routes carry an age (always 00:00:00 here: no clock yet) and every equal-cost path on its own line.
+      lines.push(`${head}[${r.ad}/${r.metric}] via ${r.nextHop}, 00:00:00, ${r.iface}`);
+      for (const alt of r.alternates ?? []) lines.push(`${' '.repeat(head.length)}[${r.ad}/${r.metric}] via ${alt.nextHop}, 00:00:00, ${alt.iface}`);
+    }
+  }
 
   return [
     ...CODES,
     '',
     gateway ? `Gateway of last resort is ${gateway.nextHop ?? '0.0.0.0'} to network 0.0.0.0` : 'Gateway of last resort is not set',
     '',
-    ...table.map((r) => {
-      const code = r.code === 'S' && isDefaultRoute(r) ? 'S*' : r.code;
-      const target = r.nextHop ? `[${r.ad}/${r.metric}] via ${r.nextHop}` : `is directly connected, ${r.iface}`;
-      return `${code.padEnd(5)}${r.network}/${r.prefix} ${target}`;
-    }),
+    ...lines,
   ].join('\n');
 }
 

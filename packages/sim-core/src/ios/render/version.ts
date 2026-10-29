@@ -10,7 +10,7 @@ const TYPE_LABEL: Record<string, string> = {
 /** Simplified `show version`: stable, plausible, and deterministic (uptime is always 0 until the engine has a clock). */
 export function renderVersion(profile: DeviceProfile, config: DeviceConfig): string {
   const interfaces = profile.groups
-    .filter((g) => g.kind !== 'svi')
+    .filter((g) => g.kind === 'ethernet' || g.kind === 'serial')
     .map((g) => `${g.ids.length} ${TYPE_LABEL[g.type] ?? g.type} interface${g.ids.length > 1 ? 's' : ''}`);
 
   return [

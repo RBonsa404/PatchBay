@@ -31,6 +31,31 @@ export interface InterfaceConfig {
   aclOut?: string;
   /** NAT role (`ip nat inside` / `ip nat outside`). */
   natRole?: 'inside' | 'outside';
+  /** `bandwidth` in kbit/s; drives the OSPF cost. Unset = the hardware default. */
+  bandwidth?: number;
+  ospfCost?: number;
+  ospfPriority?: number;
+}
+
+export interface OspfNetwork {
+  network: string;
+  wildcard: string;
+  area: number;
+}
+
+/** One OSPF process (the simulator supports a single process per router). */
+export interface OspfConfig {
+  processId: number;
+  routerId?: string;
+  networks: OspfNetwork[];
+  /** `passive-interface default`: then `notPassive` lists the exceptions. */
+  passiveDefault: boolean;
+  passive: string[];
+  notPassive: string[];
+  /** `default-information originate [always]` */
+  defaultOriginate?: { always: boolean };
+  /** `auto-cost reference-bandwidth`, in Mbit/s. */
+  referenceBandwidth: number;
 }
 
 export interface NatStatic {
@@ -132,6 +157,7 @@ export interface DeviceConfig {
   staticRoutes: StaticRoute[];
   acls: AclConfig[];
   nat: NatConfig;
+  ospf?: OspfConfig;
   vlans: VlanConfig[];
   lines: LineConfig[];
   interfaces: InterfaceConfig[];

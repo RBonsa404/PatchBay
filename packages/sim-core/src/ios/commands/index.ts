@@ -6,6 +6,7 @@ import { interfaceCommands } from './interface.js';
 import { l3Commands } from './l3.js';
 import { lineCommands } from './line.js';
 import { natCommands } from './nat.js';
+import { ospfCommands } from './ospf.js';
 import { sessionCommands } from './session.js';
 import { showCommands } from './show.js';
 import { vlanCommands } from './vlan.js';
@@ -19,6 +20,7 @@ export const allCommands: CommandDef[] = [
   ...l3Commands,
   ...aclCommands,
   ...natCommands,
+  ...ospfCommands,
   ...fileCommands,
   ...showCommands,
 ];
@@ -67,6 +69,14 @@ export const groupHelp: Record<string, string> = {
   'show ip nat': 'IP NAT information',
   'clear ip nat': 'Clear NAT',
   'clear ip nat translation': 'Clear dynamic translation',
+  router: 'Enable a routing process',
+  'default-information': 'Control distribution of default information',
+  'auto-cost': 'Calculate OSPF interface cost according to bandwidth',
+  'passive-interface': 'Suppress routing updates on an interface',
+  'ip ospf': 'OSPF interface commands',
+  'show ip ospf': 'OSPF information',
+  'show ip ospf interface': 'Interface information',
+  'clear ip ospf': 'OSPF clear commands',
   'show ip': 'IP information',
   'show ip interface': 'IP interface status and configuration',
   line: 'Configure a terminal line',

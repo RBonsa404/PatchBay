@@ -1,7 +1,12 @@
 import type { DeviceConfig } from '../../model/config.js';
 import { ipToInt, maskToPrefix, networkOf, sameSubnet } from './ip.js';
 
-export type RouteCode = 'C' | 'S';
+export type RouteCode = 'C' | 'S' | 'O' | 'O IA' | 'O E2';
+
+export interface NextHop {
+  nextHop?: string;
+  iface?: string;
+}
 
 export interface Route {
   network: string;
@@ -15,16 +20,19 @@ export interface Route {
   nextHop?: string;
   /** Exit interface (for next-hop routes: the connected interface that reaches the next hop). */
   iface?: string;
+  /** Further equal-cost paths (OSPF); forwarding uses the primary one. */
+  alternates?: NextHop[];
 }
 
 export const isDefaultRoute = (r: Route): boolean => r.prefix === 0;
 
 /**
- * Routes that make it into the routing table, given which interfaces are up/up: connected networks, and static routes
- * whose next hop is reachable through a connected network (or whose exit interface is up). For one prefix the lowest
- * administrative distance wins, which is what makes floating static routes work.
+ * Routes that make it into the routing table, given which interfaces are up/up: connected networks, static routes
+ * whose next hop is reachable through a connected network (or whose exit interface is up), and routes learned from a
+ * routing protocol (`learned`, e.g. OSPF with distance 110). For one prefix the lowest administrative distance wins,
+ * which is what makes floating static routes work.
  */
-export function buildRoutingTable(config: DeviceConfig, isUp: (interfaceName: string) => boolean): Route[] {
+export function buildRoutingTable(config: DeviceConfig, isUp: (interfaceName: string) => boolean, learned: Route[] = []): Route[] {
   const connected: Route[] = [];
   for (const ifc of config.interfaces) {
     if (!ifc.ip || !isUp(ifc.name)) continue;
@@ -54,6 +62,7 @@ export function buildRoutingTable(config: DeviceConfig, isUp: (interfaceName: st
     }
   }
 
+  candidates.push(...learned);
   const best = new Map<string, Route>();
   for (const r of candidates) {
     const key = `${r.network}/${r.prefix}`;

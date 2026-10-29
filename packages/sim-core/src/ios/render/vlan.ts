@@ -4,7 +4,7 @@ import { groupOf, type DeviceProfile } from '../profiles.js';
 import { formatVlanList, ALL_VLANS } from '../vlan-list.js';
 
 export function shortName(name: string): string {
-  return name.replace('FastEthernet', 'Fa').replace('GigabitEthernet', 'Gi').replace('Serial', 'Se');
+  return name.replace('FastEthernet', 'Fa').replace('GigabitEthernet', 'Gi').replace('Serial', 'Se').replace('Loopback', 'Lo');
 }
 
 const layer2 = (profile: DeviceProfile, config: DeviceConfig): InterfaceConfig[] =>

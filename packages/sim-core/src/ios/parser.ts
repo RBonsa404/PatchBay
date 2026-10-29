@@ -146,6 +146,7 @@ const IFACE_HELP: Record<string, string> = {
   GigabitEthernet: 'GigabitEthernet IEEE 802.3z',
   Serial: 'Serial',
   Vlan: 'Catalyst Vlans',
+  Loopback: 'Loopback interface',
 };
 
 /** When the next parameter is an interface, the interface types of this device are valid next words. */

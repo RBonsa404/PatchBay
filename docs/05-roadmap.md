@@ -4,7 +4,7 @@ Règle : un milestone est terminé quand ses critères sont verts (tests, typech
 
 ## Prochaine étape
 
-**M0 à M4 sont faits.** Commencer **M5** (OSPF, ACL, NAT), sous-milestone par sous-milestone (M5a OSPF, M5b ACL, M5c NAT). Points d'accroche déjà prévus dans `engine/l3.ts` : `onIp` porte un commentaire « M5 hooks » à l'endroit où appliquer ACL entrante, NAT et ACL sortante ; la table de routage (`protocols/l3/routing.ts`) n'a que les codes `C` et `S` : ajouter `O`, `O IA`, `O*E2` et la distance administrative 110 ; OSPF a besoin de messages entre routeurs (Hello/LSU) : les faire passer par le moteur de trames (paquets IP protocole 89, multicast 224.0.0.5) plutôt que par un raccourci.
+**M0 à M5 sont faits : le moteur réseau du MVP est complet** (câblage, VLAN, routage statique et inter-VLAN, OSPF, ACL, NAT ; 175 tests). Commencer **M6** (moteur d'objectifs et les 2 niveaux du MVP), puis **M7** (le jeu 3D), qui est l'objectif réel du projet. Le MVP est désormais défini comme **un jeu complet avec 2 niveaux** (voir M6 et `docs/02-mvp-spec.md`). La charte couleur doit reprendre celle du club d'informatique (à récupérer auprès du porteur de projet si elle n'est pas dans `docs/00-vision.md`).
 
 Dettes connues de M4 :
 - Pas de commandes sur les PC (`ipconfig`, `ping` depuis un terminal de PC) : seulement l'API `Network.configureHost` / `Network.ping`. À prévoir avec l'interface (M7).
@@ -62,15 +62,17 @@ Réalisé : `protocols/l3/ip.ts` et `routing.ts` (table de routage pure : connec
 - ARP, ICMP, table de routage, longest-prefix match, `ip route`, route par défaut, distance administrative.
 - Router-on-a-stick, `ping`, `traceroute`, `show ip route`.
 
-## M5 — OSPF, ACL, NAT
-- M5a OSPFv2 (voisins, DR/BDR, SPF, multi-zone, `default-information originate`).
-- M5b ACL standard/étendue/nommées, compteurs, `access-class`.
-- M5c NAT statique, dynamique, PAT.
-- Chaque sous-milestone : tests golden + tests de scénario (réseaux multi-équipements).
+## M5 — OSPF, ACL, NAT ✔
+- **M5b ACL** : `protocols/acl/acl.ts` (analyse, évaluation, rendu), paquets TCP/UDP et services sur les hôtes (`HostConfig.services`, `Network.tcpConnect` / `udpSend`), ACL standard/étendues/nommées, numéros de séquence, `established`, opérateurs de port, types ICMP, `ip access-group in|out`, `access-class` sur VTY (Telnet ouvert quand une ligne VTY peut se connecter), `show access-lists` avec compteurs, `clear access-list counters`.
+- **M5c NAT** : statique, dynamique par pool, PAT (sur interface ou pool), ordre des opérations IOS (ACL entrante → NAT extérieur→intérieur → routage → NAT intérieur→extérieur → ACL sortante), réponse ARP pour les adresses globales, `show ip nat translations/statistics`, `clear ip nat translation *`. Les sondes TCP/UDP retransmettent (6 tentatives) comme une vraie pile.
+- **M5a OSPF** (`engine/ospf.ts`) : Hello envoyés dans le moteur de trames (VLAN, trunks, câbles comptent), élection DR/BDR, SPF par zone avec chemins à coût égal, routes inter-zones via les ABR, E2 par `default-information originate [always]`, router-id figé jusqu'à `clear ip ospf process` ou reload (message IOS), loopbacks (annoncées en /32), `bandwidth`, `ip ospf cost/priority`, `passive-interface [default]`, `auto-cost reference-bandwidth`, messages `%OSPF-5-ADJCHG`, `show ip ospf [neighbor|interface [brief]]`, `show ip protocols`, codes `O`, `O IA`, `O*E2`. Test calqué sur le TP 11.6.1 (table de routage du PDF).
+- **Relecture complète** (après passage à Opus) : reload qui vide l'état dynamique, `Network.removeDevice`, MAC stables dans les sauvegardes, validation des réglages d'hôte, contrôles IOS d'`ip address` (adresse réseau/diffusion, masque, chevauchement), `hostname`, aide et Tab sur les types d'interface.
+
+Dettes connues de M5 : une seule instance OSPF par routeur ; pas de timers (adjacences immédiates, « Dead Time » fixe, âge des routes 00:00:00) ; pas de zones stub/NSSA ni d'authentification ; élection DR non préemptive ignorée (le plus prioritaire gagne toujours) ; NAT sans `ip nat outside source` ni redirection de port statique ; `show ip nat translations` n'affiche pas les entrées étendues d'un pool sans surcharge ; pas de `telnet` interactif (seulement l'ouverture de connexion).
 
 ## M6 — Validation et niveaux (moteur + contenu)
 - Moteur d'objectifs, scoring, feedback i18n.
-- Schéma Zod des niveaux, chargeur, 15 niveaux de la campagne MVP (`docs/02-mvp-spec.md`).
+- Schéma Zod des niveaux, chargeur. **MVP : 2 niveaux** (décision du porteur de projet) : niveau 1 « Câblage et console » (choisir les bons câbles et ports, se connecter en console, configuration de base, sauvegarde), niveau 2 « Relier deux réseaux » (deux routeurs, liaison série, horloge DCE, routes statiques, test de bout en bout). Les autres niveaux de `docs/02-mvp-spec.md` viennent après.
 - Solutions de référence rejouables (scripts de commandes) → chaque niveau est testé automatiquement : la solution passe, l'état initial échoue.
 
 ## M7 — Le jeu en 3D (interface finale)

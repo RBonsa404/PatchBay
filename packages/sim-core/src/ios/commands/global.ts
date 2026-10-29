@@ -1,5 +1,5 @@
 import { parentOf, parseInterfaceRange } from '../interfaces.js';
-import { groupOf } from '../profiles.js';
+import { groupOf, isVirtualKind } from '../profiles.js';
 import type { CommandContext, CommandDef } from '../types.js';
 
 function startBanner(ctx: CommandContext, text: string): string {
@@ -115,8 +115,8 @@ export const globalCommands: CommandDef[] = [
       const kind = groupOf(ctx.profile, name)?.kind;
       const parent = parentOf(name);
       if (ctx.negate) {
-        // Only SVIs and subinterfaces can be deleted; physical interfaces are fixed.
-        if (!parent && (kind !== 'svi' || name === 'Vlan1')) ctx.invalid(1);
+        // Only SVIs, loopbacks and subinterfaces can be deleted; physical interfaces are fixed.
+        if (!parent && (!isVirtualKind(kind) || name === 'Vlan1')) ctx.invalid(1);
         ctx.config.interfaces = ctx.config.interfaces.filter((i) => i.name !== name);
         return;
       }
@@ -128,8 +128,8 @@ export const globalCommands: CommandDef[] = [
           while (at + 1 < list.length && parentOf((list[at + 1] as { name: string }).name) === parent) at++;
           list.splice(at + 1, 0, { name, shutdown: false });
         } else {
-          // `interface vlan N` creates the SVI on first use, administratively down.
-          list.push({ name, shutdown: true });
+          // `interface vlan N` creates the SVI administratively down; a loopback comes up at once.
+          list.push({ name, shutdown: kind === 'svi' });
         }
       }
       ctx.setMode(parent ? 'config-subif' : 'config-if', { interfaces: [name] });

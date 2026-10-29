@@ -1,7 +1,10 @@
 // Minimal device profiles for M1. The full hardware catalog (ports, capabilities, cabling rules) arrives in M2
 // under model/catalog; profiles then become derived from it.
 
-export type InterfaceKind = 'ethernet' | 'serial' | 'svi';
+export type InterfaceKind = 'ethernet' | 'serial' | 'svi' | 'loopback';
+
+/** Interfaces created on demand (`interface vlan 99`, `interface loopback 0`) rather than built into the hardware. */
+export const isVirtualKind = (kind: InterfaceKind | undefined): boolean => kind === 'svi' || kind === 'loopback';
 
 export interface InterfaceGroup {
   /** Canonical type name, e.g. FastEthernet. */
@@ -44,6 +47,7 @@ export const profiles: Record<string, DeviceProfile> = {
     groups: [
       { type: 'FastEthernet', kind: 'ethernet', layer: 3, ids: ['0/0', '0/1'] },
       { type: 'Serial', kind: 'serial', layer: 3, ids: ['0/0/0', '0/0/1'] },
+      { type: 'Loopback', kind: 'loopback', layer: 3, ids: [] },
     ],
   },
   'cisco-2911': {
@@ -58,6 +62,7 @@ export const profiles: Record<string, DeviceProfile> = {
     groups: [
       { type: 'GigabitEthernet', kind: 'ethernet', layer: 3, ids: ['0/0', '0/1', '0/2'] },
       { type: 'Serial', kind: 'serial', layer: 3, ids: ['0/0/0', '0/0/1'] },
+      { type: 'Loopback', kind: 'loopback', layer: 3, ids: [] },
     ],
   },
   'catalyst-2960': {
@@ -82,6 +87,6 @@ export function groupOf(profile: DeviceProfile, interfaceName: string): Interfac
   const base = interfaceName.replace(/\.\d+$/, '');
   const exact = profile.groups.find((g) => g.ids.some((id) => g.type + id === base));
   if (exact) return exact;
-  // SVIs are created on demand (`interface vlan 99`), so they are not listed in the profile's ids.
-  return profile.groups.find((g) => g.kind === 'svi' && new RegExp(`^${g.type}\\d+$`).test(interfaceName));
+  // SVIs and loopbacks are created on demand (`interface vlan 99`), so they are not listed in the profile's ids.
+  return profile.groups.find((g) => isVirtualKind(g.kind) && new RegExp(`^${g.type}\\d+$`).test(interfaceName));
 }

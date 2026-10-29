@@ -1,5 +1,6 @@
 import { injectFrame, MacTables, memberOf, type EthernetFrame, type FrameTrace } from '../engine/l2.js';
 import { L3, type ServiceResult } from '../engine/l3.js';
+import { Ospf } from '../engine/ospf.js';
 import { Cli } from '../ios/cli.js';
 import { parentOf } from '../ios/interfaces.js';
 import type { LinkEnvironment, LinkState, PingResult } from '../ios/environment.js';
@@ -67,6 +68,9 @@ export class Network {
   readonly macTables = new MacTables();
   /** ARP, forwarding and ICMP. */
   readonly l3 = new L3(this);
+  /** OSPF, recomputed lazily when `version` moves. */
+  readonly ospf = new Ospf(this);
+  private changes = 0;
 
   private readonly lastLinks = new Map<string, LinkState>();
   private readonly syslog = new Map<string, string[]>();
@@ -91,6 +95,11 @@ export class Network {
     return device;
   }
 
+  /** Bumped by every configuration or cabling change; derived state (OSPF) is recomputed when it moves. */
+  get version(): number {
+    return this.changes;
+  }
+
   /** Take a device out of the network: its cables are unplugged (neighbours see their links go down). */
   removeDevice(id: string): boolean {
     if (!this.devices.has(id)) return false;
@@ -99,6 +108,7 @@ export class Network {
     this.syslog.delete(id);
     this.macTables.clear(id);
     this.l3.forget(id);
+    this.ospf.forget(id);
     for (const key of [...this.lastLinks.keys()]) if (key.startsWith(`${id}|`)) this.lastLinks.delete(key);
     this.settle();
     return true;
@@ -218,7 +228,9 @@ export class Network {
     const parent = parentOf(port);
     if (parent) return this.linkState(deviceId, parent);
     const here: CableEnd = { device: deviceId, port };
-    if (device.model.profile && groupOf(device.model.profile, port)?.kind === 'svi') {
+    const kind = device.model.profile ? groupOf(device.model.profile, port)?.kind : undefined;
+    if (kind === 'loopback') return { status: 'up', protocol: 'up' };
+    if (kind === 'svi') {
       // An SVI is up while its VLAN exists and at least one port in that VLAN has a live link.
       const vlan = Number(port.replace('Vlan', ''));
       const active =
@@ -275,6 +287,8 @@ export class Network {
     net.cables = snapshot.cables.map((c) => ({ type: c.type, a: { ...c.a }, b: { ...c.b } }));
     net.lastLinks.clear();
     net.reconcile();
+    net.changes++;
+    net.ospf.adjacencyChanges(); // the restored adjacencies are the baseline, not news
     return net;
   }
 
@@ -307,6 +321,13 @@ export class Network {
       reset: () => {
         this.macTables.clear(device.id);
         this.l3.forget(device.id);
+        this.ospf.forget(device.id);
+      },
+      ospf: () => this.ospf.view(device.id),
+      ospfRouterId: () => this.ospf.activeRouterId(device.id),
+      clearOspf: () => {
+        this.ospf.clearProcess(device.id);
+        this.changes++;
       },
       commit: () => this.settle(device.id),
       drain: () => this.drainSyslog(device.id),
@@ -316,7 +337,10 @@ export class Network {
   /** Re-evaluate every link. Lines for `localDevice` are returned; everyone else's are queued. */
   private settle(localDevice?: string): string[] {
     let local: string[] = [];
-    for (const [id, lines] of this.reconcile()) {
+    const changes = this.reconcile();
+    this.changes++;
+    for (const [id, lines] of this.ospf.adjacencyChanges()) changes.set(id, [...(changes.get(id) ?? []), ...lines]);
+    for (const [id, lines] of changes) {
       if (id === localDevice) local = lines;
       else this.syslog.get(id)?.push(...lines);
     }

@@ -1,6 +1,12 @@
 # Spécification du MVP
 
-Le MVP couvre : **câblage, VLAN + trunk + routage inter-VLAN, routage statique, OSPF, ACL, NAT/PAT**, avec console IOS simulée et validation par état. Pas de VR.
+> **Mise à jour (décision du porteur de projet)** : le MVP est **un jeu complet** (3D, animations, interfaces, missions, scénario, histoire) avec **seulement 2 niveaux** :
+> 1. **Câblage et console** : dans la salle technique, choisir les bons câbles (droit, croisé, console) et les bons ports, se connecter en console depuis un PC, configuration de base (nom, mots de passe, interfaces), sauvegarde.
+> 2. **Relier deux réseaux** : deux routeurs, liaison série avec horloge côté DCE, adressage, routes statiques, ping de bout en bout.
+>
+> Le moteur sait déjà faire tout le reste (VLAN, inter-VLAN, OSPF, ACL, NAT) : les niveaux suivants s'ajouteront en données, sans toucher au moteur. La liste « Campagne » plus bas reste la feuille de route des niveaux après le MVP.
+
+Le moteur couvre : **câblage, VLAN + trunk + routage inter-VLAN, routage statique, OSPF, ACL, NAT/PAT**, avec console IOS simulée et validation par état. Pas de VR.
 
 ## Matériel du catalogue MVP
 

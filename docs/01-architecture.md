@@ -89,6 +89,13 @@ Règles (avec drapeau de difficulté par niveau : `strictMdix: true|false`) :
 - Liaison série : pas d'ARP, l'autre bout est le seul destinataire possible.
 - État dynamique (tables ARP, sondes ICMP) hors `snapshot()`.
 
+### ACL, NAT, OSPF (implémentés en M5)
+
+- **Paquets** : `IpPacket` porte ICMP, TCP (drapeaux SYN/ACK/RST) ou UDP. Les hôtes déclarent leurs services (`HostConfig.services`) ; `Network.tcpConnect` / `udpSend` jouent le rôle d'un client (utile pour les objectifs « le web passe, le reste non »).
+- **Ordre sur un routeur** (`L3.onIp`, comme IOS) : ACL entrante → NAT extérieur→intérieur → livraison locale ou routage → NAT intérieur→extérieur → ACL sortante. Un refus renvoie un ICMP unreachable (d'où les `U` du ping).
+- **OSPF** (`engine/ospf.ts`, `Network.ospf`) : état **dérivé**, recalculé paresseusement quand `Network.version` bouge (chaque commande, chaque câble). Les Hello passent par le moteur de trames ; le reste (DR/BDR, SPF par zone, inter-zones, E2) est calculé de façon déterministe. Les routes OSPF entrent dans `buildRoutingTable(config, isUp, learned)` avec la distance 110 ; les transitions d'adjacence produisent des `%OSPF-5-ADJCHG` dans `Network.settle`.
+- **Reload** : `LinkEnvironment.reset()` efface l'état dynamique de l'équipement (ARP, MAC, NAT, compteurs ACL, router-id OSPF figé).
+
 ### CLI IOS
 
 - Machine à états par équipement : `user → privileged → config → config-if / config-line / config-router / config-std-nacl / config-ext-nacl / config-subif…`.

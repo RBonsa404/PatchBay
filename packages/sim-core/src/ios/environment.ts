@@ -1,5 +1,6 @@
 import type { DeviceConfig } from '../model/config.js';
 import type { NatEntry } from '../protocols/nat/nat.js';
+import type { OspfRouterView } from '../engine/ospf.js';
 
 export type LineStatus = 'up' | 'down' | 'administratively down';
 
@@ -60,6 +61,11 @@ export interface LinkEnvironment {
   natTranslations(): NatEntry[];
   natCounters(): { hits: number; misses: number };
   clearNat(): void;
+  /** OSPF as seen by this router (undefined when OSPF is not configured). */
+  ospf(): OspfRouterView | undefined;
+  /** Router ID the OSPF process uses right now (fixed until `clear ip ospf process` or reload). */
+  ospfRouterId(): string | null;
+  clearOspf(): void;
   /** Forget dynamic state (ARP, MAC table, NAT translations, ACL counters): the device has just rebooted. */
   reset(): void;
   /** Re-evaluate the links after a state change; returns the syslog lines this device must print now. */
@@ -90,6 +96,9 @@ export function createIsolatedEnvironment(getConfig: () => DeviceConfig): LinkEn
     natTranslations: () => [],
     natCounters: () => ({ hits: 0, misses: 0 }),
     clearNat: () => undefined,
+    ospf: () => undefined,
+    ospfRouterId: () => null,
+    clearOspf: () => undefined,
     reset: () => undefined,
     commit: () => [],
     drain: () => [],

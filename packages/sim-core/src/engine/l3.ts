@@ -52,6 +52,8 @@ export interface L3Interface {
   native: boolean;
   serial: boolean;
   svi: boolean;
+  /** A loopback answers for its address but never puts a frame on a wire. */
+  loopback: boolean;
 }
 
 interface Egress {
@@ -139,7 +141,7 @@ export class L3 {
       const nic = device.model.ports.find((p) => p.kind === 'ethernet');
       const host = device.host;
       if (!nic || !host?.ip || !host.mask || !this.net.hostLinkUp({ device: deviceId, port: nic.name })) return [];
-      return [{ name: nic.name, ip: host.ip, mask: host.mask, mac: this.net.macOf(deviceId, nic.name), port: nic.name, vlan: null, native: false, serial: false, svi: false }];
+      return [{ name: nic.name, ip: host.ip, mask: host.mask, mac: this.net.macOf(deviceId, nic.name), port: nic.name, vlan: null, native: false, serial: false, svi: false, loopback: false }];
     }
 
     const profile = device.model.profile!;
@@ -151,16 +153,20 @@ export class L3 {
       const common = { name: cfg.name, ip: cfg.ip.address, mask: cfg.ip.mask };
       const group = groupOf(profile, cfg.name);
 
+      if (group?.kind === 'loopback') {
+        out.push({ ...common, mac: '', port: null, vlan: null, native: false, serial: false, svi: false, loopback: true });
+        continue;
+      }
       if (group?.kind === 'svi') {
-        out.push({ ...common, mac: this.net.macOf(deviceId, cfg.name), port: null, vlan: Number(cfg.name.slice(4)), native: false, serial: false, svi: true });
+        out.push({ ...common, mac: this.net.macOf(deviceId, cfg.name), port: null, vlan: Number(cfg.name.slice(4)), native: false, serial: false, svi: true, loopback: false });
         continue;
       }
       const parent = parentOf(cfg.name);
       if (parent) {
         if (!cfg.encapsulation) continue;
-        out.push({ ...common, mac: this.net.macOf(deviceId, parent), port: parent, vlan: cfg.encapsulation.vlan, native: cfg.encapsulation.native, serial: false, svi: false });
+        out.push({ ...common, mac: this.net.macOf(deviceId, parent), port: parent, vlan: cfg.encapsulation.vlan, native: cfg.encapsulation.native, serial: false, svi: false, loopback: false });
       } else {
-        out.push({ ...common, mac: this.net.macOf(deviceId, cfg.name), port: cfg.name, vlan: null, native: false, serial: group?.kind === 'serial', svi: false });
+        out.push({ ...common, mac: this.net.macOf(deviceId, cfg.name), port: cfg.name, vlan: null, native: false, serial: group?.kind === 'serial', svi: false, loopback: false });
       }
     }
     return out;
@@ -175,7 +181,7 @@ export class L3 {
 
     if (device.model.kind === 'router' && device.cli) {
       const up = new Set(ifs.map((i) => i.name));
-      const route = lookup(buildRoutingTable(device.cli.config, (n) => up.has(n)), destination);
+      const route = lookup(buildRoutingTable(device.cli.config, (n) => up.has(n), this.net.ospf.routes(deviceId)), destination);
       const ifc = route && ifs.find((i) => i.name === route.iface);
       return route && ifc ? { ifc, nextHop: route.nextHop ?? destination } : null;
     }
@@ -230,13 +236,19 @@ export class L3 {
 
   // ---- receiving -------------------------------------------------------------------------------------------------
 
+  /** The addressed interface a frame arriving on `port` belongs to: the physical one, or the subinterface of its tag. */
+  interfaceAt(deviceId: string, port: string, vlanTag: number | undefined): L3Interface | undefined {
+    return this.interfaces(deviceId).find(
+      (i) => i.port === port && (vlanTag !== undefined ? i.vlan === vlanTag && !i.native : i.vlan === null || i.native),
+    );
+  }
+
   /** A frame reached `deviceId`, on a physical port (hosts, routers) or inside a switch VLAN (management SVI). */
   receive(deviceId: string, where: { port: string } | { vlan: number }, frame: EthernetFrame): void {
-    const ifs = this.interfaces(deviceId);
     const ifc =
       'vlan' in where
-        ? ifs.find((i) => i.svi && i.vlan === where.vlan)
-        : ifs.find((i) => i.port === where.port && (frame.vlanTag !== undefined ? i.vlan === frame.vlanTag && !i.native : i.vlan === null || i.native));
+        ? this.interfaces(deviceId).find((i) => i.svi && i.vlan === where.vlan)
+        : this.interfaceAt(deviceId, where.port, frame.vlanTag);
     const payload = frame.payload as L3Payload | undefined;
     if (!ifc || !payload) return;
 
@@ -429,7 +441,7 @@ export class L3 {
     } else if (this.serviceOpen(deviceId, 'udp', dgram.dstPort, packet.src)) {
       reply({ udp: { srcPort: dgram.dstPort, dstPort: dgram.srcPort } });
     } else {
-      this.icmpError(deviceId, { name: '', ip: packet.dst, mask: '', mac: '', port: null, vlan: null, native: false, serial: false, svi: false }, packet, 'unreachable');
+      this.icmpError(deviceId, { name: '', ip: packet.dst, mask: '', mac: '', port: null, vlan: null, native: false, serial: false, svi: false, loopback: false }, packet, 'unreachable');
     }
   }
 
@@ -475,6 +487,7 @@ export class L3 {
   }
 
   private emit(deviceId: string, ifc: L3Interface, frame: EthernetFrame): void {
+    if (ifc.loopback) return; // e.g. a route to the rest of a loopback's subnet: nothing is out there
     if (ifc.svi) {
       injectFromSwitch(this.net, deviceId, ifc.vlan as number, frame);
       return;

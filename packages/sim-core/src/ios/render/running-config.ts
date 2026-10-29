@@ -1,4 +1,4 @@
-import type { DeviceConfig, InterfaceConfig, LineConfig } from '../../model/config.js';
+import type { DeviceConfig, InterfaceConfig, LineConfig, OspfConfig } from '../../model/config.js';
 import { enableSecretHash, type7Encrypt } from '../crypto.js';
 import { parentOf } from '../interfaces.js';
 import { groupOf, type DeviceProfile } from '../profiles.js';
@@ -10,10 +10,13 @@ function renderInterface(profile: DeviceProfile, ifc: InterfaceConfig): string[]
   const out = [`interface ${ifc.name}`];
   const sub = parentOf(ifc.name) !== undefined;
   if (ifc.description) out.push(` description ${ifc.description}`);
+  if (ifc.bandwidth !== undefined) out.push(` bandwidth ${ifc.bandwidth}`);
   if (ifc.encapsulation) out.push(` encapsulation dot1Q ${ifc.encapsulation.vlan}${ifc.encapsulation.native ? ' native' : ''}`);
   if (ifc.ip) out.push(` ip address ${ifc.ip.address} ${ifc.ip.mask}`);
   else if (group && group.layer === 3 && !sub) out.push(' no ip address');
   if (ifc.natRole) out.push(` ip nat ${ifc.natRole}`);
+  if (ifc.ospfCost !== undefined) out.push(` ip ospf cost ${ifc.ospfCost}`);
+  if (ifc.ospfPriority !== undefined) out.push(` ip ospf priority ${ifc.ospfPriority}`);
   if (ifc.aclIn !== undefined) out.push(` ip access-group ${ifc.aclIn} in`);
   if (ifc.aclOut !== undefined) out.push(` ip access-group ${ifc.aclOut} out`);
   if (ifc.clockRate !== undefined) out.push(` clock rate ${ifc.clockRate}`);
@@ -40,6 +43,18 @@ function renderLine(config: DeviceConfig, line: LineConfig): string[] {
   if (line.loggingSynchronous) out.push(' logging synchronous');
   if (line.accessClassIn !== undefined) out.push(` access-class ${line.accessClassIn} in`);
   if (line.login) out.push(' login');
+  return out;
+}
+
+function renderOspf(o: OspfConfig): string[] {
+  const out = [`router ospf ${o.processId}`];
+  if (o.routerId) out.push(` router-id ${o.routerId}`);
+  out.push(' log-adjacency-changes');
+  if (o.referenceBandwidth !== 100) out.push(` auto-cost reference-bandwidth ${o.referenceBandwidth}`);
+  if (o.passiveDefault) out.push(' passive-interface default', ...o.notPassive.map((i) => ` no passive-interface ${i}`));
+  else out.push(...o.passive.map((i) => ` passive-interface ${i}`));
+  out.push(...o.networks.map((n) => ` network ${n.network} ${n.wildcard} area ${n.area}`));
+  if (o.defaultOriginate) out.push(` default-information originate${o.defaultOriginate.always ? ' always' : ''}`);
   return out;
 }
 
@@ -73,7 +88,17 @@ export function renderConfigBody(profile: DeviceProfile, config: DeviceConfig): 
 
   for (const ifc of config.interfaces) out.push(...renderInterface(profile, ifc), '!');
 
+  // IOS order after the interfaces: routing processes, default gateway, static routes, NAT, access lists.
+  if (config.ospf) out.push(...renderOspf(config.ospf), '!');
+
   if (config.defaultGateway) out.push(`ip default-gateway ${config.defaultGateway}`, '!');
+
+  if (config.staticRoutes.length > 0) {
+    for (const r of config.staticRoutes) {
+      out.push(`ip route ${r.network} ${r.mask} ${r.nextHop ?? r.iface}${r.distance === 1 ? '' : ` ${r.distance}`}`);
+    }
+    out.push('!');
+  }
 
   const { nat } = config;
   for (const p of nat.pools) out.push(`ip nat pool ${p.name} ${p.start} ${p.end} netmask ${p.mask}`);
@@ -82,13 +107,6 @@ export function renderConfigBody(profile: DeviceProfile, config: DeviceConfig): 
   }
   for (const s of nat.statics) out.push(`ip nat inside source static ${s.local} ${s.global}`);
   if (nat.pools.length + nat.rules.length + nat.statics.length > 0) out.push('!');
-
-  if (config.staticRoutes.length > 0) {
-    for (const r of config.staticRoutes) {
-      out.push(`ip route ${r.network} ${r.mask} ${r.nextHop ?? r.iface}${r.distance === 1 ? '' : ` ${r.distance}`}`);
-    }
-    out.push('!');
-  }
 
   const numbered = config.acls.filter((a) => !a.named);
   for (const acl of numbered) {

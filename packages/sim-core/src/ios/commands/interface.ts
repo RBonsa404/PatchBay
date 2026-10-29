@@ -55,6 +55,45 @@ export const interfaceCommands: CommandDef[] = [
   },
   {
     modes: [...MODES],
+    syntax: 'bandwidth <kbps:int:1-10000000>',
+    help: 'Set bandwidth informational parameter',
+    paramHelp: { kbps: 'Bandwidth in kilobits' },
+    negatable: true,
+    run: (ctx, args) => {
+      for (const ifc of selected(ctx)) {
+        if (ctx.negate) delete ifc.bandwidth;
+        else ifc.bandwidth = Number(args.kbps);
+      }
+    },
+  },
+  {
+    modes: [...MODES],
+    syntax: 'ip ospf cost <cost:int:1-65535>',
+    help: 'Interface cost',
+    paramHelp: { cost: 'Cost' },
+    negatable: true,
+    run: (ctx, args) => {
+      for (const ifc of selected(ctx)) {
+        if (ctx.negate) delete ifc.ospfCost;
+        else ifc.ospfCost = Number(args.cost);
+      }
+    },
+  },
+  {
+    modes: [...MODES],
+    syntax: 'ip ospf priority <priority:int:0-255>',
+    help: 'Router priority',
+    paramHelp: { priority: 'Priority' },
+    negatable: true,
+    run: (ctx, args) => {
+      for (const ifc of selected(ctx)) {
+        if (ctx.negate) delete ifc.ospfPriority;
+        else ifc.ospfPriority = Number(args.priority);
+      }
+    },
+  },
+  {
+    modes: [...MODES],
     syntax: 'shutdown',
     help: 'Shutdown the selected interface',
     negatable: true,

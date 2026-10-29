@@ -44,6 +44,9 @@ export function resolveInterface(profile: DeviceProfile, tokens: string[]): Reso
   if (group.kind === 'svi') {
     return /^\d+$/.test(number) && Number(number) >= 1 && Number(number) <= 4094 ? { name: group.type + Number(number), consumed } : null;
   }
+  if (group.kind === 'loopback') {
+    return /^\d+$/.test(number) && Number(number) <= 2147483647 ? { name: group.type + Number(number), consumed } : null;
+  }
   return group.ids.includes(number) ? { name: group.type + number, consumed } : null;
 }
 

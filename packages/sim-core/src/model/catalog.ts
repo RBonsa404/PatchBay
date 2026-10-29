@@ -27,7 +27,7 @@ const SPEED: Record<string, number> = { FastEthernet: 100, GigabitEthernet: 1000
 
 function iosPorts(profile: DeviceProfile, polarity: 'mdi' | 'mdix'): PortSpec[] {
   const ports: PortSpec[] = profile.groups
-    .filter((g) => g.kind !== 'svi')
+    .filter((g) => g.kind === 'ethernet' || g.kind === 'serial')
     .flatMap((g) =>
       g.ids.map(
         (id): PortSpec =>
