@@ -6,7 +6,10 @@ export interface ResolvedInterface {
   consumed: number;
 }
 
-/** Resolve user input such as `fa0/0`, `Gi 0/1` or `fastethernet 0/0` to a canonical interface name. */
+/**
+ * Resolve user input such as `fa0/0`, `Gi 0/1`, `fastethernet 0/0` or `vlan 99` to a canonical interface name.
+ * SVIs (type Vlan) accept any id 1-4094: IOS creates them on demand.
+ */
 export function resolveInterface(profile: DeviceProfile, tokens: string[]): ResolvedInterface | null {
   const first = tokens[0];
   if (first === undefined) return null;
@@ -24,6 +27,32 @@ export function resolveInterface(profile: DeviceProfile, tokens: string[]): Reso
 
   const groups = profile.groups.filter((g) => g.type.toLowerCase().startsWith(typePart));
   const group = groups.length === 1 ? groups[0] : undefined;
-  if (!group || !group.ids.includes(number)) return null;
-  return { name: group.type + number, consumed };
+  if (!group) return null;
+  if (group.kind === 'svi') {
+    return /^\d+$/.test(number) && Number(number) >= 1 && Number(number) <= 4094 ? { name: group.type + Number(number), consumed } : null;
+  }
+  return group.ids.includes(number) ? { name: group.type + number, consumed } : null;
+}
+
+/**
+ * Parse the argument of `interface range`: `fa0/1-24`, `fa0/1 - 5 , fa0/10`, `fastethernet 0/1 - 3`.
+ * Returns canonical names in order, or null when anything is unknown or reversed.
+ */
+export function parseInterfaceRange(profile: DeviceProfile, text: string): string[] | null {
+  const names: string[] = [];
+  for (const raw of text.split(',')) {
+    const part = raw.trim().replace(/\s*-\s*/g, '-').replace(/^([a-zA-Z]+)\s+(\d)/, '$1$2');
+    const m = /^([a-zA-Z]+)(\d+(?:\/\d+)*)\/(\d+)(?:-(\d+))?$/.exec(part);
+    if (!m) return null;
+    const [, type, slot, firstPort, lastPort] = m as unknown as [string, string, string, string, string | undefined];
+    const first = Number(firstPort);
+    const last = lastPort === undefined ? first : Number(lastPort);
+    if (first > last) return null;
+    for (let n = first; n <= last; n++) {
+      const r = resolveInterface(profile, [`${type}${slot}/${n}`]);
+      if (!r) return null;
+      names.push(r.name);
+    }
+  }
+  return names.length > 0 ? names : null;
 }

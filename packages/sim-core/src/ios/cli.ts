@@ -1,7 +1,7 @@
 import { cloneConfig, createDefaultConfig, sameConfig, type DeviceConfig } from '../model/config.js';
 import { allCommands, groupHelp } from './commands/index.js';
 import { createIsolatedEnvironment, type LinkEnvironment } from './environment.js';
-import { complete, compileCommands, help, match, tokenize, type CompiledCommand, type ParseEnv } from './parser.js';
+import { complete, compileCommands, help, isNegatable, match, tokenize, type CompiledCommand, type ParseEnv } from './parser.js';
 import type { DeviceProfile } from './profiles.js';
 import { SUB_CONFIG_MODES, type CliMode, type CommandContext, type PendingPrompt, type Selection } from './types.js';
 
@@ -26,6 +26,7 @@ const PROMPT_SUFFIX: Record<CliMode, string> = {
   privileged: '#',
   config: '(config)#',
   'config-if': '(config-if)#',
+  'config-if-range': '(config-if-range)#',
   'config-line': '(config-line)#',
   'config-vlan': '(config-vlan)#',
   'config-router': '(config-router)#',
@@ -134,7 +135,7 @@ export class Cli {
 
   /** Commands valid in `mode`; in sub-modes of config, global config commands are also accepted (listed last). */
   private poolFor(mode: CliMode, negate: boolean): CompiledCommand[] {
-    const ok = (c: CompiledCommand): boolean => !negate || c.def.negatable === true;
+    const ok = (c: CompiledCommand): boolean => !negate || isNegatable(c);
     const own = this.commands.filter((c) => c.def.modes.includes(mode) && ok(c));
     if (!SUB_CONFIG_MODES.includes(mode)) return own;
     return [...own, ...this.commands.filter((c) => !c.def.modes.includes(mode) && c.def.modes.includes('config') && ok(c))];

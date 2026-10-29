@@ -7,6 +7,7 @@ export type CliMode =
   | 'privileged'
   | 'config'
   | 'config-if'
+  | 'config-if-range'
   | 'config-line'
   | 'config-vlan'
   | 'config-router'
@@ -16,6 +17,7 @@ export type CliMode =
 /** Sub-modes of global configuration: global commands typed there run as if in `config`. */
 export const SUB_CONFIG_MODES: readonly CliMode[] = [
   'config-if',
+  'config-if-range',
   'config-line',
   'config-vlan',
   'config-router',
@@ -26,8 +28,10 @@ export const SUB_CONFIG_MODES: readonly CliMode[] = [
 export type Args = Record<string, string>;
 
 export interface Selection {
-  /** Canonical interface name in config-if. */
-  interface?: string;
+  /** Canonical interface names in config-if (one) and config-if-range (several). */
+  interfaces?: string[];
+  /** VLAN id in config-vlan. */
+  vlan?: number;
   /** Line ids (see LineConfig.id) in config-line. */
   lines?: string[];
 }
@@ -81,5 +85,7 @@ export interface CommandDef {
   paramHelp?: Record<string, string>;
   /** Accepts `no <syntax>`; with `no`, trailing parameters become optional. */
   negatable?: boolean;
+  /** Syntax to use after `no` when it differs (e.g. `no switchport mode` has no `access`/`trunk` word). Implies negatable. */
+  negateSyntax?: string;
   run(ctx: CommandContext, args: Args): string | void;
 }

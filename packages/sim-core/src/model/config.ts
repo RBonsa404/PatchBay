@@ -5,13 +5,32 @@ export interface IpAddress {
   mask: string;
 }
 
+export interface SwitchportConfig {
+  /** Unset = dynamic auto, which the simulator treats as an access port (DTP is not simulated). */
+  mode?: 'access' | 'trunk';
+  /** Access VLAN; defaults to 1. */
+  accessVlan?: number;
+  /** Trunk native VLAN; defaults to 1. */
+  trunkNative?: number;
+  /** VLANs allowed on the trunk; undefined = all (1-4094). */
+  trunkAllowed?: number[];
+}
+
 export interface InterfaceConfig {
-  /** Canonical name, e.g. FastEthernet0/0. */
+  /** Canonical name, e.g. FastEthernet0/0 or Vlan99. */
   name: string;
   description?: string;
   ip?: IpAddress;
   shutdown: boolean;
   clockRate?: number;
+  switchport?: SwitchportConfig;
+}
+
+/** A VLAN created with the `vlan` command. VLAN 1 and the reserved 1002-1005 always exist and are not stored. */
+export interface VlanConfig {
+  id: number;
+  /** Custom name; the default is VLANxxxx. */
+  name?: string;
 }
 
 export interface LineConfig {
@@ -33,9 +52,21 @@ export interface DeviceConfig {
   motd?: string[];
   domainLookup: boolean;
   passwordEncryption: boolean;
+  defaultGateway?: string;
+  vlans: VlanConfig[];
   lines: LineConfig[];
   interfaces: InterfaceConfig[];
 }
+
+export const vlanName = (config: DeviceConfig, id: number): string => {
+  if (id === 1) return 'default';
+  const reserved: Record<number, string> = { 1002: 'fddi-default', 1003: 'token-ring-default', 1004: 'fddinet-default', 1005: 'trnet-default' };
+  return reserved[id] ?? config.vlans.find((v) => v.id === id)?.name ?? `VLAN${String(id).padStart(4, '0')}`;
+};
+
+/** VLAN 1 and 1002-1005 always exist; the others only once created. */
+export const vlanExists = (config: DeviceConfig, id: number): boolean =>
+  id === 1 || (id >= 1002 && id <= 1005) || config.vlans.some((v) => v.id === id);
 
 const defaultLine = (id: string, login: boolean): LineConfig => ({
   id,
@@ -52,6 +83,7 @@ export function createDefaultConfig(profile: DeviceProfile): DeviceConfig {
     hostname: profile.defaultHostname,
     domainLookup: true,
     passwordEncryption: false,
+    vlans: [],
     lines,
     interfaces: profile.groups.flatMap((g) =>
       g.ids.map((id) => ({

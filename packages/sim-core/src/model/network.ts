@@ -1,9 +1,10 @@
+import { injectFrame, MacTables, memberOf, type EthernetFrame, type FrameTrace } from '../engine/l2.js';
 import { Cli } from '../ios/cli.js';
 import type { LinkEnvironment, LinkState } from '../ios/environment.js';
 import { groupOf } from '../ios/profiles.js';
 import { canPlug, copperLinkWorks, type CableType } from '../physical/rules.js';
 import { catalog, type DeviceModel, type PortSpec } from './catalog.js';
-import { cloneConfig, type DeviceConfig } from './config.js';
+import { cloneConfig, vlanExists, type DeviceConfig } from './config.js';
 
 export interface CableEnd {
   device: string;
@@ -47,6 +48,9 @@ export class Network {
   readonly devices = new Map<string, Device>();
   cables: Cable[] = [];
 
+  /** Learned MAC addresses per switch (dynamic state, not part of snapshots). */
+  readonly macTables = new MacTables();
+
   private readonly lastLinks = new Map<string, LinkState>();
   private readonly syslog = new Map<string, string[]>();
 
@@ -77,6 +81,35 @@ export class Network {
 
   cableAt(end: CableEnd): Cable | undefined {
     return this.cables.find((c) => sameEnd(c.a, end) || sameEnd(c.b, end));
+  }
+
+  /** The other end of the cable plugged into `end`, if any (console cables included). */
+  peerOf(end: CableEnd): CableEnd | undefined {
+    const cable = this.cableAt(end);
+    if (!cable) return undefined;
+    return sameEnd(cable.a, end) ? cable.b : cable.a;
+  }
+
+  /** Deterministic MAC address of a port: derived from the device's insertion index and the port's position. */
+  macOf(deviceId: string, port: string): string {
+    const device = this.device(deviceId);
+    const index = Math.max(0, device.model.ports.findIndex((p) => p.name === port));
+    return `0001.43${device.index.toString(16).padStart(2, '0')}.${index.toString(16).padStart(4, '0')}`;
+  }
+
+  /** Put a frame on the wire at a host port and follow it through the switches. */
+  sendFrame(from: CableEnd, frame: EthernetFrame): FrameTrace {
+    return injectFrame(this, from, frame);
+  }
+
+  /** Is the link at a host port up? True when a working cable reaches a live peer. */
+  hostLinkUp(end: CableEnd): boolean {
+    const cable = this.cableAt(end);
+    if (!cable || cable.type === 'console' || cable.type === 'serial') return false;
+    const peer = this.peerOf(end) as CableEnd;
+    const peerDevice = this.devices.get(peer.device);
+    if (peerDevice?.cli) return this.linkState(peer.device, peer.port).status === 'up';
+    return copperLinkWorks(cable.type, this.portSpec(cable.a) as PortSpec, this.portSpec(cable.b) as PortSpec, this.options.strictMdix);
   }
 
   /** Plug a cable. For `serial`, `a` is the DCE end. A wrong copper cable still plugs in; its link just stays down. */
@@ -119,7 +152,13 @@ export class Network {
 
     if (cfg.shutdown) return { status: 'administratively down', protocol: 'down' };
     const here: CableEnd = { device: deviceId, port };
-    if (device.model.profile && groupOf(device.model.profile, port)?.kind === 'svi') return { status: 'down', protocol: 'down' };
+    if (device.model.profile && groupOf(device.model.profile, port)?.kind === 'svi') {
+      // An SVI is up while its VLAN exists and at least one port in that VLAN has a live link.
+      const vlan = Number(port.replace('Vlan', ''));
+      const active =
+        vlanExists(device.cli.config, vlan) && device.cli.config.interfaces.some((i) => memberOf(this, deviceId, i.name, vlan));
+      return active ? { status: 'up', protocol: 'up' } : { status: 'down', protocol: 'down' };
+    }
 
     const cable = this.cableAt(here);
     if (!cable || cable.type === 'console') return { status: 'down', protocol: 'down' };
@@ -184,11 +223,10 @@ export class Network {
         if (cable?.type !== 'serial') return null;
         return sameEnd(cable.a, { device: device.id, port: name }) ? 'dce' : 'dte';
       },
-      macAddress: (name) => {
-        const port = device.model.ports.findIndex((p) => p.name === name);
-        const dev = device.index.toString(16).padStart(2, '0');
-        return `0001.43${dev}.${Math.max(0, port).toString(16).padStart(4, '0')}`;
-      },
+      // SVIs are not ports: they share the switch's base address (port index 0).
+      macAddress: (name) => this.macOf(device.id, name),
+      macTable: () => this.macTables.list(device.id),
+      clearMacTable: () => this.macTables.clear(device.id),
       commit: () => this.settle(device.id),
       drain: () => this.drainSyslog(device.id),
     };
@@ -214,6 +252,7 @@ export class Network {
         const before = this.lastLinks.get(key);
         this.lastLinks.set(key, now);
         if (!before) continue;
+        if (before.status === 'up' && now.status !== 'up') this.macTables.flushPort(device.id, ifc.name);
         const lines: string[] = [];
         // IOS stays silent when an interface leaves "administratively down" without gaining a link.
         const crossedUp = (before.status === 'up') !== (now.status === 'up');

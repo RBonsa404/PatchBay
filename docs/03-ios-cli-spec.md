@@ -51,6 +51,8 @@ Mécanismes (voir `packages/sim-core/src/ios/`) :
 - **Questions** : `ctx.ask({prompt, hidden?, handler})` — la ligne suivante va au handler (mot de passe, `[confirm]`, saisie de bannière…). Le `prompt` du résultat devient la question.
 - **Commandes globales depuis un sous-mode** : exécutées comme en mode `config` (le mode revient à `config`).
 - **`do <commande>`** depuis tout mode de configuration.
+- **`negateSyntax`** : syntaxe alternative après `no` (ex. `no switchport mode` n'a pas le mot `access`/`trunk`).
+- **Type `text`** : consomme le reste de la ligne (utilisé par `interface range`, `description`, `banner`).
 - **`ctx.invalid(i)`** : un handler peut rejeter la commande avec le caret sous le mot `i`.
 
 Ajouter une commande = une entrée dans `src/ios/commands/<famille>.ts` + un test golden. Aucune logique de protocole dans le handler : il modifie la config structurée du device ; les protocoles lisent cette config.

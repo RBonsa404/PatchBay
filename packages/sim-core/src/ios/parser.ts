@@ -6,10 +6,18 @@ import type { Args, CommandDef } from './types.js';
 export interface CompiledCommand {
   def: CommandDef;
   nodes: SyntaxNode[];
+  /** Nodes used after `no` when the command declares a negateSyntax. */
+  negNodes?: SyntaxNode[];
 }
 
 export const compileCommands = (defs: CommandDef[]): CompiledCommand[] =>
-  defs.map((def) => ({ def, nodes: parseSyntax(def.syntax) }));
+  defs.map((def) => ({
+    def,
+    nodes: parseSyntax(def.syntax),
+    ...(def.negateSyntax ? { negNodes: parseSyntax(def.negateSyntax) } : {}),
+  }));
+
+export const isNegatable = (c: CompiledCommand): boolean => c.def.negatable === true || c.def.negateSyntax !== undefined;
 
 export interface Token {
   text: string;
@@ -36,23 +44,25 @@ interface State {
   /** Index of the next syntax node to match. */
   n: number;
   args: Args;
+  /** The syntax being matched (negate form after `no` when the command has one). */
+  nodes: SyntaxNode[];
 }
 
 type WalkError = { kind: 'invalid'; at: number } | { kind: 'ambiguous' };
 
 function walk(pool: CompiledCommand[], tokens: Token[], line: string, env: ParseEnv): { states: State[]; error?: WalkError } {
-  let states: State[] = pool.map((cmd) => ({ cmd, n: 0, args: {} }));
+  let states: State[] = pool.map((cmd) => ({ cmd, n: 0, args: {}, nodes: env.negate && cmd.negNodes ? cmd.negNodes : cmd.nodes }));
   let t = 0;
   while (t < tokens.length) {
     const tok = tokens[t] as Token;
     const lower = tok.text.toLowerCase();
 
     const literalHits = states.filter((s) => {
-      const nd = s.cmd.nodes[s.n];
+      const nd = s.nodes[s.n];
       return nd?.kind === 'literal' && nd.word.startsWith(lower);
     });
     if (literalHits.length > 0) {
-      const wordOf = (s: State): string => (s.cmd.nodes[s.n] as LiteralNode).word;
+      const wordOf = (s: State): string => (s.nodes[s.n] as LiteralNode).word;
       const exact = literalHits.filter((s) => wordOf(s) === lower);
       const use = exact.length > 0 ? exact : literalHits;
       if (new Set(use.map(wordOf)).size > 1) return { states, error: { kind: 'ambiguous' } };
@@ -64,14 +74,14 @@ function walk(pool: CompiledCommand[], tokens: Token[], line: string, env: Parse
     let consumed = 0;
     const next: State[] = [];
     for (const s of states) {
-      const nd = s.cmd.nodes[s.n];
+      const nd = s.nodes[s.n];
       if (nd?.kind !== 'param') continue;
       const r = matchParam(nd, tokens, t, line, env);
       if (!r) continue;
       // States that disagree on how many tokens a parameter consumes are dropped: first one wins.
       if (consumed === 0) consumed = r.consumed;
       if (r.consumed !== consumed) continue;
-      next.push({ cmd: s.cmd, n: s.n + 1, args: { ...s.args, [nd.name]: r.value } });
+      next.push({ cmd: s.cmd, n: s.n + 1, args: { ...s.args, [nd.name]: r.value }, nodes: s.nodes });
     }
     if (next.length === 0) return { states, error: { kind: 'invalid', at: t } };
     states = next;
@@ -110,7 +120,7 @@ function matchParam(
 
 /** A command is complete when all nodes matched; with `no`, remaining parameter-only nodes may be omitted. */
 function isComplete(s: State, env: ParseEnv): boolean {
-  const rest = s.cmd.nodes.slice(s.n);
+  const rest = s.nodes.slice(s.n);
   return rest.length === 0 || (env.negate && rest.every((nd) => nd.kind === 'param'));
 }
 
@@ -134,7 +144,7 @@ const NO_HELP = 'Negate a command or set its defaults';
 function nextWords(states: State[]): LiteralNode[] {
   const words = new Map<string, LiteralNode>();
   for (const s of states) {
-    const nd = s.cmd.nodes[s.n];
+    const nd = s.nodes[s.n];
     if (nd?.kind === 'literal') words.set(nd.word, nd);
   }
   return [...words.values()];
@@ -160,11 +170,11 @@ export function help(pool: CompiledCommand[], body: string, env: ParseEnv, allow
 
   const rows = new Map<string, string>();
   for (const s of states) {
-    const nd = s.cmd.nodes[s.n];
+    const nd = s.nodes[s.n];
     if (nd?.kind === 'literal') {
       if (rows.has(nd.word)) continue;
-      const last = s.n === s.cmd.nodes.length - 1;
-      const path = s.cmd.nodes
+      const last = s.n === s.nodes.length - 1;
+      const path = s.nodes
         .slice(0, s.n + 1)
         .map((x) => (x.kind === 'literal' ? x.word : '*'))
         .join(' ');

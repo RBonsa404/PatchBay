@@ -5,12 +5,14 @@ import { interfaceCommands } from './interface.js';
 import { lineCommands } from './line.js';
 import { sessionCommands } from './session.js';
 import { showCommands } from './show.js';
+import { vlanCommands } from './vlan.js';
 
 export const allCommands: CommandDef[] = [
   ...sessionCommands,
   ...globalCommands,
   ...lineCommands,
   ...interfaceCommands,
+  ...vlanCommands,
   ...fileCommands,
   ...showCommands,
 ];
@@ -27,6 +29,18 @@ export const groupHelp: Record<string, string> = {
   exit: 'Exit from the EXEC',
   ip: 'Global IP configuration subcommands',
   'ip domain': 'Domain Name System',
+  clear: 'Reset functions',
+  'clear mac': 'MAC forwarding table',
+  'show mac': 'MAC configuration',
+  switchport: 'Set switching mode characteristics',
+  'switchport mode': 'Set trunking mode of the interface',
+  'switchport access': 'Set access mode characteristics of the interface',
+  'switchport trunk': 'Set trunking characteristics of the interface',
+  'switchport trunk native': 'Set trunking native characteristics when interface is in trunking mode',
+  'switchport trunk allowed': 'Set allowed VLAN characteristics when interface is in trunking mode',
+  'switchport trunk allowed vlan': 'Set allowed VLAN characteristics when interface is in trunking mode',
+  'switchport trunk native vlan': 'Set native VLAN when interface is in trunking mode',
+  'switchport access vlan': 'Set VLAN when interface is in access mode',
   'show ip': 'IP information',
   'show ip interface': 'IP interface status and configuration',
   line: 'Configure a terminal line',

@@ -4,9 +4,16 @@ Règle : un milestone est terminé quand ses critères sont verts (tests, typech
 
 ## Prochaine étape
 
-**M0, M1 et M2 sont faits.** Commencer **M3** (couche 2) : VLAN (`vlan <id>`, `name`), ports d'accès et trunk 802.1Q, `interface range`, apprentissage MAC, `show vlan brief`, `show interfaces trunk`, `show mac address-table`. Cela remplit aussi `interface Vlan1` (état up/down selon les ports actifs du VLAN, aujourd'hui toujours `down`) et il faut ajouter les lignes `switchport …` au rendu de `running-config`. Il faudra un moteur de trames (`engine/`) minimal pour l'apprentissage MAC : le concevoir avec M4 (ARP/ICMP) en tête.
+**M0 à M3 sont faits.** Commencer **M4** (couche 3 : routage statique et inter-VLAN). Le moteur de trames `engine/l2.ts` existe (`Network.sendFrame`, tables MAC) mais ne transporte que des trames L2 brutes : M4 doit y ajouter ARP, IP/ICMP, la table de routage (longest-prefix match, `ip route`, route par défaut, distance administrative), les sous-interfaces `encapsulation dot1Q` (router-on-a-stick, le routeur reçoit déjà des trames dans `injectFrame` : brancher le traitement L3 là), `ping` (avec `.!!!!` du premier ARP), `traceroute`, `show ip route`, `show arp`. Les PC/serveurs n'ont pas encore de configuration IP (adresse, masque, passerelle) ni de commandes : prévoir leur modèle (`Device.host`) et une façon de les configurer depuis les niveaux. Le routeur a besoin de `ip routing` côté switch L3 seulement après le MVP.
 
-Dettes connues de M1/M2 (à traiter quand le sujet revient) :
+Dettes connues de M1/M2/M3 (à traiter quand le sujet revient) :
+- DTP non simulé : un port sans `switchport mode` agit comme un port d'accès. VTP, STP, EtherChannel, port-security : absents (post-MVP). Sans STP, une boucle est coupée par un compteur de visites par injection.
+- `show vlan` = `show vlan brief` (pas de tableaux type/SAID/MTU) ; `show vlan id N` = ligne brief ; `show interfaces <if> switchport` absent.
+- Largeurs de `show vlan brief` copiées du PDF (Packet Tracer : 31 caractères de nom, 4 ports par ligne) ; un vrai 2960 utilise 32.
+- Noms de VLAN en doublon non refusés ; VLAN 1002-1005 refusés avec `Invalid input` (le vrai message IOS diffère).
+- Les VLAN créés apparaissent dans `running-config` (stanzas `vlan N`) alors que sur du vrai matériel ils sont dans `vlan.dat` selon la version d'IOS. `spanning-tree` non rendu.
+- Un nouveau SVI (`interface vlan N`) démarre `shutdown` ; supprimer un VLAN laisse ses ports configurés mais inactifs (trames abandonnées).
+- Les tables MAC ne font pas partie du `snapshot()` (état dynamique) et n'ont pas de vieillissement.
 - `ping` : pas encore (M4). `show interfaces` : compteurs à zéro, rendu simplifié (matériel « Lance » / « HD64570 » comme Packet Tracer).
 - Messages de lien : on imprime `%LINK-5-CHANGED` (style Packet Tracer, comme les PDF) ; un vrai matériel affiche `%LINK-3-UPDOWN` pour une montée/descente physique. Prévoir une option de style si on veut les deux.
 - Les transitions `administratively down` → `down` n'impriment rien (comme IOS) ; la montée de lien est immédiate (pas de délai).
@@ -36,7 +43,8 @@ Réalisé : `model/catalog.ts` (modèles et ports, polarité MDI/MDI-X, auto-MDI
 - États `up/down`, `show ip interface brief`, `show interfaces`, messages `%LINK-5-CHANGED`.
 - Série DCE/DTE, `clock rate`.
 
-## M3 — Couche 2
+## M3 — Couche 2 ✔
+Réalisé : VLAN (`vlan`, `name`, `no vlan`, création automatique à l'affectation d'un port, comme IOS), `interface range` (virgules, tirets, types mixtes), `switchport mode access|trunk`, `access vlan`, `trunk native vlan`, `trunk allowed vlan` (liste, `add`, `remove`, `all`, `none`), formes `no`, SVI créés à la demande (`interface vlan 99`) avec état dérivé des ports du VLAN, `ip default-gateway`, rendu de `running-config` (VLAN, `switchport`), `show vlan [brief|id]`, `show interface trunk`, `show mac address-table`, `clear mac address-table dynamic`, moteur de trames L2 (`engine/l2.ts` : classification access/trunk/natif, liste autorisée, apprentissage MAC par VLAN, inondation, étiquetage 802.1Q, purge à la chute du lien), goldens du TP VLAN.
 - VLAN, ports d'accès, trunk 802.1Q, MAC learning, `show vlan brief`, `show interfaces trunk`, `show mac address-table`.
 - Tests : isolation VLAN, trunk allowed/native.
 

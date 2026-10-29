@@ -1,3 +1,5 @@
+import { parseInterfaceRange } from '../interfaces.js';
+import { groupOf } from '../profiles.js';
 import type { CommandContext, CommandDef } from '../types.js';
 
 function startBanner(ctx: CommandContext, text: string): string {
@@ -104,7 +106,60 @@ export const globalCommands: CommandDef[] = [
     syntax: 'interface <name:iface>',
     help: 'Select an interface to configure',
     paramHelp: { name: 'Interface type and number' },
-    run: (ctx, args) => ctx.setMode('config-if', { interface: args.name as string }),
+    negatable: true,
+    run: (ctx, args) => {
+      const name = args.name as string;
+      const kind = groupOf(ctx.profile, name)?.kind;
+      if (ctx.negate) {
+        // Only SVIs can be deleted; physical interfaces are fixed.
+        if (kind !== 'svi' || name === 'Vlan1') ctx.invalid(1);
+        ctx.config.interfaces = ctx.config.interfaces.filter((i) => i.name !== name);
+        return;
+      }
+      // `interface vlan N` creates the SVI on first use, administratively down.
+      if (!ctx.config.interfaces.some((i) => i.name === name)) ctx.config.interfaces.push({ name, shutdown: true });
+      ctx.setMode('config-if', { interfaces: [name] });
+    },
+  },
+  {
+    modes: ['config'],
+    syntax: 'interface range <ports:text>',
+    help: 'Configure a range of interfaces',
+    paramHelp: { ports: 'Interface range, e.g. fa0/1 - 24 , fa0/30' },
+    run: (ctx, args) => {
+      const names = parseInterfaceRange(ctx.profile, args.ports as string) ?? ctx.invalid(2);
+      ctx.setMode('config-if-range', { interfaces: names });
+    },
+  },
+  {
+    modes: ['config'],
+    syntax: 'vlan <id:int:1-4094>',
+    help: 'VLAN commands',
+    paramHelp: { id: 'ISL VLAN IDs 1-4094' },
+    negatable: true,
+    run: (ctx, args) => {
+      const id = Number(args.id);
+      if (ctx.profile.family !== 'switch') ctx.invalid(0);
+      if (id >= 1002 && id <= 1005) ctx.invalid(1);
+      if (ctx.negate) {
+        if (id === 1) ctx.invalid(1);
+        ctx.config.vlans = ctx.config.vlans.filter((v) => v.id !== id);
+        return;
+      }
+      if (!ctx.config.vlans.some((v) => v.id === id) && id !== 1) ctx.config.vlans.push({ id });
+      ctx.setMode('config-vlan', { vlan: id });
+    },
+  },
+  {
+    modes: ['config'],
+    syntax: 'ip default-gateway <address:ip>',
+    help: 'Specify default gateway (if not routing IP)',
+    paramHelp: { address: 'IP address of default gateway' },
+    negatable: true,
+    run: (ctx, args) => {
+      if (ctx.negate) delete ctx.config.defaultGateway;
+      else ctx.config.defaultGateway = args.address as string;
+    },
   },
   {
     modes: ['config'],

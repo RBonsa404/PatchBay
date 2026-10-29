@@ -74,6 +74,13 @@ Règles (avec drapeau de difficulté par niveau : `strictMdix: true|false`) :
 - Console : `consoleTarget(pcId)` donne l'équipement derrière le câble console d'un PC ; c'est ce que le terminal de l'interface ouvrira.
 - `snapshot()` / `Network.restore()` (JSON) : base des sauvegardes et des tests de replay.
 
+### Trames et couche 2 (implémenté en M3)
+
+- `engine/l2.ts` : `injectFrame(net, from, frame)` envoie une trame par un port d'hôte et la suit jusqu'aux hôtes (`FrameTrace` : `deliveries` + `drops` avec raison). Pour chaque switch : classification du VLAN (port d'accès → `accessVlan` ; trunk → étiquette ou VLAN natif, filtrée par la liste autorisée), apprentissage de l'adresse source par VLAN, puis envoi vers le port connu ou inondation vers les membres du VLAN dont le lien est `up`. Sortie trunk : étiquetée sauf VLAN natif ; sortie accès : sans étiquette. Un port d'accès abandonne une trame étiquetée.
+- `Network.macTables` (`MacTables`) : état dynamique par switch, hors `snapshot()`, purgé quand un port quitte `up`.
+- Le routeur ne traite pas encore les trames reçues (M4) : `injectFrame` les livre comme à un hôte.
+- Les SVI (`interface vlan N`) sont créés à la demande ; `groupOf` les reconnaît par leur type, et leur état dépend de l'existence du VLAN et d'au moins un port actif dans ce VLAN (`memberOf`).
+
 ### CLI IOS
 
 - Machine à états par équipement : `user → privileged → config → config-if / config-line / config-router / config-std-nacl / config-ext-nacl / config-subif…`.
