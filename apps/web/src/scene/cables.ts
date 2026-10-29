@@ -42,7 +42,7 @@ const LANE = 0.016;
  * flat along the bench to the other device. Each cable has its own lane (`lane`), so neighbours lie side by side
  * instead of crossing in the air. Two ports in the rack, close to each other, get a short patch loop instead.
  */
-function routeBetween(a: THREE.Vector3, na: THREE.Vector3, b: THREE.Vector3, nb: THREE.Vector3, lane: number, radius: number): THREE.CatmullRomCurve3 {
+function routeBetween(a: THREE.Vector3, na: THREE.Vector3, b: THREE.Vector3, nb: THREE.Vector3, lane: number, radius: number, obstacles: THREE.Box3[]): THREE.CatmullRomCurve3 {
   const lead = 0.05;
   const a1 = a.clone().addScaledVector(na, lead);
   const b1 = b.clone().addScaledVector(nb, lead);
@@ -79,11 +79,79 @@ function routeBetween(a: THREE.Vector3, na: THREE.Vector3, b: THREE.Vector3, nb:
   const db = down(b1, nb, highB).reverse();
   const ta = da[da.length - 1] as THREE.Vector3;
   const tb = db[0] as THREE.Vector3;
-  // Lie flat: one point in the middle of the run, on the bench, in the lane.
-  const mid = ta.clone().lerp(tb, 0.5);
-  mid.y = rest;
-  mid.z += offset * 0.5;
-  return new THREE.CatmullRomCurve3([a, a1, ...da, mid, ...db, b1, b], false, 'centripetal', 0.5);
+  // Lie flat along the bench, going around whatever stands on it.
+  const around = avoid(ta, tb, obstacles, offset, 0);
+  let run = around;
+  if (around.length === 0) {
+    const mid = ta.clone().lerp(tb, 0.5);
+    mid.z += offset * 0.5;
+    run = [mid];
+  }
+  for (const p of run) p.y = rest;
+  return new THREE.CatmullRomCurve3([a, a1, ...da, ...run, ...db, b1, b], false, 'centripetal', 0.5);
+}
+
+/** Clearance kept between a cable lying on the bench and the objects standing on it. */
+const CLEARANCE = 0.035;
+
+/**
+ * Points to pass through so that the straight run from `a` to `b` (on the bench, seen from above) goes around every
+ * obstacle instead of through it: at the first box in the way, take the shorter way round its corners, then check
+ * the two halves again. The lane offset widens the detour so neighbouring cables do not overlap.
+ */
+function avoid(a: THREE.Vector3, b: THREE.Vector3, boxes: THREE.Box3[], offset: number, depth: number): THREE.Vector3[] {
+  if (depth > 4) return [];
+  const margin = CLEARANCE + offset;
+  let hit: { box: THREE.Box3; t: number } | null = null;
+  for (const box of boxes) {
+    const t = segmentHitsRect(a, b, box.min.x - margin, box.max.x + margin, box.min.z - margin, box.max.z + margin);
+    if (t !== null && (!hit || t < hit.t)) hit = { box, t };
+  }
+  if (!hit) return [];
+  const { box } = hit;
+  const m = margin + 0.005;
+  const corners = [
+    new THREE.Vector3(box.min.x - m, a.y, box.min.z - m),
+    new THREE.Vector3(box.max.x + m, a.y, box.min.z - m),
+    new THREE.Vector3(box.max.x + m, a.y, box.max.z + m),
+    new THREE.Vector3(box.min.x - m, a.y, box.max.z + m),
+  ];
+  // Corners on each side of the line a → b, visited in the order of travel.
+  const dir = b.clone().sub(a);
+  const side = (p: THREE.Vector3): number => dir.x * (p.z - a.z) - dir.z * (p.x - a.x);
+  const along = (p: THREE.Vector3): number => (p.x - a.x) * dir.x + (p.z - a.z) * dir.z;
+  const left = corners.filter((p) => side(p) > 0).sort((p, q) => along(p) - along(q));
+  const right = corners.filter((p) => side(p) <= 0).sort((p, q) => along(p) - along(q));
+  const length = (pts: THREE.Vector3[]): number => [a, ...pts, b].reduce((n, p, i, all) => (i ? n + p.distanceTo(all[i - 1] as THREE.Vector3) : 0), 0);
+  const way = left.length && (!right.length || length(left) <= length(right)) ? left : right;
+  if (way.length === 0) return [];
+  // Recurse on each leg, in case another object stands on it.
+  const out: THREE.Vector3[] = [];
+  const stops = [a, ...way, b];
+  for (let i = 0; i < stops.length - 1; i++) {
+    out.push(...avoid(stops[i] as THREE.Vector3, stops[i + 1] as THREE.Vector3, boxes.filter((x) => x !== box), offset, depth + 1));
+    if (i < way.length) out.push(way[i] as THREE.Vector3);
+  }
+  return out;
+}
+
+/** Where (0..1) the segment a → b first enters the rectangle, seen from above; null if it misses it. */
+function segmentHitsRect(a: THREE.Vector3, b: THREE.Vector3, x0: number, x1: number, z0: number, z1: number): number | null {
+  let t0 = 0;
+  let t1 = 1;
+  const dx = b.x - a.x;
+  const dz = b.z - a.z;
+  for (const [p, q] of [[-dx, a.x - x0], [dx, x1 - a.x], [-dz, a.z - z0], [dz, z1 - a.z]] as const) {
+    if (p === 0) {
+      if (q < 0) return null;
+      continue;
+    }
+    const r = q / p;
+    if (p < 0) t0 = Math.max(t0, r);
+    else t1 = Math.min(t1, r);
+    if (t0 > t1) return null;
+  }
+  return t0;
 }
 
 function plug(type: CableType): THREE.Group {
@@ -112,6 +180,31 @@ export class CableLayer {
   /** Path of each cable, from its `a` end to its `b` end, for packets to travel along. */
   private readonly paths = new Map<string, { cable: Cable; curve: THREE.CatmullRomCurve3 }>();
   private readonly lanes = new Map<string, number>();
+  /** Boxes of the objects standing on the bench, which cables lying on it must go around. */
+  private obstacles: THREE.Box3[] = [];
+
+  /** Objects standing on the bench (world-space boxes). Call before the first `sync`. */
+  setObstacles(boxes: THREE.Box3[]): void {
+    // Objects close enough that no cable fits between them (a monitor beside its tower) count as one block, so
+    // detours go round the whole group instead of zigzagging through it.
+    const merged = boxes.filter((b) => b.min.y < BENCH_TOP + 0.05 && b.max.y > BENCH_TOP).map((b) => b.clone());
+    const near = (p: THREE.Box3, q: THREE.Box3): boolean =>
+      p.min.x - CLEARANCE * 2 < q.max.x && q.min.x - CLEARANCE * 2 < p.max.x && p.min.z - CLEARANCE * 2 < q.max.z && q.min.z - CLEARANCE * 2 < p.max.z;
+    for (let changed = true; changed; ) {
+      changed = false;
+      for (let i = 0; i < merged.length && !changed; i++) {
+        for (let j = i + 1; j < merged.length; j++) {
+          if (near(merged[i] as THREE.Box3, merged[j] as THREE.Box3)) {
+            (merged[i] as THREE.Box3).union(merged[j] as THREE.Box3);
+            merged.splice(j, 1);
+            changed = true;
+            break;
+          }
+        }
+      }
+    }
+    this.obstacles = merged;
+  }
   private preview: THREE.Mesh | null = null;
   private previewPlug: THREE.Group | null = null;
 
@@ -140,7 +233,7 @@ export class CableLayer {
       let lane = 0;
       while (used.has(lane)) lane++;
       this.lanes.set(key, lane);
-      const curve = routeBetween(a.point, a.normal, b.point, b.normal, lane, CABLE_STYLE[cable.type].radius);
+      const curve = routeBetween(a.point, a.normal, b.point, b.normal, lane, CABLE_STYLE[cable.type].radius, this.obstacles);
       const view = this.build(cable.type, a, b, curve);
       this.views.set(key, view);
       this.paths.set(key, { cable, curve });

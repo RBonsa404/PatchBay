@@ -110,7 +110,9 @@ Retours du porteur de projet après la première version jouable (à traiter qua
 - Notes de Claude : animation d'entrée dans la salle, son d'ambiance (ventilateurs), retour visuel au survol des ports, écran de résultats plus spectaculaire, captures pour la présentation.
 
 État après la première passe (2026-10-29) — fait : interface, icônes Lucide, logo PatchBay et logo du club, salle réaliste, équipements ancrés, câbles rangés, personnage d'Aïcha (portrait + texte qui s'écrit). Reste à faire :
-- Faire valider la nouvelle interface par le porteur de projet et itérer (couleurs, tailles, écran titre).
+- Interface validée par le porteur de projet (2026-10-29) : « beaucoup plus pro ». Garder cette direction, l'affiner sans tout casser.
+- **Personnage jouable** (demande du porteur de projet) : aujourd'hui on dirige la caméra. Il veut incarner un personnage qui se déplace dans la salle (vue à la troisième personne, ZQSD/flèches, manette), et qui s'approche de l'établi pour travailler.
+- **Physique des câbles** (demande du porteur de projet) : les câbles traversent les objets. Ils doivent contourner les équipements posés sur l'établi.
 - Baie : panneaux d'obturation dans les unités vides selon le niveau (la baie du niveau 2 paraît vide), guide-câbles verticaux.
 - Équipements plus fins (sérigraphie, faces arrière) ou modèles GLB CC0.
 - Aïcha en 3D ou animée (expressions, voix synthétisée en option), et un assistant qui répond aux questions de l'élève.

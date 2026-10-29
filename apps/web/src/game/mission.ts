@@ -77,6 +77,12 @@ export class Mission {
       this.picks.push(...view.body, ...[...view.ports.values()].map((p) => p.hit));
     }
     this.cables = new CableLayer(stage);
+    this.cables.setObstacles(
+      [...this.devices.values()].flatMap((v) => {
+        v.root.updateMatrixWorld(true);
+        return v.body.map((mesh) => new THREE.Box3().setFromObject(mesh));
+      }),
+    );
     stage.level.add(this.cables.group, buildWhiteboard(level));
     stage.controls.enabled = true;
     void stage.flyTo(HOME.position, HOME.target, 1.4);
