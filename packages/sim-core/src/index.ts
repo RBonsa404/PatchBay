@@ -17,3 +17,4 @@ export type { Level, LevelCable, LevelDevice, Text } from './scenario/level.js';
 export { evaluate } from './validation/objectives.js';
 export type { ConfigCheck, Evaluation, FailureReason, Objective, ObjectiveResult } from './validation/objectives.js';
 export type { RouteCode } from './protocols/l3/routing.js';
+export { canPlug } from './physical/rules.js';

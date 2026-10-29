@@ -30,6 +30,8 @@ npm test                    # Vitest, tous les packages
 npm run typecheck           # tsc --noEmit partout
 npm run lint                # ESLint
 npm run test -w @patchbay/sim-core   # un seul package
+npm run dev -w @patchbay/web          # le jeu 3D sur http://127.0.0.1:5180
+npm run build -w @patchbay/web        # build statique hors ligne (apps/web/dist)
 ```
 
 ## Conventions de code
@@ -45,7 +47,8 @@ npm run test -w @patchbay/sim-core   # un seul package
 
 ```
 apps/preview/        page de vérification du moteur (topologie 2D + consoles) : outil de dev, PAS l'interface finale
-apps/web/            LE JEU : scène 3D Three.js (équipements, ports, câbles à saisir/brancher, voyants, animations) + Vite/React  [M7]
+apps/web/            LE JEU : scène 3D Three.js (équipements, ports, câbles à saisir/brancher, voyants, animations), interface TypeScript sans framework (ADR 0001)  [M7]
+packages/content/    niveaux JSON validés par Zod (`campaign`)
 packages/sim-core/   moteur : modèle physique, mini-IOS, protocoles, validation
 packages/content/    niveaux (JSON) + schémas Zod + outils d'import de running-config [M7]
 docs/                vision, architecture, specs, roadmap, ADR, references/ (PDF de cours)

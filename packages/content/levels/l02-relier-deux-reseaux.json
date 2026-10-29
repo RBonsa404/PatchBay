@@ -1,67 +1,197 @@
 {
   "id": "l02-relier-deux-reseaux",
   "version": 1,
-  "title": { "fr": "Relier les deux salles", "en": "Linking the two rooms" },
+  "title": {
+    "fr": "Relier les deux salles",
+    "en": "Linking the two rooms"
+  },
   "story": {
     "fr": "Ta première installation a fonctionné : bravo ! Le club ouvre maintenant une deuxième salle de l'autre côté du campus. Chaque salle a son routeur et son réseau, mais elles ne se voient pas encore. Une liaison série a été tirée entre les deux bâtiments. À toi de les relier pour que les membres puissent partager leurs projets d'une salle à l'autre.",
     "en": "Your first setup works: well done! The club now opens a second room across the campus. Each room has its own router and network, but they cannot see each other yet. A serial line now runs between the buildings: link them so members can share their projects."
   },
   "brief": {
-    "fr": "1. Relie PC1 à R1 (Fa0/0) et PC2 à R2 (Fa0/0) : PC et routeur directement, sans switch.\n2. Relie R1 Serial0/0/0 à R2 Serial0/0/0 avec le câble série, côté DCE sur R1.\n3. Adresse les interfaces : R1 Fa0/0 = 192.168.1.1/24, R2 Fa0/0 = 192.168.2.1/24, liaison série en 10.0.0.0/30 (R1 = .1, R2 = .2).\n4. Le côté DCE fournit l'horloge (clock rate).\n5. Ajoute les routes statiques pour que chaque routeur connaisse le réseau de l'autre.\n6. Vérifie : PC1 doit joindre PC2 (192.168.2.10).",
+    "fr": "1. Relie PC1 à R1 (Fa0/0) et PC2 à R2 (Fa0/0) : PC et routeur directement, sans switch.\n2. Relie R1 Serial0/0/0 à R2 Serial0/0/0 avec le câble série, côté DCE sur R1.\n3. Adresse les interfaces : R1 Fa0/0 = 192.168.1.1/24, R2 Fa0/0 = 192.168.2.1/24, liaison série en 10.0.0.0/30 (R1 = .1, R2 = .2).\n4. Le côté DCE fournit l'horloge (clock rate).\n5. Ajoute les routes statiques pour que chaque routeur connaisse le réseau de l'autre.\nLe portable ADMIN n'a qu'un câble console : configure un routeur, puis déplace le câble vers l'autre.\n6. Vérifie : PC1 doit joindre PC2 (192.168.2.10).",
     "en": "Cable PC1-R1 and PC2-R2 directly, the serial link R1 (DCE) - R2, address everything (LANs 192.168.1.0/24 and 192.168.2.0/24, link 10.0.0.0/30), set the clock on the DCE end, add static routes both ways, then ping PC2 from PC1."
   },
   "difficulty": 2,
-  "settings": { "strictMdix": true },
+  "settings": {
+    "strictMdix": true
+  },
   "devices": [
-    { "id": "R1", "model": "cisco-1841", "label": { "fr": "Routeur salle A", "en": "Room A router" }, "position": [-1.5, 0.9, -0.4] },
-    { "id": "R2", "model": "cisco-1841", "label": { "fr": "Routeur salle B", "en": "Room B router" }, "position": [1.5, 0.9, -0.4] },
-    { "id": "PC1", "model": "pc", "label": { "fr": "PC salle A", "en": "Room A PC" }, "position": [-2.2, 0.8, 0.6] },
-    { "id": "PC2", "model": "pc", "label": { "fr": "PC salle B", "en": "Room B PC" }, "position": [2.2, 0.8, 0.6] }
+    {
+      "id": "ADMIN",
+      "model": "pc",
+      "label": {
+        "fr": "Portable d'administration",
+        "en": "Admin laptop"
+      },
+      "position": [
+        0,
+        0.76,
+        0.5
+      ]
+    },
+    {
+      "id": "R1",
+      "model": "cisco-1841",
+      "label": {
+        "fr": "Routeur salle A",
+        "en": "Room A router"
+      },
+      "position": [
+        -0.62,
+        0.76,
+        -0.05
+      ]
+    },
+    {
+      "id": "R2",
+      "model": "cisco-1841",
+      "label": {
+        "fr": "Routeur salle B",
+        "en": "Room B router"
+      },
+      "position": [
+        0.62,
+        0.76,
+        -0.05
+      ]
+    },
+    {
+      "id": "PC1",
+      "model": "pc",
+      "label": {
+        "fr": "PC salle A",
+        "en": "Room A PC"
+      },
+      "position": [
+        -1.25,
+        0.76,
+        0.42
+      ]
+    },
+    {
+      "id": "PC2",
+      "model": "pc",
+      "label": {
+        "fr": "PC salle B",
+        "en": "Room B PC"
+      },
+      "position": [
+        1.25,
+        0.76,
+        0.42
+      ]
+    }
   ],
-  "inventory": { "cables": { "straight": 2, "crossover": 2, "serial": 1 } },
+  "inventory": {
+    "cables": {
+      "straight": 2,
+      "crossover": 2,
+      "console": 1,
+      "serial": 1
+    }
+  },
   "initial": {
     "cables": [],
     "hosts": {
-      "PC1": { "ip": "192.168.1.10", "mask": "255.255.255.0", "gateway": "192.168.1.1" },
-      "PC2": { "ip": "192.168.2.10", "mask": "255.255.255.0", "gateway": "192.168.2.1" }
+      "PC1": {
+        "ip": "192.168.1.10",
+        "mask": "255.255.255.0",
+        "gateway": "192.168.1.1"
+      },
+      "PC2": {
+        "ip": "192.168.2.10",
+        "mask": "255.255.255.0",
+        "gateway": "192.168.2.1"
+      }
     },
     "commands": {
-      "R1": ["enable", "configure terminal", "hostname R1", "end"],
-      "R2": ["enable", "configure terminal", "hostname R2", "end"]
+      "R1": [
+        "enable",
+        "configure terminal",
+        "hostname R1",
+        "end"
+      ],
+      "R2": [
+        "enable",
+        "configure terminal",
+        "hostname R2",
+        "end"
+      ]
     }
   },
   "objectives": [
     {
       "id": "cable-pc1",
       "type": "cable",
-      "cable": { "type": "crossover", "a": "PC1:FastEthernet0", "b": "R1:FastEthernet0/0" },
-      "label": { "fr": "PC1 relié directement à R1", "en": "PC1 cabled straight to R1" },
-      "hint": { "fr": "PC et routeur ont le même brochage : il faut un câble croisé.", "en": "A PC and a router are wired alike: use a crossover cable." },
+      "cable": {
+        "type": "crossover",
+        "a": "PC1:FastEthernet0",
+        "b": "R1:FastEthernet0/0"
+      },
+      "label": {
+        "fr": "PC1 relié directement à R1",
+        "en": "PC1 cabled straight to R1"
+      },
+      "hint": {
+        "fr": "PC et routeur ont le même brochage : il faut un câble croisé.",
+        "en": "A PC and a router are wired alike: use a crossover cable."
+      },
       "points": 10
     },
     {
       "id": "cable-pc2",
       "type": "cable",
-      "cable": { "type": "crossover", "a": "PC2:FastEthernet0", "b": "R2:FastEthernet0/0" },
-      "label": { "fr": "PC2 relié directement à R2", "en": "PC2 cabled straight to R2" },
-      "hint": { "fr": "Même règle que pour PC1 : câble croisé.", "en": "Same rule as PC1: crossover cable." },
+      "cable": {
+        "type": "crossover",
+        "a": "PC2:FastEthernet0",
+        "b": "R2:FastEthernet0/0"
+      },
+      "label": {
+        "fr": "PC2 relié directement à R2",
+        "en": "PC2 cabled straight to R2"
+      },
+      "hint": {
+        "fr": "Même règle que pour PC1 : câble croisé.",
+        "en": "Same rule as PC1: crossover cable."
+      },
       "points": 10
     },
     {
       "id": "cable-serial",
       "type": "cable",
-      "cable": { "type": "serial", "a": "R1:Serial0/0/0", "b": "R2:Serial0/0/0" },
-      "label": { "fr": "Liaison série entre R1 (DCE) et R2", "en": "Serial link between R1 (DCE) and R2" },
-      "hint": { "fr": "Le câble série a deux bouts différents : l'extrémité DCE se branche sur R1.", "en": "The serial cable has two different ends: the DCE end goes into R1." },
+      "cable": {
+        "type": "serial",
+        "a": "R1:Serial0/0/0",
+        "b": "R2:Serial0/0/0"
+      },
+      "label": {
+        "fr": "Liaison série entre R1 (DCE) et R2",
+        "en": "Serial link between R1 (DCE) and R2"
+      },
+      "hint": {
+        "fr": "Le câble série a deux bouts différents : l'extrémité DCE se branche sur R1.",
+        "en": "The serial cable has two different ends: the DCE end goes into R1."
+      },
       "points": 10
     },
     {
       "id": "clock",
       "type": "config",
       "device": "R1",
-      "check": { "kind": "clock-rate", "interface": "Serial0/0/0" },
-      "label": { "fr": "Horloge fournie par le côté DCE", "en": "Clock provided by the DCE end" },
-      "hint": { "fr": "Sur R1 : interface s0/0/0, puis clock rate 64000.", "en": "On R1: interface s0/0/0, then clock rate 64000." },
+      "check": {
+        "kind": "clock-rate",
+        "interface": "Serial0/0/0"
+      },
+      "label": {
+        "fr": "Horloge fournie par le côté DCE",
+        "en": "Clock provided by the DCE end"
+      },
+      "hint": {
+        "fr": "Sur R1 : interface s0/0/0, puis clock rate 64000.",
+        "en": "On R1: interface s0/0/0, then clock rate 64000."
+      },
       "points": 10
     },
     {
@@ -69,24 +199,46 @@
       "type": "link-up",
       "device": "R1",
       "port": "Serial0/0/0",
-      "label": { "fr": "Liaison série active (up/up)", "en": "Serial link up/up" },
-      "hint": { "fr": "show ip interface brief : si le protocole reste down, il manque l'horloge ou un no shutdown en face.", "en": "show ip interface brief: if the protocol stays down, the clock or a no shutdown is missing." },
+      "label": {
+        "fr": "Liaison série active (up/up)",
+        "en": "Serial link up/up"
+      },
+      "hint": {
+        "fr": "show ip interface brief : si le protocole reste down, il manque l'horloge ou un no shutdown en face.",
+        "en": "show ip interface brief: if the protocol stays down, the clock or a no shutdown is missing."
+      },
       "points": 10
     },
     {
       "id": "lan1-ip",
       "type": "config",
       "device": "R1",
-      "check": { "kind": "interface-ip", "interface": "FastEthernet0/0", "ip": "192.168.1.1", "mask": "255.255.255.0" },
-      "label": { "fr": "R1 Fa0/0 en 192.168.1.1/24", "en": "R1 Fa0/0 is 192.168.1.1/24" },
+      "check": {
+        "kind": "interface-ip",
+        "interface": "FastEthernet0/0",
+        "ip": "192.168.1.1",
+        "mask": "255.255.255.0"
+      },
+      "label": {
+        "fr": "R1 Fa0/0 en 192.168.1.1/24",
+        "en": "R1 Fa0/0 is 192.168.1.1/24"
+      },
       "points": 5
     },
     {
       "id": "lan2-ip",
       "type": "config",
       "device": "R2",
-      "check": { "kind": "interface-ip", "interface": "FastEthernet0/0", "ip": "192.168.2.1", "mask": "255.255.255.0" },
-      "label": { "fr": "R2 Fa0/0 en 192.168.2.1/24", "en": "R2 Fa0/0 is 192.168.2.1/24" },
+      "check": {
+        "kind": "interface-ip",
+        "interface": "FastEthernet0/0",
+        "ip": "192.168.2.1",
+        "mask": "255.255.255.0"
+      },
+      "label": {
+        "fr": "R2 Fa0/0 en 192.168.2.1/24",
+        "en": "R2 Fa0/0 is 192.168.2.1/24"
+      },
       "points": 5
     },
     {
@@ -95,8 +247,14 @@
       "device": "R1",
       "prefix": "192.168.2.0/24",
       "protocol": "S",
-      "label": { "fr": "R1 connaît le réseau de la salle B", "en": "R1 knows room B's network" },
-      "hint": { "fr": "ip route 192.168.2.0 255.255.255.0 10.0.0.2", "en": "ip route 192.168.2.0 255.255.255.0 10.0.0.2" },
+      "label": {
+        "fr": "R1 connaît le réseau de la salle B",
+        "en": "R1 knows room B's network"
+      },
+      "hint": {
+        "fr": "ip route 192.168.2.0 255.255.255.0 10.0.0.2",
+        "en": "ip route 192.168.2.0 255.255.255.0 10.0.0.2"
+      },
       "points": 10
     },
     {
@@ -105,8 +263,14 @@
       "device": "R2",
       "prefix": "192.168.1.0/24",
       "protocol": "S",
-      "label": { "fr": "R2 connaît le réseau de la salle A", "en": "R2 knows room A's network" },
-      "hint": { "fr": "Le retour compte aussi : sans route sur R2, la réponse ne revient jamais.", "en": "The way back matters too: without a route on R2, the reply never returns." },
+      "label": {
+        "fr": "R2 connaît le réseau de la salle A",
+        "en": "R2 knows room A's network"
+      },
+      "hint": {
+        "fr": "Le retour compte aussi : sans route sur R2, la réponse ne revient jamais.",
+        "en": "The way back matters too: without a route on R2, the reply never returns."
+      },
       "points": 10
     },
     {
@@ -115,19 +279,43 @@
       "from": "PC1",
       "to": "192.168.2.10",
       "expect": "success",
-      "label": { "fr": "PC1 joint PC2 d'une salle à l'autre", "en": "PC1 reaches PC2 across the rooms" },
-      "hint": { "fr": "Teste étape par étape : passerelle, interface série d'en face, puis PC2.", "en": "Test step by step: gateway, the far serial interface, then PC2." },
+      "label": {
+        "fr": "PC1 joint PC2 d'une salle à l'autre",
+        "en": "PC1 reaches PC2 across the rooms"
+      },
+      "hint": {
+        "fr": "Teste étape par étape : passerelle, interface série d'en face, puis PC2.",
+        "en": "Test step by step: gateway, the far serial interface, then PC2."
+      },
       "points": 20
     }
   ],
   "hints": [
-    { "afterSeconds": 120, "text": { "fr": "show ip route sur chaque routeur : chaque réseau distant doit y apparaître.", "en": "show ip route on each router: every remote network must be listed." } }
+    {
+      "afterSeconds": 120,
+      "text": {
+        "fr": "show ip route sur chaque routeur : chaque réseau distant doit y apparaître.",
+        "en": "show ip route on each router: every remote network must be listed."
+      }
+    }
   ],
   "solution": {
     "cables": [
-      { "type": "crossover", "a": "PC1:FastEthernet0", "b": "R1:FastEthernet0/0" },
-      { "type": "crossover", "a": "PC2:FastEthernet0", "b": "R2:FastEthernet0/0" },
-      { "type": "serial", "a": "R1:Serial0/0/0", "b": "R2:Serial0/0/0" }
+      {
+        "type": "crossover",
+        "a": "PC1:FastEthernet0",
+        "b": "R1:FastEthernet0/0"
+      },
+      {
+        "type": "crossover",
+        "a": "PC2:FastEthernet0",
+        "b": "R2:FastEthernet0/0"
+      },
+      {
+        "type": "serial",
+        "a": "R1:Serial0/0/0",
+        "b": "R2:Serial0/0/0"
+      }
     ],
     "commands": {
       "R1": [

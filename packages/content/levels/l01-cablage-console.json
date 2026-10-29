@@ -1,7 +1,10 @@
 {
   "id": "l01-cablage-console",
   "version": 1,
-  "title": { "fr": "Premier jour en salle technique", "en": "First day in the server room" },
+  "title": {
+    "fr": "Premier jour en salle technique",
+    "en": "First day in the server room"
+  },
   "story": {
     "fr": "Bienvenue au Club Informatique de l'IST ! Le bureau du club vient de recevoir un routeur et un switch pour équiper la salle de TP. Le responsable technique te confie ta première mission : brancher le matériel proprement et préparer le routeur. Les autres membres comptent sur toi pour que le PC de la salle puisse joindre le routeur avant la séance de demain.",
     "en": "Welcome to the IST Computer Club! The club has just received a router and a switch for the lab room. The technical lead gives you your first mission: cable the equipment properly and prepare the router so the lab PC can reach it before tomorrow's session."
@@ -11,34 +14,116 @@
     "en": "Cable PC1 to S1 Fa0/1, S1 Gi0/1 to R1 Gi0/0, the ADMIN laptop's console cable to R1, then configure R1 (hostname, enable secret, console password, Gi0/0 = 192.168.10.1/24), test from PC1 and save."
   },
   "difficulty": 1,
-  "settings": { "strictMdix": true },
+  "settings": {
+    "strictMdix": true
+  },
   "devices": [
-    { "id": "ADMIN", "model": "pc", "label": { "fr": "Portable d'administration", "en": "Admin laptop" }, "position": [-1.2, 0.8, 0.6] },
-    { "id": "PC1", "model": "pc", "label": { "fr": "PC de la salle", "en": "Lab PC" }, "position": [1.4, 0.8, 0.6] },
-    { "id": "S1", "model": "catalyst-2960", "label": { "fr": "Switch de la salle", "en": "Lab switch" }, "position": [0, 1.2, -0.4] },
-    { "id": "R1", "model": "cisco-2911", "label": { "fr": "Routeur du club", "en": "Club router" }, "position": [0, 0.9, -0.4] }
+    {
+      "id": "ADMIN",
+      "model": "pc",
+      "label": {
+        "fr": "Portable d'administration",
+        "en": "Admin laptop"
+      },
+      "position": [
+        -0.8,
+        0.76,
+        0.25
+      ]
+    },
+    {
+      "id": "PC1",
+      "model": "pc",
+      "label": {
+        "fr": "PC de la salle",
+        "en": "Lab PC"
+      },
+      "position": [
+        0.7,
+        0.76,
+        0.25
+      ]
+    },
+    {
+      "id": "S1",
+      "model": "catalyst-2960",
+      "label": {
+        "fr": "Switch de la salle",
+        "en": "Lab switch"
+      },
+      "position": [
+        0,
+        1.2,
+        -0.4
+      ]
+    },
+    {
+      "id": "R1",
+      "model": "cisco-2911",
+      "label": {
+        "fr": "Routeur du club",
+        "en": "Club router"
+      },
+      "position": [
+        0,
+        0.9,
+        -0.4
+      ]
+    }
   ],
-  "inventory": { "cables": { "straight": 3, "crossover": 2, "console": 1 } },
+  "inventory": {
+    "cables": {
+      "straight": 3,
+      "crossover": 2,
+      "console": 1
+    }
+  },
   "initial": {
     "cables": [],
-    "hosts": { "PC1": { "ip": "192.168.10.10", "mask": "255.255.255.0", "gateway": "192.168.10.1" } },
+    "hosts": {
+      "PC1": {
+        "ip": "192.168.10.10",
+        "mask": "255.255.255.0",
+        "gateway": "192.168.10.1"
+      }
+    },
     "commands": {}
   },
   "objectives": [
     {
       "id": "cable-pc1",
       "type": "cable",
-      "cable": { "type": "straight", "a": "PC1:FastEthernet0", "b": "S1:FastEthernet0/1" },
-      "label": { "fr": "PC1 relié au switch avec le bon câble", "en": "PC1 cabled to the switch with the right cable" },
-      "hint": { "fr": "Un PC et un switch n'ont pas le même brochage : c'est un câble droit.", "en": "A PC and a switch are wired differently: use a straight-through cable." },
+      "cable": {
+        "type": "straight",
+        "a": "PC1:FastEthernet0",
+        "b": "S1:FastEthernet0/1"
+      },
+      "label": {
+        "fr": "PC1 relié au switch avec le bon câble",
+        "en": "PC1 cabled to the switch with the right cable"
+      },
+      "hint": {
+        "fr": "Un PC et un switch n'ont pas le même brochage : c'est un câble droit.",
+        "en": "A PC and a switch are wired differently: use a straight-through cable."
+      },
       "points": 10
     },
     {
       "id": "cable-uplink",
       "type": "cable",
-      "cable": { "type": "straight", "a": "S1:GigabitEthernet0/1", "b": "R1:GigabitEthernet0/0" },
-      "label": { "fr": "Switch relié au routeur avec le bon câble", "en": "Switch cabled to the router with the right cable" },
-      "hint": { "fr": "Switch vers routeur : brochages différents, donc câble droit.", "en": "Switch to router: different wiring, straight-through cable." },
+      "cable": {
+        "type": "straight",
+        "a": "S1:GigabitEthernet0/1",
+        "b": "R1:GigabitEthernet0/0"
+      },
+      "label": {
+        "fr": "Switch relié au routeur avec le bon câble",
+        "en": "Switch cabled to the router with the right cable"
+      },
+      "hint": {
+        "fr": "Switch vers routeur : brochages différents, donc câble droit.",
+        "en": "Switch to router: different wiring, straight-through cable."
+      },
       "points": 10
     },
     {
@@ -46,44 +131,86 @@
       "type": "console",
       "from": "ADMIN",
       "to": "R1",
-      "label": { "fr": "Câble console branché entre ADMIN et R1", "en": "Console cable between ADMIN and R1" },
-      "hint": { "fr": "Le câble console (bleu clair) va du port RS232 du portable au port CONSOLE du routeur.", "en": "The console cable goes from the laptop's RS232 port to the router's CONSOLE port." },
+      "label": {
+        "fr": "Câble console branché entre ADMIN et R1",
+        "en": "Console cable between ADMIN and R1"
+      },
+      "hint": {
+        "fr": "Le câble console (bleu clair) va du port RS232 du portable au port CONSOLE du routeur.",
+        "en": "The console cable goes from the laptop's RS232 port to the router's CONSOLE port."
+      },
       "points": 10
     },
     {
       "id": "hostname",
       "type": "config",
       "device": "R1",
-      "check": { "kind": "hostname", "equals": "R1" },
-      "label": { "fr": "Le routeur s'appelle R1", "en": "The router is named R1" },
-      "hint": { "fr": "En mode configuration globale : hostname R1", "en": "In global configuration mode: hostname R1" },
+      "check": {
+        "kind": "hostname",
+        "equals": "R1"
+      },
+      "label": {
+        "fr": "Le routeur s'appelle R1",
+        "en": "The router is named R1"
+      },
+      "hint": {
+        "fr": "En mode configuration globale : hostname R1",
+        "en": "In global configuration mode: hostname R1"
+      },
       "points": 5
     },
     {
       "id": "enable-secret",
       "type": "config",
       "device": "R1",
-      "check": { "kind": "enable-secret" },
-      "label": { "fr": "Mode privilégié protégé (enable secret)", "en": "Privileged mode protected (enable secret)" },
-      "hint": { "fr": "enable secret <mot de passe>, en configuration globale.", "en": "enable secret <password>, in global configuration." },
+      "check": {
+        "kind": "enable-secret"
+      },
+      "label": {
+        "fr": "Mode privilégié protégé (enable secret)",
+        "en": "Privileged mode protected (enable secret)"
+      },
+      "hint": {
+        "fr": "enable secret <mot de passe>, en configuration globale.",
+        "en": "enable secret <password>, in global configuration."
+      },
       "points": 10
     },
     {
       "id": "console-login",
       "type": "config",
       "device": "R1",
-      "check": { "kind": "console-login" },
-      "label": { "fr": "Console protégée par mot de passe", "en": "Console protected by a password" },
-      "hint": { "fr": "line console 0, puis password <mot de passe> et login.", "en": "line console 0, then password <password> and login." },
+      "check": {
+        "kind": "console-login"
+      },
+      "label": {
+        "fr": "Console protégée par mot de passe",
+        "en": "Console protected by a password"
+      },
+      "hint": {
+        "fr": "line console 0, puis password <mot de passe> et login.",
+        "en": "line console 0, then password <password> and login."
+      },
       "points": 10
     },
     {
       "id": "gi0-ip",
       "type": "config",
       "device": "R1",
-      "check": { "kind": "interface-ip", "interface": "GigabitEthernet0/0", "ip": "192.168.10.1", "mask": "255.255.255.0" },
-      "label": { "fr": "Gi0/0 adressée en 192.168.10.1/24", "en": "Gi0/0 addressed 192.168.10.1/24" },
-      "hint": { "fr": "interface g0/0, puis ip address 192.168.10.1 255.255.255.0", "en": "interface g0/0, then ip address 192.168.10.1 255.255.255.0" },
+      "check": {
+        "kind": "interface-ip",
+        "interface": "GigabitEthernet0/0",
+        "ip": "192.168.10.1",
+        "mask": "255.255.255.0"
+      },
+      "label": {
+        "fr": "Gi0/0 adressée en 192.168.10.1/24",
+        "en": "Gi0/0 addressed 192.168.10.1/24"
+      },
+      "hint": {
+        "fr": "interface g0/0, puis ip address 192.168.10.1 255.255.255.0",
+        "en": "interface g0/0, then ip address 192.168.10.1 255.255.255.0"
+      },
       "points": 10
     },
     {
@@ -91,8 +218,14 @@
       "type": "link-up",
       "device": "R1",
       "port": "GigabitEthernet0/0",
-      "label": { "fr": "Lien Gi0/0 actif (up/up)", "en": "Gi0/0 link up/up" },
-      "hint": { "fr": "Les interfaces d'un routeur sont désactivées au départ : no shutdown. Vérifie aussi le câble.", "en": "Router interfaces start shut down: no shutdown. Check the cable too." },
+      "label": {
+        "fr": "Lien Gi0/0 actif (up/up)",
+        "en": "Gi0/0 link up/up"
+      },
+      "hint": {
+        "fr": "Les interfaces d'un routeur sont désactivées au départ : no shutdown. Vérifie aussi le câble.",
+        "en": "Router interfaces start shut down: no shutdown. Check the cable too."
+      },
       "points": 5
     },
     {
@@ -101,28 +234,64 @@
       "from": "PC1",
       "to": "192.168.10.1",
       "expect": "success",
-      "label": { "fr": "PC1 joint le routeur (ping 192.168.10.1)", "en": "PC1 reaches the router (ping 192.168.10.1)" },
-      "hint": { "fr": "Si le ping échoue : câbles, voyants, adresse et no shutdown.", "en": "If the ping fails: cables, LEDs, address and no shutdown." },
+      "label": {
+        "fr": "PC1 joint le routeur (ping 192.168.10.1)",
+        "en": "PC1 reaches the router (ping 192.168.10.1)"
+      },
+      "hint": {
+        "fr": "Si le ping échoue : câbles, voyants, adresse et no shutdown.",
+        "en": "If the ping fails: cables, LEDs, address and no shutdown."
+      },
       "points": 15
     },
     {
       "id": "saved",
       "type": "saved",
       "device": "R1",
-      "label": { "fr": "Configuration sauvegardée", "en": "Configuration saved" },
-      "hint": { "fr": "copy running-config startup-config (ou write memory), sinon tout est perdu au redémarrage.", "en": "copy running-config startup-config (or write memory), otherwise it is lost on reboot." },
+      "label": {
+        "fr": "Configuration sauvegardée",
+        "en": "Configuration saved"
+      },
+      "hint": {
+        "fr": "copy running-config startup-config (ou write memory), sinon tout est perdu au redémarrage.",
+        "en": "copy running-config startup-config (or write memory), otherwise it is lost on reboot."
+      },
       "points": 15
     }
   ],
   "hints": [
-    { "afterSeconds": 90, "text": { "fr": "Commence par les câbles : un voyant éteint veut souvent dire mauvais câble ou mauvais port.", "en": "Start with the cables: a dark LED often means a wrong cable or port." } },
-    { "afterSeconds": 300, "text": { "fr": "Dans la console, tape ? à tout moment pour voir les commandes possibles.", "en": "In the console, type ? at any time to list the possible commands." } }
+    {
+      "afterSeconds": 90,
+      "text": {
+        "fr": "Commence par les câbles : un voyant éteint veut souvent dire mauvais câble ou mauvais port.",
+        "en": "Start with the cables: a dark LED often means a wrong cable or port."
+      }
+    },
+    {
+      "afterSeconds": 300,
+      "text": {
+        "fr": "Dans la console, tape ? à tout moment pour voir les commandes possibles.",
+        "en": "In the console, type ? at any time to list the possible commands."
+      }
+    }
   ],
   "solution": {
     "cables": [
-      { "type": "straight", "a": "PC1:FastEthernet0", "b": "S1:FastEthernet0/1" },
-      { "type": "straight", "a": "S1:GigabitEthernet0/1", "b": "R1:GigabitEthernet0/0" },
-      { "type": "console", "a": "ADMIN:RS232", "b": "R1:Console" }
+      {
+        "type": "straight",
+        "a": "PC1:FastEthernet0",
+        "b": "S1:FastEthernet0/1"
+      },
+      {
+        "type": "straight",
+        "a": "S1:GigabitEthernet0/1",
+        "b": "R1:GigabitEthernet0/0"
+      },
+      {
+        "type": "console",
+        "a": "ADMIN:RS232",
+        "b": "R1:Console"
+      }
     ],
     "commands": {
       "R1": [

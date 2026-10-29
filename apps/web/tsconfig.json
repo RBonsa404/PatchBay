@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"],
+    "resolveJsonModule": true,
+    "noEmit": true
+  },
+  "include": ["src", "vite.config.ts", "../../packages/sim-core/src", "../../packages/content/src", "../../packages/content/levels/*.json"]
+}

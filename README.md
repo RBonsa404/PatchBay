@@ -13,7 +13,8 @@ Jeu web de formation réseau : reproduire sur le « terrain » une configuration
 ```bash
 npm install
 npm test
-npm run preview -w @patchbay/preview   # aperçu du moteur sur http://127.0.0.1:5173
+npm run dev -w @patchbay/web          # le jeu 3D sur http://127.0.0.1:5180
+npm run preview -w @patchbay/preview   # outil de vérification du moteur sur http://127.0.0.1:5173
 ```
 
 L'aperçu (`apps/preview`) fait tourner le vrai moteur dans le navigateur : topologie avec l'état des liens, console IOS par équipement, panneau pour configurer et pinguer les PC. Ce n'est pas l'interface finale (prévue en M7).

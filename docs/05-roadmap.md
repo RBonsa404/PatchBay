@@ -4,7 +4,7 @@ Règle : un milestone est terminé quand ses critères sont verts (tests, typech
 
 ## Prochaine étape
 
-**M0 à M6 sont faits : moteur réseau complet et les 2 niveaux du MVP** (`packages/content`, 193 tests). Commencer **M7, le jeu 3D** (objectif réel du projet) : `apps/web` avec Three.js, en suivant `docs/06-charte-club-ist.md`. Le jeu charge `campaign` depuis `@patchbay/content`, construit le réseau avec `buildLevel`, laisse le joueur câbler (`Network.connect`) et taper dans la console, puis appelle `evaluate` pour la checklist d'objectifs et le score. Les positions 3D des appareils sont déjà dans les niveaux (`devices[].position`).
+**M0 à M6 sont faits, M7 a une première version jouable** : `apps/web` (Three.js) fait jouer les 2 missions du MVP de bout en bout dans une salle technique en 3D (testé par de vrais clics simulés : 100/100 sur les deux missions). Prochaines étapes de M7 : animation des paquets (M7e), sons, modèles plus détaillés (ou GLB sous licence libre, `apps/web/ASSETS.md`), tutoriel guidé des premières actions, terminal des PC (`ipconfig`, `ping` en ligne de commande), mode manette/tactile, PWA hors ligne et moteur dans un Web Worker.
 
 À faire en parallèle (outillage) : passer Vitest en version 5 (alertes `npm audit` sur Vitest 2 / esbuild, outils de développement uniquement).
 
@@ -78,7 +78,10 @@ Réalisé : `scenario/level.ts` (modèle `Level` : appareils avec position 3D, i
 - Schéma Zod des niveaux, chargeur. **MVP : 2 niveaux** (décision du porteur de projet) : niveau 1 « Câblage et console » (choisir les bons câbles et ports, se connecter en console, configuration de base, sauvegarde), niveau 2 « Relier deux réseaux » (deux routeurs, liaison série, horloge DCE, routes statiques, test de bout en bout). Les autres niveaux de `docs/02-mvp-spec.md` viennent après.
 - Solutions de référence rejouables (scripts de commandes) → chaque niveau est testé automatiquement : la solution passe, l'état initial échoue.
 
-## M7 — Le jeu en 3D (interface finale)
+## M7 — Le jeu en 3D (interface finale) — en cours
+
+Réalisé (première version) : `apps/web` avec Vite + Three.js (ADR 0001 : interface sans framework) ; scène à rendu physique (ACES, ombres douces, environnement de réflexion généré, bloom sur les voyants, préréglages de qualité) ; salle procédurale aux couleurs du club (mur à circuit imprimé, établi, baie 19", enseigne) ; modèles procéduraux des routeurs 1841/2911, du switch 2960, du PC et du portable avec leurs vrais ports, voyants de lien (vert = up/up, ambre = série sans horloge) ; câblage à la souris (choix du câble, deux clics, refus visuel des connecteurs incompatibles, clic droit pour débrancher, câbles qui se déroulent) ; console IOS ouverte depuis le portable relié en console, panneau réseau des PC avec ping ; écran titre, choix des missions, briefing avec histoire, HUD d'objectifs cochés en direct, indices, résultats avec étoiles et meilleur score mémorisé. Lancer : `npm run dev -w @patchbay/web` puis http://127.0.0.1:5180.
+
 
 **C'est l'objectif réel du projet** : le moteur (M0–M6) n'en est que la base. Le joueur doit *voir* le matériel, prendre un câble à la souris, chercher le bon port (Ethernet, série, console) sur la face avant ou arrière, brancher, et voir les voyants réagir. Un simulateur 2D de type Packet Tracer ne suffit pas. L'aperçu `apps/preview` n'est qu'un outil de vérification du moteur.
 
