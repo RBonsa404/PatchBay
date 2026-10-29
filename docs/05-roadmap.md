@@ -4,7 +4,9 @@ Règle : un milestone est terminé quand ses critères sont verts (tests, typech
 
 ## Prochaine étape
 
-**M0 à M5 sont faits : le moteur réseau du MVP est complet** (câblage, VLAN, routage statique et inter-VLAN, OSPF, ACL, NAT ; 175 tests). Commencer **M6** (moteur d'objectifs et les 2 niveaux du MVP), puis **M7** (le jeu 3D), qui est l'objectif réel du projet. Le MVP est désormais défini comme **un jeu complet avec 2 niveaux** (voir M6 et `docs/02-mvp-spec.md`). La charte graphique est celle du **Club Informatique de l'IST** : `docs/06-charte-club-ist.md`.
+**M0 à M6 sont faits : moteur réseau complet et les 2 niveaux du MVP** (`packages/content`, 193 tests). Commencer **M7, le jeu 3D** (objectif réel du projet) : `apps/web` avec Three.js, en suivant `docs/06-charte-club-ist.md`. Le jeu charge `campaign` depuis `@patchbay/content`, construit le réseau avec `buildLevel`, laisse le joueur câbler (`Network.connect`) et taper dans la console, puis appelle `evaluate` pour la checklist d'objectifs et le score. Les positions 3D des appareils sont déjà dans les niveaux (`devices[].position`).
+
+À faire en parallèle (outillage) : passer Vitest en version 5 (alertes `npm audit` sur Vitest 2 / esbuild, outils de développement uniquement).
 
 Dettes connues de M4 :
 - Pas de commandes sur les PC (`ipconfig`, `ping` depuis un terminal de PC) : seulement l'API `Network.configureHost` / `Network.ping`. À prévoir avec l'interface (M7).
@@ -70,7 +72,8 @@ Réalisé : `protocols/l3/ip.ts` et `routing.ts` (table de routage pure : connec
 
 Dettes connues de M5 : une seule instance OSPF par routeur ; pas de timers (adjacences immédiates, « Dead Time » fixe, âge des routes 00:00:00) ; pas de zones stub/NSSA ni d'authentification ; élection DR non préemptive ignorée (le plus prioritaire gagne toujours) ; NAT sans `ip nat outside source` ni redirection de port statique ; `show ip nat translations` n'affiche pas les entrées étendues d'un pool sans surcharge ; pas de `telnet` interactif (seulement l'ouverture de connexion).
 
-## M6 — Validation et niveaux (moteur + contenu)
+## M6 — Validation et niveaux (moteur + contenu) ✔
+Réalisé : `scenario/level.ts` (modèle `Level` : appareils avec position 3D, inventaire de câbles, état initial, objectifs, indices, histoire, solution de référence ; `buildLevel`, `applySolution`), `validation/objectives.ts` (`evaluate` : objectifs câble — type, extrémités, sens DCE —, console, lien actif, configuration structurée, ping, TCP, route, sauvegarde ; raisons d'échec codées pour l'interface ; score), `packages/content` (schéma Zod strict avec références croisées, `parseLevel`, `campaign`), niveaux `l01-cablage-console` et `l02-relier-deux-reseaux` en français et anglais avec fil narratif autour du Club Informatique de l'IST. Chaque niveau est testé : non résolu au départ, résolu à 100 % par sa solution, erreurs typiques détectées.
 - Moteur d'objectifs, scoring, feedback i18n.
 - Schéma Zod des niveaux, chargeur. **MVP : 2 niveaux** (décision du porteur de projet) : niveau 1 « Câblage et console » (choisir les bons câbles et ports, se connecter en console, configuration de base, sauvegarde), niveau 2 « Relier deux réseaux » (deux routeurs, liaison série, horloge DCE, routes statiques, test de bout en bout). Les autres niveaux de `docs/02-mvp-spec.md` viennent après.
 - Solutions de référence rejouables (scripts de commandes) → chaque niveau est testé automatiquement : la solution passe, l'état initial échoue.

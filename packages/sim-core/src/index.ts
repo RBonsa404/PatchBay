@@ -12,3 +12,8 @@ export type { Cable, CableEnd, ConnectError, ConnectResult, Device, NetworkOptio
 export type { CableType } from './physical/rules.js';
 export type { ServiceResult } from './engine/l3.js';
 export type { HostConfig } from './model/network.js';
+export { applySolution, buildLevel, parseEnd } from './scenario/level.js';
+export type { Level, LevelCable, LevelDevice, Text } from './scenario/level.js';
+export { evaluate } from './validation/objectives.js';
+export type { ConfigCheck, Evaluation, FailureReason, Objective, ObjectiveResult } from './validation/objectives.js';
+export type { RouteCode } from './protocols/l3/routing.js';

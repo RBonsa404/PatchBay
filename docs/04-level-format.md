@@ -1,5 +1,7 @@
 # Format des niveaux
 
+> **Implémenté en M6** : le format réel est le type `Level` de `packages/sim-core/src/scenario/level.ts`, validé par `packages/content/src/schema.ts`. Exemples complets : `packages/content/levels/*.json`. Les objectifs disponibles sont dans `packages/sim-core/src/validation/objectives.ts` (`cable`, `console`, `link-up`, `config`, `ping`, `tcp`, `route`, `saved`). La description ci-dessous est l'intention d'origine.
+
 Un niveau est un fichier JSON validé par un schéma Zod (`packages/content/src/schema.ts`). Aucun niveau ne contient de code.
 
 ## Structure
