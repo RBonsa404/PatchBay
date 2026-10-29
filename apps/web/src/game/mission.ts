@@ -1,11 +1,13 @@
 import * as THREE from 'three';
-import { buildLevel, canPlug, catalog, evaluate, type CableType, type Evaluation, type Level, type Network, type ObjectiveResult, type PortSpec } from '@patchbay/sim-core';
+import { buildLevel, canPlug, catalog, evaluate, type CableEnd, type CableType, type EthernetFrame, type Evaluation, type L3Payload, type Level, type Network, type ObjectiveResult, type PortSpec } from '@patchbay/sim-core';
+import { sound } from '../audio.js';
 import { t, tx } from '../i18n.js';
+import { Coach, type CoachView } from './coach.js';
 import { CableLayer, portFrame } from '../scene/cables.js';
 import { buildDevice, highlightSocket, setLed, type DeviceView, type PortView } from '../scene/devices.js';
 import type { Quality, Stage } from '../scene/stage.js';
 import { Hud } from '../ui/hud.js';
-import { closePanel, Consoles, showHostPanel, showNotice } from '../ui/panels.js';
+import { closePanel, Consoles, openPanelKey, showHostPanel, showNotice } from '../ui/panels.js';
 
 const HOME = { position: new THREE.Vector3(0, 1.78, 2.45), target: new THREE.Vector3(0, 0.86, 0.02) };
 const ACCEPTS: Record<CableType, PortSpec['kind'][]> = {
@@ -16,6 +18,20 @@ const ACCEPTS: Record<CableType, PortSpec['kind'][]> = {
 };
 /** Objectives that send traffic: checked when the player asks, not after every keystroke. */
 const TRAFFIC = new Set(['ping', 'tcp']);
+/** Colour of an animated frame: what it carries. */
+function packetColour(frame: EthernetFrame): string {
+  const payload = frame.payload as L3Payload | undefined;
+  if (!payload) return '#e2e8f0';
+  if (payload.type === 'arp') return '#fbbf24';
+  const p = payload.packet;
+  if (p.icmp?.type === 'echo-request') return '#38bdf8';
+  if (p.icmp?.type === 'echo-reply') return '#10b981';
+  if (p.icmp) return '#ef4444';
+  return '#60a5fa';
+}
+/** Seconds between two animated hops, and the most hops replayed for one action. */
+const HOP_GAP = 0.16;
+const MAX_HOPS = 90;
 
 export interface MissionEvents {
   complete(evaluation: Evaluation): void;
@@ -39,6 +55,10 @@ export class Mission {
   private trafficResults = new Map<string, ObjectiveResult>();
   private hintIndex = 0;
   private finished = false;
+  private coach: Coach | null = null;
+  private recording = false;
+  private hops: { from: CableEnd; to: CableEnd; frame: EthernetFrame }[] = [];
+  private doneCount = -1;
 
   constructor(private readonly stage: Stage, readonly level: Level, private readonly events: MissionEvents) {
     stage.clearLevel();
@@ -56,7 +76,12 @@ export class Mission {
     stage.controls.enabled = true;
     void stage.flyTo(HOME.position, HOME.target, 1.4);
 
-    this.consoles = new Consoles(this.net, () => this.afterChange());
+    this.consoles = new Consoles(this.net, () => this.afterChange(), (action) => this.recordTraffic(action));
+    this.cleanup.push(
+      this.net.onWire((from, to, frame) => {
+        if (this.recording && this.hops.length < MAX_HOPS) this.hops.push({ from, to, frame });
+      }),
+    );
     this.hud = new Hud(level, {
       check: () => this.check(),
       hint: () => this.hint(),
@@ -67,10 +92,43 @@ export class Mission {
     }, stage.currentQuality);
     this.listen();
     this.afterChange();
+    this.coach = Coach.for(level.id, stage, () => this.coachView());
+  }
+
+  private coachView(): CoachView {
+    const key = openPanelKey();
+    return {
+      net: this.net,
+      selected: this.selected,
+      firstEnd: this.firstEnd ? { device: this.firstEnd.device, port: this.firstEnd.port } : null,
+      console: key?.startsWith('console:') ? key.slice(8) : null,
+      portPosition: (device, port) => {
+        const p = this.devices.get(device)?.ports.get(port);
+        return p ? portFrame(p).point : null;
+      },
+      devicePosition: (device) => {
+        const v = this.devices.get(device);
+        return v ? v.root.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, v.height + 0.08, 0)) : null;
+      },
+    };
+  }
+
+  /** Run an action and replay the frames it put on the wires as glowing packets travelling along the cables. */
+  private recordTraffic(action: () => void): void {
+    this.recording = true;
+    this.hops = [];
+    try {
+      action();
+    } finally {
+      this.recording = false;
+    }
+    this.hops.forEach((hop, i) => this.cables.pulse(hop.from, hop.to, packetColour(hop.frame), i * HOP_GAP));
+    for (let i = 0; i < Math.min(this.hops.length, 6); i++) setTimeout(() => sound.play('packet'), i * HOP_GAP * 1000);
   }
 
   dispose(): void {
     for (const fn of this.cleanup) fn();
+    this.coach?.dispose();
     this.cables.showPreview('straight', null, null);
     this.hud.destroy();
     closePanel();
@@ -170,11 +228,14 @@ export class Mission {
     const problem = this.canTake(port);
     if (problem) {
       this.hud.toast(problem, 'bad');
+      sound.play('error');
       return;
     }
     if (!this.firstEnd) {
       this.firstEnd = port;
+      sound.play('plug');
       this.hud.toast(type === 'serial' ? t('cable.firstSerial') : t('cable.first'));
+      this.coach?.update();
       return;
     }
     const a = this.firstEnd;
@@ -186,6 +247,7 @@ export class Mission {
       return;
     }
     this.hud.toast(t('cable.plugged'), 'good');
+    sound.play('plug');
     if (this.left(type) === 0) this.selected = null;
     this.afterChange();
   }
@@ -197,6 +259,7 @@ export class Mission {
       return;
     }
     if (this.net.disconnect({ device: port.device, port: port.port })) {
+      sound.play('unplug');
       this.hud.toast(t('cable.unplugged'));
       this.afterChange();
     }
@@ -214,6 +277,7 @@ export class Mission {
   private select(type: CableType | null): void {
     if (type && this.left(type) === 0) {
       this.hud.toast(t('cable.none'), 'bad');
+      sound.play('error');
       return;
     }
     if (this.firstEnd && type !== this.selected) this.hud.toast(t('cable.cancel'));
@@ -221,6 +285,7 @@ export class Mission {
     this.firstEnd = null;
     this.cables.showPreview('straight', null, null);
     this.hud.setInventory(this.inventoryLeft(), this.selected);
+    this.coach?.update();
   }
 
   // ---- devices ---------------------------------------------------------------------------------------------------
@@ -239,15 +304,17 @@ export class Mission {
       const laptop = this.consoleLaptop(id);
       if (laptop) this.consoles.open(id, laptop);
       else showNotice(id, t('panel.routerInfo'));
+      this.coach?.update();
       return;
     }
     const target = this.net.consoleTarget(id);
     if (view.shape === 'laptop') {
       if (target) this.consoles.open(target.id, id);
       else showNotice(`${t('panel.console')} · ${id}`, t('panel.noConsole'));
+      this.coach?.update();
       return;
     }
-    showHostPanel(this.net, id, () => this.afterChange(), target ? () => this.consoles.open(target.id, id) : null);
+    showHostPanel(this.net, id, () => this.afterChange(), target ? () => this.consoles.open(target.id, id) : null, (action) => this.recordTraffic(action));
   }
 
   // ---- state -----------------------------------------------------------------------------------------------------
@@ -286,7 +353,17 @@ export class Mission {
     this.hud.setInventory(this.inventoryLeft(), this.selected);
     const quiet = this.level.objectives.filter((o) => !TRAFFIC.has(o.type));
     const results = evaluate(this.net, quiet).results;
-    this.hud.setObjectives([...results, ...this.trafficResults.values()]);
+    const merged = [...results, ...this.trafficResults.values()];
+    this.celebrate(merged);
+    this.hud.setObjectives(merged);
+    this.coach?.update();
+  }
+
+  /** A ding when the number of completed objectives grows (not on the first display). */
+  private celebrate(results: ObjectiveResult[]): void {
+    const done = results.filter((r) => r.passed).length;
+    if (this.doneCount >= 0 && done > this.doneCount) sound.play('objective');
+    this.doneCount = done;
   }
 
   private check(): void {
@@ -298,6 +375,9 @@ export class Mission {
     this.hud.setObjectives(evaluation.results);
     if (evaluation.complete) {
       this.finished = true;
+      sound.play('success');
+      this.coach?.dispose();
+      this.coach = null;
       this.hud.toast(t('check.done'), 'good');
       this.hud.showTooltip(null);
       closePanel();
@@ -307,8 +387,10 @@ export class Mission {
       return;
     }
     this.hud.revealHints(evaluation.results.filter((r) => !r.passed).map((r) => r.id));
+    this.celebrate(evaluation.results);
     this.hud.setObjectives(evaluation.results);
     this.hud.toast(t('check.missing'), 'bad');
+    sound.play('error');
   }
 
   private hint(): void {

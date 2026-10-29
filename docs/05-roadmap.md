@@ -4,7 +4,7 @@ Règle : un milestone est terminé quand ses critères sont verts (tests, typech
 
 ## Prochaine étape
 
-**M0 à M6 sont faits, M7 a une première version jouable** : `apps/web` (Three.js) fait jouer les 2 missions du MVP de bout en bout dans une salle technique en 3D (testé par de vrais clics simulés : 100/100 sur les deux missions). Prochaines étapes de M7 : animation des paquets (M7e), sons, modèles plus détaillés (ou GLB sous licence libre, `apps/web/ASSETS.md`), tutoriel guidé des premières actions, terminal des PC (`ipconfig`, `ping` en ligne de commande), mode manette/tactile, PWA hors ligne et moteur dans un Web Worker.
+**M0 à M6 sont faits, M7 a une première version jouable** : `apps/web` (Three.js) fait jouer les 2 missions du MVP de bout en bout dans une salle technique en 3D (testé par de vrais clics simulés : 100/100 sur les deux missions). Ajouté ensuite : paquets animés sur les câbles (ARP ambre, requête cyan, réponse verte, erreur rouge) rejoués dans l'ordre réel après chaque commande ou ping (`Network.onWire`), sons synthétisés (Web Audio, coupure mémorisée), tutoriel guidé de la mission 1 (bulle coach, anneau sur le port à viser, étapes validées par l'état réel). Prochaines étapes de M7 : modèles plus détaillés (ou GLB sous licence libre, `apps/web/ASSETS.md`), tutoriel guidé des premières actions, terminal des PC (`ipconfig`, `ping` en ligne de commande), mode manette/tactile, PWA hors ligne et moteur dans un Web Worker.
 
 À faire en parallèle (outillage) : passer Vitest en version 5 (alertes `npm audit` sur Vitest 2 / esbuild, outils de développement uniquement).
 

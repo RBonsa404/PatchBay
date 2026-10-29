@@ -7,11 +7,17 @@ import './style.css';
 import * as THREE from 'three';
 import { campaign } from '@patchbay/content';
 import { catalog, type Level } from '@patchbay/sim-core';
+import { sound } from './audio.js';
 import { Mission } from './game/mission.js';
 import { buildDevice } from './scene/devices.js';
 import { buildRoom } from './scene/room.js';
 import { detectQuality, Stage } from './scene/stage.js';
 import { progress, showBriefing, showMissions, showResults, showTitle } from './ui/screens.js';
+
+// A soft tick on every button of the interface.
+document.addEventListener('click', (e) => {
+  if ((e.target as HTMLElement).closest('.btn, .cable-slot, .mission-card')) sound.play('click');
+});
 
 const stage = new Stage(document.getElementById('stage') as HTMLElement, detectQuality());
 stage.scene.add(buildRoom());

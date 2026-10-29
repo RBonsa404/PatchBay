@@ -95,6 +95,20 @@ export class Network {
     return device;
   }
 
+  /** Observers of every frame crossing a cable, in order (used by the game to animate packets). */
+  private readonly wireListeners = new Set<(from: CableEnd, to: CableEnd, frame: EthernetFrame) => void>();
+
+  /** Watch frames as they cross cables; returns the function that stops watching. */
+  onWire(listener: (from: CableEnd, to: CableEnd, frame: EthernetFrame) => void): () => void {
+    this.wireListeners.add(listener);
+    return () => this.wireListeners.delete(listener);
+  }
+
+  /** Called by the L2 engine for every frame put on a cable. */
+  notifyWire(from: CableEnd, to: CableEnd, frame: EthernetFrame): void {
+    for (const listener of this.wireListeners) listener(from, to, frame);
+  }
+
   /** Bumped by every configuration or cabling change; derived state (OSPF) is recomputed when it moves. */
   get version(): number {
     return this.changes;

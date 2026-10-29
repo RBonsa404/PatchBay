@@ -196,6 +196,7 @@ function transmit(net: Network, out: CableEnd, frame: EthernetFrame, trace: Fram
     trace.drops.push({ device: out.device, port: out.port, reason: 'link-down' });
     return null;
   }
+  net.notifyWire(out, peer, frame);
   return { at: peer, frame };
 }
 

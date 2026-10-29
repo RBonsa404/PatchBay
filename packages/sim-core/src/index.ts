@@ -18,3 +18,5 @@ export { evaluate } from './validation/objectives.js';
 export type { ConfigCheck, Evaluation, FailureReason, Objective, ObjectiveResult } from './validation/objectives.js';
 export type { RouteCode } from './protocols/l3/routing.js';
 export { canPlug } from './physical/rules.js';
+export type { EthernetFrame } from './engine/l2.js';
+export type { IpPacket, L3Payload } from './engine/l3.js';

@@ -4,14 +4,23 @@ import { h, ui } from './dom.js';
 
 /** The side panel: one at a time (console, PC settings, or a notice). */
 let current: HTMLElement | null = null;
+let currentKey: string | null = null;
+
+/** What the side panel shows: `console:R1`, `host:PC1`, `notice`, or null when closed. */
+export const openPanelKey = (): string | null => currentKey;
+
+/** Wraps an action whose traffic the game animates (a console command, a ping from a PC). */
+export type Around = (action: () => void) => void;
 
 export function closePanel(): void {
   current?.remove();
   current = null;
+  currentKey = null;
 }
 
-function panel(title: string, body: Node[]): HTMLElement {
+function panel(title: string, body: Node[], key = 'notice'): HTMLElement {
   closePanel();
+  currentKey = key;
   current = h(
     'div',
     { class: 'panel glass', role: 'dialog', 'aria-label': title },
@@ -36,7 +45,7 @@ export class Consoles {
   private readonly history = new Map<string, string[]>();
   private refresh: (() => void) | null = null;
 
-  constructor(private readonly net: Network, private readonly onCommand: () => void) {}
+  constructor(private readonly net: Network, private readonly onCommand: () => void, private readonly around: Around = (a) => a()) {}
 
   append(deviceId: string, lines: string[]): void {
     if (lines.length === 0) return;
@@ -73,9 +82,15 @@ export class Consoles {
     const run = (line: string, raw = false): void => {
       const before = cli.prompt;
       const hidden = input.type === 'password';
-      const r = cli.execute(line);
-      this.append(deviceId, [before + (hidden ? '' : line), ...(r.output ? r.output.split('\n') : [])]);
-      input.type = r.hiddenInput ? 'password' : 'text';
+      let output = '';
+      let hiddenNext = false;
+      this.around(() => {
+        const r = cli.execute(line);
+        output = r.output;
+        hiddenNext = r.hiddenInput;
+      });
+      this.append(deviceId, [before + (hidden ? '' : line), ...(output ? output.split('\n') : [])]);
+      input.type = hiddenNext ? 'password' : 'text';
       if (!raw && line.trim() && !hidden) {
         const list = [...(this.history.get(deviceId) ?? []), line];
         this.history.set(deviceId, list);
@@ -121,7 +136,7 @@ export class Consoles {
     const el = panel(`${t('panel.consoleOf')} ${deviceId} · ${via}`, [
       h('div', { class: 'terminal', onclick: () => input.focus() }, screen, form),
       h('div', { class: 'help' }, t('panel.help')),
-    ]);
+    ], `console:${deviceId}`);
     el.addEventListener('remove', () => (this.refresh = null));
     paint();
     input.focus();
@@ -129,7 +144,7 @@ export class Consoles {
 }
 
 /** IP settings and ping of a PC, plus a shortcut to the console it is cabled to. */
-export function showHostPanel(net: Network, deviceId: string, onChange: () => void, openConsole: (() => void) | null): void {
+export function showHostPanel(net: Network, deviceId: string, onChange: () => void, openConsole: (() => void) | null, around: Around = (a) => a()): void {
   const host = net.device(deviceId).host ?? {};
   const field = (label: string, value: string | undefined): [HTMLElement, HTMLInputElement] => {
     const input: HTMLInputElement = h('input', { value: value ?? '', spellcheck: 'false', inputmode: 'decimal' });
@@ -158,7 +173,10 @@ export function showHostPanel(net: Network, deviceId: string, onChange: () => vo
   const ping = (): void => {
     const target = dst.value.trim();
     if (!target) return;
-    const r = net.ping(deviceId, target, 4);
+    let r = { symbols: '', sent: 0, received: 0 };
+    around(() => {
+      r = net.ping(deviceId, target, 4);
+    });
     const lost = r.sent - r.received;
     output.textContent = [
       `${t('host.pingSending')} ${target}`,
@@ -182,5 +200,5 @@ export function showHostPanel(net: Network, deviceId: string, onChange: () => vo
     dstRow,
     h('button', { class: 'btn small primary', onclick: ping }, t('host.ping')),
     output,
-  ]);
+  ], `host:${deviceId}`);
 }

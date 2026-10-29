@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { Cable, CableType } from '@patchbay/sim-core';
+import type { Cable, CableEnd, CableType } from '@patchbay/sim-core';
 import type { PortView } from './devices.js';
 import type { Stage } from './stage.js';
 
@@ -56,6 +56,8 @@ function placePlug(group: THREE.Group, point: THREE.Vector3, normal: THREE.Vecto
 export class CableLayer {
   readonly group = new THREE.Group();
   private readonly views = new Map<string, THREE.Group>();
+  /** Path of each cable, from its `a` end to its `b` end, for packets to travel along. */
+  private readonly paths = new Map<string, { cable: Cable; curve: THREE.CatmullRomCurve3 }>();
   private preview: THREE.Mesh | null = null;
   private previewPlug: THREE.Group | null = null;
 
@@ -69,14 +71,18 @@ export class CableLayer {
       this.group.remove(view);
       view.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
       this.views.delete(key);
+      this.paths.delete(key);
     }
     for (const [key, cable] of wanted) {
       if (this.views.has(key)) continue;
       const pa = ports(cable.a.device, cable.a.port);
       const pb = ports(cable.b.device, cable.b.port);
       if (!pa || !pb) continue;
-      const view = this.build(cable.type, portFrame(pa), portFrame(pb));
+      const a = portFrame(pa);
+      const b = portFrame(pb);
+      const view = this.build(cable.type, a, b);
       this.views.set(key, view);
+      this.paths.set(key, { cable, curve: curveBetween(a.point, a.normal, b.point, b.normal) });
       this.group.add(view);
     }
   }
@@ -104,6 +110,35 @@ export class CableLayer {
         pb.visible = true;
       });
     return group;
+  }
+
+  /**
+   * A glowing packet travelling along the cable between two ends, starting after `delay` seconds.
+   * Several packets queued with growing delays replay an exchange in the order it happened.
+   */
+  pulse(from: CableEnd, to: CableEnd, colour: string, delay: number): void {
+    const entry = [...this.paths.values()].find(
+      (p) =>
+        (p.cable.a.device === from.device && p.cable.a.port === from.port && p.cable.b.device === to.device && p.cable.b.port === to.port) ||
+        (p.cable.b.device === from.device && p.cable.b.port === from.port && p.cable.a.device === to.device && p.cable.a.port === to.port),
+    );
+    if (!entry) return;
+    const forward = entry.cable.a.device === from.device && entry.cable.a.port === from.port;
+    const packet = new THREE.Mesh(new THREE.SphereGeometry(0.0075, 14, 14), new THREE.MeshBasicMaterial({ color: colour, toneMapped: false }));
+    const halo = new THREE.Mesh(new THREE.SphereGeometry(0.016, 14, 14), new THREE.MeshBasicMaterial({ color: colour, transparent: true, opacity: 0.25, toneMapped: false, depthWrite: false }));
+    packet.add(halo);
+    packet.visible = false;
+    this.group.add(packet);
+    setTimeout(() => {
+      packet.visible = true;
+      void this.stage
+        .animate(0.42, (t) => packet.position.copy(entry.curve.getPointAt(forward ? t : 1 - t)))
+        .then(() => {
+          this.group.remove(packet);
+          packet.geometry.dispose();
+          halo.geometry.dispose();
+        });
+    }, delay * 1000);
   }
 
   /** Draw the cable in hand from `from` to the pointer; null clears it. */

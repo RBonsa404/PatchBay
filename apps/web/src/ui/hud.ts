@@ -2,6 +2,7 @@ import type { CableType, Level, ObjectiveResult } from '@patchbay/sim-core';
 import { t, tx, type Key } from '../i18n.js';
 import { CABLE_STYLE } from '../scene/cables.js';
 import type { Quality } from '../scene/stage.js';
+import { sound } from '../audio.js';
 import { h, ui } from './dom.js';
 
 export interface HudActions {
@@ -44,6 +45,7 @@ export class Hud {
           { class: 'hud-actions' },
           h('button', { class: 'btn small', onclick: () => actions.overview() }, t('hud.view')),
           qualityButton,
+          h('button', { class: 'btn small', onclick: (e: Event) => { const muted = sound.toggleMute(); (e.currentTarget as HTMLElement).textContent = muted ? t('hud.soundOff') : t('hud.sound'); } }, sound.isMuted ? t('hud.soundOff') : t('hud.sound')),
           h('button', { class: 'btn small', onclick: () => actions.hint() }, t('hud.hint')),
           h('button', { class: 'btn small', onclick: () => actions.menu() }, t('hud.menu')),
           h('button', { class: 'btn small amber', onclick: () => actions.check() }, t('hud.check')),

@@ -159,3 +159,20 @@ describe('snapshot', () => {
     expect(copy.drainSyslog('R1')).toEqual([]);
   });
 });
+
+describe('wire observers', () => {
+  it('reports every frame crossing a cable, in order, until unsubscribed', () => {
+    const net = lab152R1Done();
+    net.configureHost('PC1', { ip: '192.168.1.10', mask: '255.255.255.0', gateway: '192.168.1.1' });
+    const seen: string[] = [];
+    const stop = net.onWire((from, to, frame) => seen.push(`${from.device}>${to.device}:${(frame.payload as { type: string }).type}`));
+    net.ping('PC1', '192.168.1.1', 2);
+    expect(seen.slice(0, 2)).toEqual(['PC1>R1:arp', 'R1>PC1:arp']);
+    expect(seen).toContain('PC1>R1:ip');
+    expect(seen).toContain('R1>PC1:ip');
+    stop();
+    const before = seen.length;
+    net.ping('PC1', '192.168.1.1', 1);
+    expect(seen.length).toBe(before);
+  });
+});

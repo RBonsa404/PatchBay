@@ -165,3 +165,11 @@ h1, h2, h3 { font-family: var(--font-heading); margin: 0; line-height: 1.2; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* ---- tutorial coach --------------------------------------------------------------------------------------------- */
+.coach { position: fixed; left: 50%; bottom: 108px; transform: translateX(-50%); width: min(560px, calc(100vw - 32px)); padding: 14px 16px; display: grid; gap: 8px; border-color: rgba(251, 191, 36, 0.45); box-shadow: var(--shadow), 0 0 22px rgba(251, 191, 36, 0.18); animation: rise 0.4s var(--ease-out); z-index: 15; }
+.coach .step { font: 600 12px var(--font-heading); letter-spacing: 0.1em; text-transform: uppercase; color: var(--amber); }
+.coach p { margin: 0; font-size: 15px; }
+.coach footer { display: flex; justify-content: flex-end; gap: 8px; }
+.pulse-ui { outline: 2px solid var(--amber); outline-offset: 3px; animation: pulse-ui 1.2s ease-in-out infinite; }
+@keyframes pulse-ui { 50% { outline-color: rgba(251, 191, 36, 0.25); } }
