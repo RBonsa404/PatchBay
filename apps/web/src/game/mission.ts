@@ -8,7 +8,7 @@ import { CableLayer, portFrame } from '../scene/cables.js';
 import { buildDevice, highlightSocket, setLed, type DeviceView, type PortView } from '../scene/devices.js';
 import { buildWhiteboard } from '../scene/details.js';
 import type { Quality, Stage } from '../scene/stage.js';
-import { Hud } from '../ui/hud.js';
+import { CABLE_ORDER, Hud } from '../ui/hud.js';
 import { closePanel, Consoles, openPanelKey, resetHostShells, showHostPanel, showNotice } from '../ui/panels.js';
 
 const HOME = { position: new THREE.Vector3(0, 1.78, 2.45), target: new THREE.Vector3(0, 0.86, 0.02) };
@@ -64,7 +64,7 @@ export class Mission {
   private hops: { from: CableEnd; to: CableEnd; frame: EthernetFrame }[] = [];
   private doneCount = -1;
 
-  constructor(private readonly stage: Stage, readonly level: Level, private readonly events: MissionEvents) {
+  constructor(private readonly stage: Stage, readonly level: Level, private readonly events: MissionEvents, index = 0) {
     stage.clearLevel();
     resetHostShells();
     this.net = buildLevel(level);
@@ -94,7 +94,7 @@ export class Mission {
       overview: () => void stage.flyTo(HOME.position, HOME.target),
       cycleQuality: () => this.cycleQuality(),
       selectCable: (type) => this.select(type),
-    }, stage.currentQuality);
+    }, stage.currentQuality, index);
     this.listen();
     this.afterChange();
     this.coach = Coach.for(level.id, stage, () => this.coachView());
@@ -203,6 +203,9 @@ export class Mission {
     on(canvas, 'dblclick', () => this.onFocus());
     on(window, 'keydown', (e) => {
       if (e.key === 'Escape') this.select(null);
+      // 1-4 pick a cable from the inventory (not while typing in a console).
+      const slot = /^[1-4]$/.test(e.key) && !(e.target instanceof HTMLInputElement) ? CABLE_ORDER.filter((type) => this.level.inventory.cables[type] !== undefined)[Number(e.key) - 1] : undefined;
+      if (slot) this.select(this.selected === slot ? null : slot);
     });
     this.cleanup.push(cancelPress, setGameTarget(this.gameTarget()));
   }

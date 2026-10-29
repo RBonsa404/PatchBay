@@ -3,6 +3,7 @@ import type { CableType, Network } from '@patchbay/sim-core';
 import { sound } from '../audio.js';
 import { t, type Key } from '../i18n.js';
 import type { Stage } from '../scene/stage.js';
+import { MENTOR, mentorPortrait } from '../ui/brand.js';
 import { h, ui } from '../ui/dom.js';
 
 /** What the coach can see of the mission to decide whether a step is done. */
@@ -81,6 +82,8 @@ export class Coach {
   private readonly arrow: THREE.Mesh;
   private readonly stopFrame: () => void;
   private finished = false;
+  private typing: ReturnType<typeof setInterval> | null = null;
+  private lastLine = '';
 
   static for(levelId: string, stage: Stage, view: () => CoachView): Coach | null {
     const steps = TUTORIALS[levelId];
@@ -118,6 +121,7 @@ export class Coach {
   }
 
   dispose(): void {
+    if (this.typing) clearInterval(this.typing);
     this.stopFrame();
     this.stage.scene.remove(this.marker);
     this.bubble.remove();
@@ -130,25 +134,49 @@ export class Coach {
     this.dispose();
   }
 
+  /** Aïcha "speaks": the line appears a few letters at a time (instantly when motion is reduced). */
+  private type(el: HTMLElement, line: string): void {
+    if (this.typing) clearInterval(this.typing);
+    if (line === this.lastLine || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      el.textContent = line;
+      this.lastLine = line;
+      return;
+    }
+    this.lastLine = line;
+    let n = 0;
+    this.typing = setInterval(() => {
+      n = Math.min(line.length, n + 2);
+      el.textContent = line.slice(0, n);
+      if (n >= line.length && this.typing) clearInterval(this.typing);
+    }, 18);
+  }
+
   private render(): void {
     const step = this.steps[this.index] as Step;
     const v = this.view();
     const last = this.index === this.steps.length - 1;
+    const text = h('p', {});
     this.bubble.replaceChildren(
-      h('span', { class: 'step' }, t('tuto.step', { n: this.index + 1, total: this.steps.length })),
-      h('p', {}, t(step.text)),
+      mentorPortrait(),
       h(
-        'footer',
-        {},
-        last ? null : h('button', { class: 'btn small', onclick: () => this.finish() }, t('tuto.skip')),
-        last ? h('button', { class: 'btn small amber', onclick: () => this.finish() }, t('tuto.next')) : null,
+        'div',
+        { class: 'coach-body' },
+        h('header', {}, h('strong', {}, MENTOR.name), h('span', { class: 'step' }, t('tuto.step', { n: this.index + 1, total: this.steps.length }))),
+        text,
+        h(
+          'footer',
+          {},
+          h('span', { class: 'dots' }, ...this.steps.map((_, i) => h('i', { class: i < this.index ? 'done' : i === this.index ? 'now' : '' }))),
+          last ? null : h('button', { class: 'btn ghost small', onclick: () => this.finish() }, t('tuto.skip')),
+          last ? h('button', { class: 'btn primary small', onclick: () => this.finish() }, t('tuto.next')) : null,
+        ),
       ),
     );
+    this.type(text, t(step.text));
 
     document.querySelectorAll('.pulse-ui').forEach((e) => e.classList.remove('pulse-ui'));
     if (step.slot && v.selected !== step.slot) {
-      const slots = [...document.querySelectorAll<HTMLElement>('.cable-slot')];
-      slots.find((s) => s.textContent?.includes(t(`cable.${step.slot}` as Key)))?.classList.add('pulse-ui');
+      document.querySelector(`.cable-slot[data-cable="${step.slot}"]`)?.classList.add('pulse-ui');
     }
 
     const target = step.port?.(v);

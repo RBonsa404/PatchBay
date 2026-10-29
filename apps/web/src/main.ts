@@ -18,7 +18,7 @@ import { progress, showBriefing, showMissions, showResults, showTitle } from './
 
 // A soft tick on every button of the interface.
 document.addEventListener('click', (e) => {
-  if ((e.target as HTMLElement).closest('.btn, .cable-slot, .mission-card')) sound.play('click');
+  if ((e.target as HTMLElement).closest('.btn, .tool, .cable-slot, .mission-row, .menu-item')) sound.play('click');
 });
 
 const stage = new Stage(document.getElementById('stage') as HTMLElement, detectQuality());
@@ -95,7 +95,7 @@ function play(index: number): void {
       showResults(level, evaluation, { ...(next ? { next } : {}), retry: () => play(index), menu: missions });
     },
     menu: missions,
-  });
+  }, index);
 }
 
 // Development only: lets automated checks find where a port is on screen. Stripped from production builds.

@@ -1,6 +1,8 @@
+import { ArrowLeft, ArrowRight, ChevronRight, LayoutList, Play, RotateCcw, Star } from 'lucide';
 import type { Evaluation, Level } from '@patchbay/sim-core';
 import { t, tx } from '../i18n.js';
-import { h, leave, stars, ui } from './dom.js';
+import { clubBadge, icon, logo, MENTOR, mentorPortrait } from './brand.js';
+import { h, leave, starCount, ui } from './dom.js';
 
 /** Best score per level, kept in this browser only (a convenience, not a source of truth). */
 export const progress = {
@@ -21,23 +23,36 @@ export const progress = {
   },
 };
 
+/** Three stars, filled according to the score. */
+function starRow(score: number | null, size = 16): HTMLElement {
+  const n = score === null ? 0 : starCount(score);
+  return h('span', { class: 'star-row', 'aria-label': `${n} / 3` }, ...[0, 1, 2].map((i) => {
+    const s = icon(Star, size);
+    if (i < n) s.classList.add('on');
+    return s;
+  }));
+}
+
+const button = (label: string, onclick: () => void, kind = '', glyph?: Parameters<typeof icon>[0], after = false): HTMLButtonElement =>
+  h('button', { class: `btn ${kind}`, onclick }, glyph && !after ? icon(glyph) : null, h('span', {}, label), glyph && after ? icon(glyph) : null);
+
+/** Title: the room in the background, the game's name and menu on the left, the club at the bottom. */
 export function showTitle(onPlay: () => void, onMissions: () => void): void {
-  const screen = h(
+  const screen: HTMLElement = h(
     'div',
-    { class: 'screen' },
+    { class: 'screen screen-side' },
     h(
       'div',
-      { class: 'title-card glass' },
-      h('div', { class: 'kicker' }, t('app.club')),
-      h('h1', { class: 'logo' }, h('span', {}, 'Patch'), 'Bay'),
-      h('p', {}, t('title.tagline')),
+      { class: 'side-column' },
+      logo('large'),
+      h('p', { class: 'tagline' }, t('title.tagline')),
       h(
-        'div',
-        { class: 'title-actions' },
-        h('button', { class: 'btn primary', onclick: () => void leave(screen).then(onPlay) }, t('title.play')),
-        h('button', { class: 'btn', onclick: () => void leave(screen).then(onMissions) }, t('title.missions')),
+        'nav',
+        { class: 'menu', 'aria-label': 'Menu principal' },
+        h('button', { class: 'menu-item primary', onclick: () => void leave(screen).then(onPlay) }, icon(Play, 20), h('span', {}, t('title.play')), icon(ChevronRight, 20)),
+        h('button', { class: 'menu-item', onclick: () => void leave(screen).then(onMissions) }, icon(LayoutList, 20), h('span', {}, t('title.missions')), icon(ChevronRight, 20)),
       ),
-      h('div', { class: 'credit' }, t('title.credit')),
+      h('footer', { class: 'club' }, clubBadge(), h('div', {}, h('strong', {}, t('app.club')), h('span', {}, t('title.credit')))),
     ),
   );
   ui().append(screen);
@@ -46,57 +61,68 @@ export function showTitle(onPlay: () => void, onMissions: () => void): void {
 export function showMissions(levels: Level[], onPick: (level: Level) => void, onBack: () => void): void {
   const screen: HTMLElement = h(
     'div',
-    { class: 'screen' },
+    { class: 'screen screen-side' },
     h(
       'div',
-      { class: 'missions glass' },
-      h(
-        'header',
-        {},
-        h('div', {}, h('div', { class: 'kicker' }, t('app.club')), h('h2', {}, t('missions.title'))),
-        h('button', { class: 'btn small', onclick: () => void leave(screen).then(onBack) }, t('missions.back')),
-      ),
+      { class: 'side-column wide' },
+      logo('small'),
+      h('h2', { class: 'screen-title' }, t('missions.title')),
       h(
         'div',
-        { class: 'mission-grid' },
+        { class: 'mission-list' },
         ...levels.map((level, i) => {
           const best = progress.best(level.id);
           return h(
             'button',
-            { class: 'mission-card', onclick: () => void leave(screen).then(() => onPick(level)) },
-            h('span', { class: 'num' }, `${t('missions.mission')} ${String(i + 1).padStart(2, '0')}`),
-            h('h3', {}, tx(level.title)),
-            h('span', { class: 'muted' }, tx(level.brief).split('\n')[0] ?? ''),
+            { class: 'mission-row', onclick: () => void leave(screen).then(() => onPick(level)) },
+            h('span', { class: 'num' }, String(i + 1).padStart(2, '0')),
             h(
               'span',
-              { class: 'meta' },
-              h('span', {}, `${t('missions.difficulty')} ${'●'.repeat(level.difficulty)}${'○'.repeat(5 - level.difficulty)}`),
-              h('span', { class: 'stars' }, best === null ? t('missions.new') : `${stars(best)} ${best}`),
+              { class: 'body' },
+              h('span', { class: 'name' }, tx(level.title)),
+              // The story's last sentence says what is at stake.
+              h('span', { class: 'summary' }, tx(level.story).split(/(?<=[.!?])\s+/).filter(Boolean).pop() ?? ''),
+              h(
+                'span',
+                { class: 'meta' },
+                h('span', { class: 'difficulty', 'aria-label': `${t('missions.difficulty')} ${level.difficulty} / 5` }, ...[1, 2, 3, 4, 5].map((d) => h('i', { class: d <= level.difficulty ? 'on' : '' }))),
+                best === null ? h('span', { class: 'tag' }, t('missions.new')) : h('span', { class: 'best' }, starRow(best, 14), `${best} / 100`),
+              ),
             ),
+            icon(ChevronRight, 20),
           );
         }),
       ),
+      h('div', { class: 'actions' }, button(t('missions.back'), () => void leave(screen).then(onBack), 'ghost', ArrowLeft)),
     ),
   );
   ui().append(screen);
 }
 
+/** Mission order: Aïcha's message, the work order and what will be checked. */
 export function showBriefing(level: Level, index: number, onStart: () => void, onBack: () => void): void {
   const screen: HTMLElement = h(
     'div',
-    { class: 'screen' },
+    { class: 'screen screen-center' },
     h(
-      'div',
-      { class: 'briefing glass' },
-      h('div', { class: 'kicker' }, `${t('briefing.mission')} ${String(index + 1).padStart(2, '0')}`),
-      h('h2', {}, tx(level.title)),
-      level.story ? h('p', { class: 'story' }, tx(level.story)) : null,
-      h('div', { class: 'brief' }, tx(level.brief)),
+      'article',
+      { class: 'dossier panel-solid' },
+      h('header', {}, h('span', { class: 'label' }, `${t('briefing.mission')} ${String(index + 1).padStart(2, '0')}`), h('h2', {}, tx(level.title))),
+      level.story
+        ? h('div', { class: 'mentor-line' }, mentorPortrait(), h('div', {}, h('strong', {}, `${MENTOR.name} · ${MENTOR.role}`), h('p', {}, tx(level.story))))
+        : null,
+      h('section', {}, h('h3', {}, t('briefing.order')), h('div', { class: 'brief' }, tx(level.brief))),
+      h(
+        'section',
+        {},
+        h('h3', {}, t('briefing.checked')),
+        h('ul', { class: 'check-list' }, ...level.objectives.map((o) => h('li', {}, h('span', {}, tx(o.label)), h('span', { class: 'pts' }, `${o.points} ${t('hud.points')}`)))),
+      ),
       h(
         'footer',
         {},
-        h('button', { class: 'btn', onclick: () => void leave(screen).then(onBack) }, t('briefing.back')),
-        h('button', { class: 'btn primary', onclick: () => void leave(screen).then(onStart) }, t('briefing.start')),
+        button(t('briefing.back'), () => void leave(screen).then(onBack), 'ghost', ArrowLeft),
+        button(t('briefing.start'), () => void leave(screen).then(onStart), 'primary', ArrowRight, true),
       ),
     ),
   );
@@ -108,33 +134,42 @@ export function showResults(
   evaluation: Evaluation,
   actions: { next?: () => void; retry: () => void; menu: () => void },
 ): void {
+  const score = h('div', { class: 'score' }, '0');
   const screen: HTMLElement = h(
     'div',
-    { class: 'screen' },
+    { class: 'screen screen-center' },
     h(
-      'div',
-      { class: 'results glass' },
-      h('div', { class: 'kicker' }, t('results.title')),
+      'article',
+      { class: 'results panel-solid' },
+      h('span', { class: 'label' }, t('results.title')),
       h('h2', {}, tx(level.title)),
-      h('div', { class: 'score' }, String(evaluation.score)),
-      h('div', { class: 'stars', style: { fontSize: '28px' } }, stars(evaluation.score)),
+      h('div', { class: 'score-block' }, score, h('span', { class: 'out-of' }, '/ 100')),
+      starRow(evaluation.score, 34),
       h(
         'ul',
-        {},
+        { class: 'check-list results-list' },
         ...level.objectives.map((o) => {
           const passed = evaluation.results.find((r) => r.id === o.id)?.passed ?? false;
-          return h('li', { class: `objective${passed ? ' done' : ''}` }, h('span', { class: 'tick' }), h('span', { class: 'label' }, tx(o.label)), h('span', { class: 'pts' }, `${o.points}`));
+          return h('li', { class: passed ? 'done' : 'missed' }, h('span', {}, tx(o.label)), h('span', { class: 'pts' }, passed ? `+${o.points}` : '0'));
         }),
       ),
       actions.next ? null : h('p', { class: 'muted' }, t('results.campaignDone')),
       h(
-        'div',
-        { class: 'title-actions' },
-        h('button', { class: 'btn', onclick: () => void leave(screen).then(actions.menu) }, t('results.menu')),
-        h('button', { class: 'btn', onclick: () => void leave(screen).then(actions.retry) }, t('results.retry')),
-        actions.next ? h('button', { class: 'btn primary', onclick: () => void leave(screen).then(actions.next!) }, t('results.next')) : null,
+        'footer',
+        {},
+        button(t('results.menu'), () => void leave(screen).then(actions.menu), 'ghost', LayoutList),
+        button(t('results.retry'), () => void leave(screen).then(actions.retry), 'ghost', RotateCcw),
+        actions.next ? button(t('results.next'), () => void leave(screen).then(actions.next!), 'primary', ArrowRight, true) : null,
       ),
     ),
   );
   ui().append(screen);
+  // Count the score up, and let the stars land one after the other.
+  const start = performance.now();
+  const tick = (now: number): void => {
+    const k = Math.min(1, (now - start) / 1100);
+    score.textContent = String(Math.round(evaluation.score * (1 - (1 - k) ** 3)));
+    if (k < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
 }

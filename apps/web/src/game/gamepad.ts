@@ -74,7 +74,7 @@ export function startGamepad(stage: Stage, notify: (text: string) => void): void
       case 0: // A
         if (overRoom) target?.act();
         else if (under instanceof HTMLInputElement || under instanceof HTMLTextAreaElement) under.focus();
-        else (under?.closest('button, a, [role="button"], .mission-card, .cable-slot, label') as HTMLElement | null)?.click();
+        else (under?.closest('button, a, [role="button"], label') as HTMLElement | null)?.click();
         break;
       case 1: // B
         if (overRoom) target?.unplug();
@@ -122,7 +122,7 @@ export function startGamepad(stage: Stage, notify: (text: string) => void): void
       y = Math.min(window.innerHeight - 1, Math.max(0, y + moveY));
       const under = document.elementFromPoint(x, y);
       if (target && under === target.canvas) target.aim(x, y);
-      const button = under?.closest('button, .mission-card, .cable-slot') ?? null;
+      const button = under?.closest('button') ?? null;
       if (button !== hovered) {
         hovered?.classList.remove('pad-hover');
         button?.classList.add('pad-hover');

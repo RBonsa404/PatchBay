@@ -45,7 +45,7 @@ export class Stage {
     this.quality = quality;
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMappingExposure = 0.95;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(this.renderer.domElement);
@@ -58,27 +58,27 @@ export class Stage {
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.08;
     this.controls.minDistance = 0.35;
-    this.controls.maxDistance = 5;
+    this.controls.maxDistance = 3.2;
     this.controls.maxPolarAngle = Math.PI * 0.49;
     this.controls.screenSpacePanning = true;
 
-    this.scene.background = new THREE.Color('#070d1e');
-    this.scene.fog = new THREE.FogExp2('#070d1e', 0.09);
+    this.scene.background = new THREE.Color('#9aa3af');
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    this.scene.environmentIntensity = 0.35;
+    this.scene.environmentIntensity = 0.55;
     pmrem.dispose();
 
-    // Night-blue ambience from the charter, a warm key light over the bench, a cyan rim from behind.
-    this.scene.add(new THREE.HemisphereLight('#9ec5ff', '#0b1e3f', 0.45));
-    this.key = new THREE.SpotLight('#fff1dd', 24, 0, 0.62, 0.6, 2);
-    this.key.position.set(0.4, 3.1, 1.3);
+    // A lit technical room: neutral ceiling light everywhere, a key light from the LED panel above the bench casting
+    // the shadows, a cool rim from the back.
+    this.scene.add(new THREE.HemisphereLight('#f5f8ff', '#5b6472', 1.0));
+    this.key = new THREE.SpotLight('#fff8ee', 9, 0, 0.7, 0.9, 1.6);
+    this.key.position.set(0.4, 2.95, 0.6);
     this.key.target.position.set(0, 0.8, -0.2);
     this.key.shadow.mapSize.set(2048, 2048);
     this.key.shadow.bias = -0.0004;
     this.key.shadow.normalBias = 0.02;
     this.scene.add(this.key, this.key.target);
-    const rim = new THREE.DirectionalLight('#38bdf8', 0.9);
+    const rim = new THREE.DirectionalLight('#dbeafe', 0.5);
     rim.position.set(-2, 2.2, -3);
     const fill = new THREE.DirectionalLight('#c7d8ff', 0.35);
     fill.position.set(2.5, 1.5, 2.5);
@@ -86,7 +86,8 @@ export class Stage {
 
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.55, 0.45, 0.82);
+    // High threshold: only LEDs, screens and ceiling panels glow, not the lit walls.
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.4, 0.35, 0.97);
     this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
 

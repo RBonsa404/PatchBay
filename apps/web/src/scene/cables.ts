@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { Cable, CableEnd, CableType } from '@patchbay/sim-core';
 import type { PortView } from './devices.js';
+import { BENCH_TOP } from './room.js';
 import type { Stage } from './stage.js';
 
 /** Cable colours: the usual workshop habits (blue straight, amber crossover, light-blue console, dark serial). */
@@ -21,16 +22,68 @@ export function portFrame(port: PortView): { point: THREE.Vector3; normal: THREE
   return { point, normal: FORWARD.clone().applyQuaternion(q) };
 }
 
-/** A hanging path: out of each port, then a sag between them that never goes through the bench. */
+/** A hanging path: out of each port, then a sag between them that never goes through the bench (cable in hand). */
 function curveBetween(a: THREE.Vector3, na: THREE.Vector3, b: THREE.Vector3, nb: THREE.Vector3): THREE.CatmullRomCurve3 {
   const lead = 0.07;
   const a1 = a.clone().addScaledVector(na, lead);
   const b1 = b.clone().addScaledVector(nb, lead);
   const span = a1.distanceTo(b1);
   const mid = a1.clone().lerp(b1, 0.5);
-  mid.y = Math.max(Math.min(a1.y, b1.y) - 0.04 - span * 0.18, 0.775);
+  mid.y = Math.max(Math.min(a1.y, b1.y) - 0.04 - span * 0.18, BENCH_TOP + 0.015);
   mid.z = Math.max(a1.z, b1.z) + 0.04 + span * 0.05;
   return new THREE.CatmullRomCurve3([a, a1, mid, b1, b], false, 'centripetal', 0.5);
+}
+
+/** Space between two cables lying side by side on the bench. */
+const LANE = 0.016;
+
+/**
+ * Where a plugged cable runs, the way a technician would lay it: out of the port, a bend down to the bench, then
+ * flat along the bench to the other device. Each cable has its own lane (`lane`), so neighbours lie side by side
+ * instead of crossing in the air. Two ports in the rack, close to each other, get a short patch loop instead.
+ */
+function routeBetween(a: THREE.Vector3, na: THREE.Vector3, b: THREE.Vector3, nb: THREE.Vector3, lane: number, radius: number): THREE.CatmullRomCurve3 {
+  const lead = 0.05;
+  const a1 = a.clone().addScaledVector(na, lead);
+  const b1 = b.clone().addScaledVector(nb, lead);
+  const rest = BENCH_TOP + radius + 0.001;
+  const highA = a.y - BENCH_TOP > 0.1;
+  const highB = b.y - BENCH_TOP > 0.1;
+  const offset = lane * LANE;
+
+  if (highA && highB && a1.distanceTo(b1) < 0.6) {
+    // Patch loop in front of the rack: down and out, each cable a little lower and further out than the last.
+    const mid = a1.clone().lerp(b1, 0.5);
+    mid.y = Math.min(a1.y, b1.y) - 0.05 - offset * 0.6;
+    mid.z = Math.max(a1.z, b1.z) + 0.03 + offset;
+    mid.x += a1.x <= b1.x ? 0.12 + offset : -0.12 - offset;
+    return new THREE.CatmullRomCurve3([a, a1, mid, b1, b], false, 'centripetal', 0.5);
+  }
+
+  // Touch-down points on the bench, just past each port, shifted into this cable's lane.
+  const down = (p: THREE.Vector3, n: THREE.Vector3, high: boolean): THREE.Vector3[] => {
+    const flat = new THREE.Vector3(n.x, 0, n.z).normalize();
+    if (!high) {
+      const t = p.clone().addScaledVector(flat, 0.04 + offset);
+      t.y = rest;
+      return [t];
+    }
+    // From the rack: hang straight down in front of it, then rest on the bench's back edge.
+    const fall = p.clone().addScaledVector(flat, 0.02 + offset * 0.5);
+    fall.y = (p.y + rest) / 2;
+    const t = p.clone().addScaledVector(flat, 0.09 + offset);
+    t.y = rest;
+    return [fall, t];
+  };
+  const da = down(a1, na, highA);
+  const db = down(b1, nb, highB).reverse();
+  const ta = da[da.length - 1] as THREE.Vector3;
+  const tb = db[0] as THREE.Vector3;
+  // Lie flat: one point in the middle of the run, on the bench, in the lane.
+  const mid = ta.clone().lerp(tb, 0.5);
+  mid.y = rest;
+  mid.z += offset * 0.5;
+  return new THREE.CatmullRomCurve3([a, a1, ...da, mid, ...db, b1, b], false, 'centripetal', 0.5);
 }
 
 function plug(type: CableType): THREE.Group {
@@ -58,6 +111,7 @@ export class CableLayer {
   private readonly views = new Map<string, THREE.Group>();
   /** Path of each cable, from its `a` end to its `b` end, for packets to travel along. */
   private readonly paths = new Map<string, { cable: Cable; curve: THREE.CatmullRomCurve3 }>();
+  private readonly lanes = new Map<string, number>();
   private preview: THREE.Mesh | null = null;
   private previewPlug: THREE.Group | null = null;
 
@@ -72,6 +126,7 @@ export class CableLayer {
       view.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
       this.views.delete(key);
       this.paths.delete(key);
+      this.lanes.delete(key);
     }
     for (const [key, cable] of wanted) {
       if (this.views.has(key)) continue;
@@ -80,18 +135,23 @@ export class CableLayer {
       if (!pa || !pb) continue;
       const a = portFrame(pa);
       const b = portFrame(pb);
-      const view = this.build(cable.type, a, b);
+      // The first free lane: a cable keeps its lane while it stays plugged.
+      const used = new Set([...this.lanes.values()]);
+      let lane = 0;
+      while (used.has(lane)) lane++;
+      this.lanes.set(key, lane);
+      const curve = routeBetween(a.point, a.normal, b.point, b.normal, lane, CABLE_STYLE[cable.type].radius);
+      const view = this.build(cable.type, a, b, curve);
       this.views.set(key, view);
-      this.paths.set(key, { cable, curve: curveBetween(a.point, a.normal, b.point, b.normal) });
+      this.paths.set(key, { cable, curve });
       this.group.add(view);
     }
   }
 
-  private build(type: CableType, a: { point: THREE.Vector3; normal: THREE.Vector3 }, b: { point: THREE.Vector3; normal: THREE.Vector3 }): THREE.Group {
+  private build(type: CableType, a: { point: THREE.Vector3; normal: THREE.Vector3 }, b: { point: THREE.Vector3; normal: THREE.Vector3 }, curve: THREE.CatmullRomCurve3): THREE.Group {
     const style = CABLE_STYLE[type];
     const group = new THREE.Group();
-    const curve = curveBetween(a.point, a.normal, b.point, b.normal);
-    const geometry = new THREE.TubeGeometry(curve, 96, style.radius, 10, false);
+    const geometry = new THREE.TubeGeometry(curve, 160, style.radius, 10, false);
     const tube = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: style.colour, roughness: 0.45, metalness: 0.05 }));
     tube.castShadow = true;
     const pa = plug(type);

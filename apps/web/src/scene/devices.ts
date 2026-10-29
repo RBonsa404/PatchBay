@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { DeviceModel, PortSpec } from '@patchbay/sim-core';
-import { BENCH_TOP } from './room.js';
+import { contactShadow } from './materials.js';
+import { BENCH_TOP, RACK } from './room.js';
 import { addFeet, addRackEars, addVents, powerButton, roundedChassis } from './details.js';
 import { screenTexture, textTexture } from './textures.js';
 
@@ -314,8 +315,16 @@ export function buildDevice(id: string, model: DeviceModel, position: [number, n
   const inRack = (shape === 'router' || shape === 'switch') && Math.abs(x) < 0.3 && z < -0.15;
   if (inRack) addRackEars(view.root, view.width, view.height, view.depth);
   else if (shape === 'router' || shape === 'switch') addFeet(view.root, view.width, view.depth);
-  // Desktop units stand on their feet, 4 mm above the bench.
-  view.root.position.set(x, inRack ? y : BENCH_TOP + (shape === 'router' || shape === 'switch' ? 0.004 : 0), z);
+  // Desktop units stand on their feet, 4 mm above the bench, over a soft contact shadow. Rack gear is pushed back so
+  // its ears rest against the rack's front rails.
+  const lift = shape === 'router' || shape === 'switch' ? 0.004 : 0;
+  if (!inRack) {
+    const [sw, sd] = shape === 'pc' ? [0.62, 0.5] : shape === 'laptop' ? [0.42, 0.34] : [view.width + 0.08, view.depth + 0.08];
+    const shadow = contactShadow(sw, sd, 0.5);
+    shadow.position.y = 0.0012 - lift;
+    view.root.add(shadow);
+  }
+  view.root.position.set(x, inRack ? y : BENCH_TOP + lift, inRack ? RACK.frontZ - view.depth / 2 : z);
   for (const b of view.body) b.userData.device = id;
   return view;
 }

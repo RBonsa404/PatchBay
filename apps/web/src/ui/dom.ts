@@ -35,7 +35,5 @@ export function leave(el: HTMLElement): Promise<void> {
   );
 }
 
-export const stars = (score: number): string => {
-  const n = score >= 100 ? 3 : score >= 75 ? 2 : score >= 50 ? 1 : 0;
-  return '★'.repeat(n) + '☆'.repeat(3 - n);
-};
+/** Stars earned for a score: 1 from 50, 2 from 75, 3 at 100. */
+export const starCount = (score: number): number => (score >= 100 ? 3 : score >= 75 ? 2 : score >= 50 ? 1 : 0);

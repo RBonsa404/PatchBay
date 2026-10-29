@@ -1,8 +1,10 @@
+import { Check, CircleCheckBig, Gauge, Lightbulb, Menu, Scan, Volume2, VolumeX, type IconNode } from 'lucide';
 import type { CableType, Level, ObjectiveResult } from '@patchbay/sim-core';
 import { t, tx, type Key } from '../i18n.js';
 import { CABLE_STYLE } from '../scene/cables.js';
 import type { Quality } from '../scene/stage.js';
 import { sound } from '../audio.js';
+import { icon } from './brand.js';
 import { h, ui } from './dom.js';
 
 export interface HudActions {
@@ -14,44 +16,79 @@ export interface HudActions {
   selectCable(type: CableType | null): void;
 }
 
-const CABLE_ORDER: CableType[] = ['straight', 'crossover', 'console', 'serial'];
+export const CABLE_ORDER: CableType[] = ['straight', 'crossover', 'console', 'serial'];
+
+/** A small drawing of the cable's connector, in the cable's colour (RJ45, console RJ45/DB9, serial DB60). */
+function cableGlyph(type: CableType): SVGElement {
+  const colour = CABLE_STYLE[type].colour;
+  const plug =
+    type === 'serial'
+      ? '<rect x="6" y="8" width="20" height="12" rx="2" fill="#94a3b8"/><rect x="9" y="11" width="14" height="6" rx="1" fill="#1e293b"/>'
+      : '<rect x="9" y="6" width="14" height="14" rx="2" fill="#e2e8f0"/><path d="M12 6h8v-3h-8z" fill="#cbd5e1"/><g fill="#d97706"><rect x="11.5" y="8" width="1.4" height="4"/><rect x="14" y="8" width="1.4" height="4"/><rect x="16.6" y="8" width="1.4" height="4"/><rect x="19.1" y="8" width="1.4" height="4"/></g>';
+  const source = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 40" width="26" height="32" aria-hidden="true">${plug}<rect x="12" y="20" width="8" height="6" rx="1.5" fill="${colour}"/><path d="M16 26c0 6-6 7-6 14" stroke="${colour}" stroke-width="4" fill="none" stroke-linecap="round"/></svg>`;
+  const doc = new DOMParser().parseFromString(source, 'image/svg+xml');
+  return document.importNode(doc.documentElement, true) as unknown as SVGElement;
+}
+
+const toolButton = (label: string, glyph: IconNode, onclick: (e: Event) => void): HTMLButtonElement =>
+  h('button', { class: 'tool', title: label, 'aria-label': label, onclick }, icon(glyph, 18));
 
 /** Mission title, objectives checklist, cable inventory, tooltip and toasts. */
 export class Hud {
   private readonly root: HTMLElement;
   private readonly objectivesList: HTMLElement;
   private readonly scoreLabel: HTMLElement;
+  private readonly scoreBar: HTMLElement;
   private readonly inventory: HTMLElement;
   private readonly tooltip: HTMLElement;
   private readonly toasts: HTMLElement;
   private readonly hintsShown = new Set<string>();
 
-  constructor(private readonly level: Level, private readonly actions: HudActions, quality: Quality) {
-    this.objectivesList = h('div');
-    this.scoreLabel = h('span', {}, `0 / 100`);
-    this.inventory = h('div', { class: 'inventory glass', role: 'toolbar', 'aria-label': 'Inventaire' });
-    this.tooltip = h('div', { class: 'tooltip glass', hidden: true });
+  constructor(private readonly level: Level, private readonly actions: HudActions, quality: Quality, index = 0) {
+    this.objectivesList = h('ol', { class: 'objective-list' });
+    this.scoreLabel = h('span', { class: 'score' }, '0');
+    this.scoreBar = h('span', { class: 'fill' });
+    this.inventory = h('div', { class: 'inventory panel-solid', role: 'toolbar', 'aria-label': 'Inventaire de câbles' });
+    this.tooltip = h('div', { class: 'tooltip', hidden: true });
     this.toasts = h('div', { class: 'toasts', 'aria-live': 'polite' });
-    const qualityButton: HTMLButtonElement = h('button', { class: 'btn small', onclick: () => (qualityButton.textContent = this.qualityLabel(actions.cycleQuality())) }, this.qualityLabel(quality));
+
+    const qualityButton = toolButton(this.qualityLabel(quality), Gauge, () => {
+      const label = this.qualityLabel(actions.cycleQuality());
+      qualityButton.title = label;
+      qualityButton.setAttribute('aria-label', label);
+      this.toast(label);
+    });
+    const soundButton = toolButton(sound.isMuted ? t('hud.soundOff') : t('hud.sound'), sound.isMuted ? VolumeX : Volume2, () => {
+      const muted = sound.toggleMute();
+      soundButton.replaceChildren(icon(muted ? VolumeX : Volume2, 18));
+      soundButton.title = muted ? t('hud.soundOff') : t('hud.sound');
+    });
+
     this.root = h(
       'div',
-      {},
+      { class: 'hud' },
       h(
-        'div',
+        'header',
         { class: 'hud-top' },
-        h('div', { class: 'mission-tag glass' }, h('div', { class: 'kicker' }, t('app.club')), h('h3', {}, tx(level.title))),
+        h('div', { class: 'mission-chip panel-solid' }, h('span', { class: 'label' }, `${t('briefing.mission')} ${String(index + 1).padStart(2, '0')}`), h('strong', {}, tx(level.title))),
         h(
           'div',
-          { class: 'hud-actions' },
-          h('button', { class: 'btn small', onclick: () => actions.overview() }, t('hud.view')),
+          { class: 'toolbar panel-solid' },
+          toolButton(t('hud.view'), Scan, () => actions.overview()),
+          toolButton(t('hud.hint'), Lightbulb, () => actions.hint()),
           qualityButton,
-          h('button', { class: 'btn small', onclick: (e: Event) => { const muted = sound.toggleMute(); (e.currentTarget as HTMLElement).textContent = muted ? t('hud.soundOff') : t('hud.sound'); } }, sound.isMuted ? t('hud.soundOff') : t('hud.sound')),
-          h('button', { class: 'btn small', onclick: () => actions.hint() }, t('hud.hint')),
-          h('button', { class: 'btn small', onclick: () => actions.menu() }, t('hud.menu')),
-          h('button', { class: 'btn small amber', onclick: () => actions.check() }, t('hud.check')),
+          soundButton,
+          toolButton(t('hud.menu'), Menu, () => actions.menu()),
+          h('button', { class: 'btn primary small', onclick: () => actions.check() }, icon(CircleCheckBig, 16), h('span', {}, t('hud.check'))),
         ),
       ),
-      h('div', { class: 'objectives glass' }, h('h4', {}, h('span', {}, t('hud.objectives')), this.scoreLabel), this.objectivesList),
+      h(
+        'aside',
+        { class: 'objectives panel-solid' },
+        h('header', {}, h('span', { class: 'label' }, t('hud.objectives')), h('span', { class: 'score-line' }, this.scoreLabel, h('small', {}, '/ 100'))),
+        h('div', { class: 'progress' }, this.scoreBar),
+        this.objectivesList,
+      ),
       this.inventory,
       this.tooltip,
       this.toasts,
@@ -70,17 +107,18 @@ export class Hud {
   setObjectives(results: ObjectiveResult[]): void {
     const passed = new Map(results.map((r) => [r.id, r]));
     const score = results.reduce((n, r) => n + r.points, 0);
-    this.scoreLabel.textContent = `${score} / 100`;
+    this.scoreLabel.textContent = String(score);
+    this.scoreBar.style.width = `${score}%`;
     this.objectivesList.replaceChildren(
       ...this.level.objectives.map((o) => {
         const done = passed.get(o.id)?.passed ?? false;
         return h(
-          'div',
+          'li',
           { class: `objective${done ? ' done' : ''}` },
-          h('span', { class: 'tick', 'aria-label': done ? 'fait' : 'à faire' }),
-          h('span', { class: 'label' }, tx(o.label)),
-          h('span', { class: 'pts' }, `${o.points} ${t('hud.points')}`),
-          !done && this.hintsShown.has(o.id) && o.hint ? h('span', { class: 'hint' }, tx(o.hint)) : null,
+          h('span', { class: 'tick', 'aria-label': done ? 'fait' : 'à faire' }, done ? icon(Check, 12) : null),
+          h('span', { class: 'text' }, tx(o.label)),
+          h('span', { class: 'pts' }, String(o.points)),
+          !done && this.hintsShown.has(o.id) && o.hint ? h('span', { class: 'hint' }, icon(Lightbulb, 13), tx(o.hint)) : null,
         );
       }),
     );
@@ -92,19 +130,23 @@ export class Hud {
   }
 
   setInventory(left: Partial<Record<CableType, number>>, selected: CableType | null): void {
-    const slots = CABLE_ORDER.filter((type) => this.level.inventory.cables[type] !== undefined).map((type) => {
+    const types = CABLE_ORDER.filter((type) => this.level.inventory.cables[type] !== undefined);
+    const slots = types.map((type, i) => {
       const count = left[type] ?? 0;
       return h(
         'button',
         {
           class: `cable-slot${selected === type ? ' selected' : ''}`,
+          'data-cable': type,
           disabled: count === 0 && selected !== type,
           'aria-pressed': selected === type ? 'true' : 'false',
+          title: `${t(`cable.${type}` as Key)} (${i + 1})`,
           onclick: () => this.actions.selectCable(selected === type ? null : type),
         },
-        h('span', { class: 'swatch', style: { background: `linear-gradient(135deg, ${CABLE_STYLE[type].colour}, #0b1e3f)` } }),
+        h('kbd', {}, String(i + 1)),
+        cableGlyph(type),
         h('span', { class: 'name' }, t(`cable.${type}` as Key)),
-        h('span', { class: 'count' }, `${count} ${t('cable.left')}`),
+        h('span', { class: 'count' }, `× ${count}`),
       );
     });
     this.inventory.replaceChildren(...slots, h('span', { class: 'tool-hint' }, t(matchMedia('(pointer: coarse)').matches ? 'hud.toolHintTouch' : 'hud.toolHint')));
@@ -123,8 +165,9 @@ export class Hud {
   }
 
   toast(message: string, kind: 'info' | 'good' | 'bad' = 'info'): void {
-    const el = h('div', { class: `toast glass ${kind === 'info' ? '' : kind}` }, message);
+    const el = h('div', { class: `toast ${kind}` }, message);
     this.toasts.append(el);
+    while (this.toasts.children.length > 3) this.toasts.firstElementChild?.remove();
     setTimeout(() => el.remove(), 3200);
   }
 }

@@ -6,7 +6,7 @@
     "en": "First day in the server room"
   },
   "story": {
-    "fr": "Bienvenue au Club Informatique de l'IST ! Le bureau du club vient de recevoir un routeur et un switch pour équiper la salle de TP. Le responsable technique te confie ta première mission : brancher le matériel proprement et préparer le routeur. Les autres membres comptent sur toi pour que le PC de la salle puisse joindre le routeur avant la séance de demain.",
+    "fr": "Bienvenue au Club Informatique de l'IST ! Le bureau du club vient de recevoir un routeur et un switch pour équiper la salle de TP. Je te confie ta première mission : brancher le matériel proprement et préparer le routeur. Les autres membres comptent sur toi pour que le PC de la salle puisse joindre le routeur avant la séance de demain.",
     "en": "Welcome to the IST Computer Club! The club has just received a router and a switch for the lab room. The technical lead gives you your first mission: cable the equipment properly and prepare the router so the lab PC can reach it before tomorrow's session."
   },
   "brief": {
