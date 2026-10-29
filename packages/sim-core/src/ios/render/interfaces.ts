@@ -1,12 +1,7 @@
 import type { DeviceConfig, InterfaceConfig } from '../../model/config.js';
 import type { LinkEnvironment } from '../environment.js';
+import { maskToPrefix } from '../../protocols/l3/ip.js';
 import { groupOf, type DeviceProfile } from '../profiles.js';
-
-export function maskToPrefix(mask: string): number {
-  return mask
-    .split('.')
-    .reduce((n, octet) => n + Number(octet).toString(2).split('').filter((b) => b === '1').length, 0);
-}
 
 /** `show ip interface brief` */
 export function renderInterfaceBrief(config: DeviceConfig, env: LinkEnvironment): string {
@@ -40,7 +35,7 @@ function renderOne(profile: DeviceProfile, ifc: InterfaceConfig, env: LinkEnviro
   if (group?.kind === 'serial') lines.push('  Hardware is HD64570');
   else lines.push(`  Hardware is ${group?.kind === 'svi' ? 'EtherSVI' : 'Lance'}, address is ${mac} (bia ${mac})`);
   if (ifc.description) lines.push(`  Description: ${ifc.description}`);
-  if (ifc.ip) lines.push(`  Internet address is ${ifc.ip.address}/${maskToPrefix(ifc.ip.mask)}`);
+  if (ifc.ip) lines.push(`  Internet address is ${ifc.ip.address}/${maskToPrefix(ifc.ip.mask) ?? 0}`);
   lines.push(
     `  MTU 1500 bytes, BW ${bw} Kbit, DLY ${delay} usec,`,
     '     reliability 255/255, txload 1/255, rxload 1/255',

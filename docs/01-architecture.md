@@ -81,6 +81,14 @@ Règles (avec drapeau de difficulté par niveau : `strictMdix: true|false`) :
 - Le routeur ne traite pas encore les trames reçues (M4) : `injectFrame` les livre comme à un hôte.
 - Les SVI (`interface vlan N`) sont créés à la demande ; `groupOf` les reconnaît par leur type, et leur état dépend de l'existence du VLAN et d'au moins un port actif dans ce VLAN (`memberOf`).
 
+### Couche 3 (implémenté en M4)
+
+- `protocols/l3/` est **pur** (IP, table de routage à partir d'une config et de l'état des interfaces) ; `engine/l3.ts` (`Network.l3`) fait tourner ARP, IPv4 et ICMP.
+- L'engine voit chaque appareil comme une liste d'`L3Interface` (adresse, MAC, port, VLAN) : NIC d'un hôte, interface physique ou sous-interface d'un routeur (MAC du parent, étiquette 802.1Q), SVI d'un switch. Seules les interfaces `up/up` et adressées existent.
+- Tout est synchrone : un envoi retourne quand l'échange complet (ARP imbriqué compris) est terminé, ce qui rend `ping` déterministe. Les trames des routeurs et hôtes arrivent depuis `engine/l2.ts` via `net.l3.receive` ; les switches livrent à leur SVI les diffusions et les trames adressées à sa MAC.
+- Liaison série : pas d'ARP, l'autre bout est le seul destinataire possible.
+- État dynamique (tables ARP, sondes ICMP) hors `snapshot()`.
+
 ### CLI IOS
 
 - Machine à états par équipement : `user → privileged → config → config-if / config-line / config-router / config-std-nacl / config-ext-nacl / config-subif…`.

@@ -1,16 +1,19 @@
 import type { DeviceConfig, InterfaceConfig, LineConfig } from '../../model/config.js';
 import { enableSecretHash, type7Encrypt } from '../crypto.js';
+import { parentOf } from '../interfaces.js';
 import { groupOf, type DeviceProfile } from '../profiles.js';
 import { formatVlanList } from '../vlan-list.js';
 
 function renderInterface(profile: DeviceProfile, ifc: InterfaceConfig): string[] {
   const group = groupOf(profile, ifc.name);
   const out = [`interface ${ifc.name}`];
+  const sub = parentOf(ifc.name) !== undefined;
   if (ifc.description) out.push(` description ${ifc.description}`);
+  if (ifc.encapsulation) out.push(` encapsulation dot1Q ${ifc.encapsulation.vlan}${ifc.encapsulation.native ? ' native' : ''}`);
   if (ifc.ip) out.push(` ip address ${ifc.ip.address} ${ifc.ip.mask}`);
-  else if (group && group.layer === 3) out.push(' no ip address');
+  else if (group && group.layer === 3 && !sub) out.push(' no ip address');
   if (ifc.clockRate !== undefined) out.push(` clock rate ${ifc.clockRate}`);
-  if (group?.kind === 'ethernet' && group.layer === 3) out.push(' duplex auto', ' speed auto');
+  if (group?.kind === 'ethernet' && group.layer === 3 && !sub) out.push(' duplex auto', ' speed auto');
   const sw = ifc.switchport;
   if (sw) {
     if (sw.accessVlan !== undefined) out.push(` switchport access vlan ${sw.accessVlan}`);
@@ -66,6 +69,13 @@ export function renderConfigBody(profile: DeviceProfile, config: DeviceConfig): 
   for (const ifc of config.interfaces) out.push(...renderInterface(profile, ifc), '!');
 
   if (config.defaultGateway) out.push(`ip default-gateway ${config.defaultGateway}`, '!');
+
+  if (config.staticRoutes.length > 0) {
+    for (const r of config.staticRoutes) {
+      out.push(`ip route ${r.network} ${r.mask} ${r.nextHop ?? r.iface}${r.distance === 1 ? '' : ` ${r.distance}`}`);
+    }
+    out.push('!');
+  }
 
   if (config.motd !== undefined) out.push('banner motd ^C', ...config.motd, '^C', '!');
 

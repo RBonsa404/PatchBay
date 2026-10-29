@@ -6,6 +6,9 @@ export interface ResolvedInterface {
   consumed: number;
 }
 
+/** `FastEthernet0/1.10` -> `FastEthernet0/1`; undefined for anything that is not a subinterface. */
+export const parentOf = (interfaceName: string): string | undefined => /^(.+)\.\d+$/.exec(interfaceName)?.[1];
+
 /**
  * Resolve user input such as `fa0/0`, `Gi 0/1`, `fastethernet 0/0` or `vlan 99` to a canonical interface name.
  * SVIs (type Vlan) accept any id 1-4094: IOS creates them on demand.
@@ -28,6 +31,16 @@ export function resolveInterface(profile: DeviceProfile, tokens: string[]): Reso
   const groups = profile.groups.filter((g) => g.type.toLowerCase().startsWith(typePart));
   const group = groups.length === 1 ? groups[0] : undefined;
   if (!group) return null;
+
+  // Subinterfaces (router Ethernet only): fa0/1.10
+  const dot = number.indexOf('.');
+  if (dot >= 0) {
+    const base = number.slice(0, dot);
+    const sub = number.slice(dot + 1);
+    const ok = group.kind === 'ethernet' && group.layer === 3 && group.ids.includes(base) && /^\d+$/.test(sub) && Number(sub) >= 1 && Number(sub) <= 4294967293;
+    return ok ? { name: `${group.type}${base}.${Number(sub)}`, consumed } : null;
+  }
+
   if (group.kind === 'svi') {
     return /^\d+$/.test(number) && Number(number) >= 1 && Number(number) <= 4094 ? { name: group.type + Number(number), consumed } : null;
   }

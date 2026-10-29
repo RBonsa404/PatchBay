@@ -4,7 +4,16 @@ Règle : un milestone est terminé quand ses critères sont verts (tests, typech
 
 ## Prochaine étape
 
-**M0 à M3 sont faits.** Commencer **M4** (couche 3 : routage statique et inter-VLAN). Le moteur de trames `engine/l2.ts` existe (`Network.sendFrame`, tables MAC) mais ne transporte que des trames L2 brutes : M4 doit y ajouter ARP, IP/ICMP, la table de routage (longest-prefix match, `ip route`, route par défaut, distance administrative), les sous-interfaces `encapsulation dot1Q` (router-on-a-stick, le routeur reçoit déjà des trames dans `injectFrame` : brancher le traitement L3 là), `ping` (avec `.!!!!` du premier ARP), `traceroute`, `show ip route`, `show arp`. Les PC/serveurs n'ont pas encore de configuration IP (adresse, masque, passerelle) ni de commandes : prévoir leur modèle (`Device.host`) et une façon de les configurer depuis les niveaux. Le routeur a besoin de `ip routing` côté switch L3 seulement après le MVP.
+**M0 à M4 sont faits.** Commencer **M5** (OSPF, ACL, NAT), sous-milestone par sous-milestone (M5a OSPF, M5b ACL, M5c NAT). Points d'accroche déjà prévus dans `engine/l3.ts` : `onIp` porte un commentaire « M5 hooks » à l'endroit où appliquer ACL entrante, NAT et ACL sortante ; la table de routage (`protocols/l3/routing.ts`) n'a que les codes `C` et `S` : ajouter `O`, `O IA`, `O*E2` et la distance administrative 110 ; OSPF a besoin de messages entre routeurs (Hello/LSU) : les faire passer par le moteur de trames (paquets IP protocole 89, multicast 224.0.0.5) plutôt que par un raccourci.
+
+Dettes connues de M4 :
+- Pas de commandes sur les PC (`ipconfig`, `ping` depuis un terminal de PC) : seulement l'API `Network.configureHost` / `Network.ping`. À prévoir avec l'interface (M7).
+- RTT fixé à 1 ms, âge ARP toujours 0 : le moteur n'a pas encore d'horloge logique (`tick`). Pas de timeout ARP, pas de proxy ARP, pas de file d'attente ARP (le paquet qui déclenche l'ARP est abandonné, comme IOS : d'où le `.!!!!`).
+- Une route statique n'est installée que si son saut suivant est dans un réseau directement connecté (pas de récursivité). Pas d'ECMP, pas de `ip classless`, pas de résumé automatique.
+- ICMP seulement (echo, time-exceeded, unreachable). `ping` simple (pas de ping étendu), `traceroute` par ICMP (le vrai utilise UDP).
+- Le switch n'a ni `ip routing` ni `show ip route` (post-MVP) ; sa pile de gestion répond au ping et sort par `ip default-gateway`.
+- `ip address` ne vérifie ni chevauchement de sous-réseaux ni masque contigu.
+- Le format de `show ip route` suit les PDF (liste à plat, `/préfixe`) ; IOS 15 ajoute les routes `L` et regroupe les sous-réseaux par réseau classful.
 
 Dettes connues de M1/M2/M3 (à traiter quand le sujet revient) :
 - DTP non simulé : un port sans `switchport mode` agit comme un port d'accès. VTP, STP, EtherChannel, port-security : absents (post-MVP). Sans STP, une boucle est coupée par un compteur de visites par injection.
@@ -48,7 +57,8 @@ Réalisé : VLAN (`vlan`, `name`, `no vlan`, création automatique à l'affectat
 - VLAN, ports d'accès, trunk 802.1Q, MAC learning, `show vlan brief`, `show interfaces trunk`, `show mac address-table`.
 - Tests : isolation VLAN, trunk allowed/native.
 
-## M4 — Couche 3 : routage statique et inter-VLAN
+## M4 — Couche 3 : routage statique et inter-VLAN ✔
+Réalisé : `protocols/l3/ip.ts` et `routing.ts` (table de routage pure : connectées + statiques, accessibilité du saut suivant, distance administrative, longest-prefix match), `engine/l3.ts` (ARP, IPv4, ICMP echo/time-exceeded/unreachable, retransmission avec TTL, résolution du premier saut ; le paquet qui déclenche l'ARP est abandonné comme IOS), PC/serveurs configurables (`Network.configureHost`), sous-interfaces `encapsulation dot1q N [native]` (router-on-a-stick), pile de gestion des switches (SVI qui reçoit, répond et émet ; `ip default-gateway`), `ip route` (4 formes, `no`, distance, `%Inconsistent address and mask`), `ping`, `traceroute`, `show ip route`, `show ip arp` / `show arp`, `clear arp-cache`, rendu des routes et sous-interfaces dans `running-config`, golden du TP de routage statique.
 - ARP, ICMP, table de routage, longest-prefix match, `ip route`, route par défaut, distance administrative.
 - Router-on-a-stick, `ping`, `traceroute`, `show ip route`.
 

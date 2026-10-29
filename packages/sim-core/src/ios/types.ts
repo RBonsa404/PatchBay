@@ -8,6 +8,7 @@ export type CliMode =
   | 'config'
   | 'config-if'
   | 'config-if-range'
+  | 'config-subif'
   | 'config-line'
   | 'config-vlan'
   | 'config-router'
@@ -18,6 +19,7 @@ export type CliMode =
 export const SUB_CONFIG_MODES: readonly CliMode[] = [
   'config-if',
   'config-if-range',
+  'config-subif',
   'config-line',
   'config-vlan',
   'config-router',

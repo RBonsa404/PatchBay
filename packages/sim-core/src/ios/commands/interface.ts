@@ -6,7 +6,7 @@ import type { CommandContext, CommandDef } from '../types.js';
 const selected = (ctx: CommandContext): InterfaceConfig[] =>
   ctx.config.interfaces.filter((i) => ctx.selection.interfaces?.includes(i.name));
 
-const MODES = ['config-if', 'config-if-range'] as const;
+const MODES = ['config-if', 'config-if-range', 'config-subif'] as const;
 
 export const interfaceCommands: CommandDef[] = [
   {

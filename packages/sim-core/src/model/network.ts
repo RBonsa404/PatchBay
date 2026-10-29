@@ -1,6 +1,8 @@
 import { injectFrame, MacTables, memberOf, type EthernetFrame, type FrameTrace } from '../engine/l2.js';
+import { L3 } from '../engine/l3.js';
 import { Cli } from '../ios/cli.js';
-import type { LinkEnvironment, LinkState } from '../ios/environment.js';
+import { parentOf } from '../ios/interfaces.js';
+import type { LinkEnvironment, LinkState, PingResult } from '../ios/environment.js';
 import { groupOf } from '../ios/profiles.js';
 import { canPlug, copperLinkWorks, type CableType } from '../physical/rules.js';
 import { catalog, type DeviceModel, type PortSpec } from './catalog.js';
@@ -23,6 +25,13 @@ export interface NetworkOptions {
   strictMdix: boolean;
 }
 
+/** IP settings of a PC or server. */
+export interface HostConfig {
+  ip?: string;
+  mask?: string;
+  gateway?: string;
+}
+
 export interface Device {
   id: string;
   model: DeviceModel;
@@ -30,6 +39,8 @@ export interface Device {
   index: number;
   /** IOS command line; routers and switches only. */
   cli?: Cli;
+  /** IP settings; PCs and servers only. */
+  host?: HostConfig;
 }
 
 export type ConnectError = 'unknown-device' | 'unknown-port' | 'same-port' | 'port-busy' | 'incompatible-ports';
@@ -37,7 +48,7 @@ export type ConnectResult = { ok: true; cable: Cable } | { ok: false; error: Con
 
 export interface NetworkSnapshot {
   options: NetworkOptions;
-  devices: { id: string; model: string; running?: DeviceConfig; startup?: DeviceConfig | null }[];
+  devices: { id: string; model: string; running?: DeviceConfig; startup?: DeviceConfig | null; host?: HostConfig }[];
   cables: Cable[];
 }
 
@@ -50,6 +61,8 @@ export class Network {
 
   /** Learned MAC addresses per switch (dynamic state, not part of snapshots). */
   readonly macTables = new MacTables();
+  /** ARP, forwarding and ICMP. */
+  readonly l3 = new L3(this);
 
   private readonly lastLinks = new Map<string, LinkState>();
   private readonly syslog = new Map<string, string[]>();
@@ -63,6 +76,7 @@ export class Network {
 
     const device: Device = { id, model, index: this.devices.size };
     if (model.profile) device.cli = new Cli({ profile: model.profile, env: this.environmentFor(device) });
+    else device.host = {};
     this.devices.set(id, device);
     this.syslog.set(id, []);
     this.reconcile(); // seeds the link table; the new device has no cables so nothing is printed
@@ -93,13 +107,27 @@ export class Network {
   /** Deterministic MAC address of a port: derived from the device's insertion index and the port's position. */
   macOf(deviceId: string, port: string): string {
     const device = this.device(deviceId);
-    const index = Math.max(0, device.model.ports.findIndex((p) => p.name === port));
+    const found = device.model.ports.findIndex((p) => p.name === port);
+    // SVIs are not ports: give each VLAN its own address, clear of the physical ports.
+    const index = found >= 0 ? found : port.startsWith('Vlan') ? 0x1000 + Number(port.slice(4)) : 0;
     return `0001.43${device.index.toString(16).padStart(2, '0')}.${index.toString(16).padStart(4, '0')}`;
   }
 
   /** Put a frame on the wire at a host port and follow it through the switches. */
   sendFrame(from: CableEnd, frame: EthernetFrame): FrameTrace {
     return injectFrame(this, from, frame);
+  }
+
+  /** Set the IP address, mask and default gateway of a PC or server. */
+  configureHost(deviceId: string, config: HostConfig): void {
+    const device = this.device(deviceId);
+    if (!device.host) throw new Error(`${deviceId} is not a host`);
+    device.host = { ...config };
+  }
+
+  /** Echo requests from any device (PCs included); IOS devices use the `ping` command instead. */
+  ping(deviceId: string, destination: string, count = 5): PingResult {
+    return this.l3.ping(deviceId, destination, count);
   }
 
   /** Is the link at a host port up? True when a working cable reaches a live peer. */
@@ -151,6 +179,9 @@ export class Network {
     if (!device?.cli || !cfg) return { status: 'down', protocol: 'down' };
 
     if (cfg.shutdown) return { status: 'administratively down', protocol: 'down' };
+    // A subinterface follows its parent interface.
+    const parent = parentOf(port);
+    if (parent) return this.linkState(deviceId, parent);
     const here: CableEnd = { device: deviceId, port };
     if (device.model.profile && groupOf(device.model.profile, port)?.kind === 'svi') {
       // An SVI is up while its VLAN exists and at least one port in that VLAN has a live link.
@@ -191,6 +222,7 @@ export class Network {
         id: d.id,
         model: d.model.id,
         ...(d.cli ? { running: cloneConfig(d.cli.config), startup: d.cli.startup ? cloneConfig(d.cli.startup) : null } : {}),
+        ...(d.host ? { host: { ...d.host } } : {}),
       })),
       cables: this.cables.map((c) => ({ type: c.type, a: { ...c.a }, b: { ...c.b } })),
     };
@@ -202,6 +234,7 @@ export class Network {
       const device = net.addDevice(d.id, d.model);
       if (device.cli && d.running) device.cli.config = cloneConfig(d.running);
       if (device.cli) device.cli.startup = d.startup ? cloneConfig(d.startup) : null;
+      if (d.host) device.host = { ...d.host };
     }
     net.cables = snapshot.cables.map((c) => ({ type: c.type, a: { ...c.a }, b: { ...c.b } }));
     net.lastLinks.clear();
@@ -227,6 +260,10 @@ export class Network {
       macAddress: (name) => this.macOf(device.id, name),
       macTable: () => this.macTables.list(device.id),
       clearMacTable: () => this.macTables.clear(device.id),
+      ping: (destination, count) => this.l3.ping(device.id, destination, count),
+      traceroute: (destination, maxHops) => this.l3.traceroute(device.id, destination, maxHops),
+      arpTable: () => this.l3.arpTable(device.id),
+      clearArp: () => this.l3.clearArp(device.id),
       commit: () => this.settle(device.id),
       drain: () => this.drainSyslog(device.id),
     };

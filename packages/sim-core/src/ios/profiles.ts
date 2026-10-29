@@ -78,7 +78,9 @@ export const profiles: Record<string, DeviceProfile> = {
 };
 
 export function groupOf(profile: DeviceProfile, interfaceName: string): InterfaceGroup | undefined {
-  const exact = profile.groups.find((g) => g.ids.some((id) => g.type + id === interfaceName));
+  // A subinterface (FastEthernet0/1.10) belongs to its parent's group.
+  const base = interfaceName.replace(/\.\d+$/, '');
+  const exact = profile.groups.find((g) => g.ids.some((id) => g.type + id === base));
   if (exact) return exact;
   // SVIs are created on demand (`interface vlan 99`), so they are not listed in the profile's ids.
   return profile.groups.find((g) => g.kind === 'svi' && new RegExp(`^${g.type}\\d+$`).test(interfaceName));

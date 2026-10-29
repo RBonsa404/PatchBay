@@ -27,6 +27,7 @@ const PROMPT_SUFFIX: Record<CliMode, string> = {
   config: '(config)#',
   'config-if': '(config-if)#',
   'config-if-range': '(config-if-range)#',
+  'config-subif': '(config-subif)#',
   'config-line': '(config-line)#',
   'config-vlan': '(config-vlan)#',
   'config-router': '(config-router)#',

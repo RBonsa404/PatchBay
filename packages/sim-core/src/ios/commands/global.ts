@@ -1,4 +1,4 @@
-import { parseInterfaceRange } from '../interfaces.js';
+import { parentOf, parseInterfaceRange } from '../interfaces.js';
 import { groupOf } from '../profiles.js';
 import type { CommandContext, CommandDef } from '../types.js';
 
@@ -110,15 +110,26 @@ export const globalCommands: CommandDef[] = [
     run: (ctx, args) => {
       const name = args.name as string;
       const kind = groupOf(ctx.profile, name)?.kind;
+      const parent = parentOf(name);
       if (ctx.negate) {
-        // Only SVIs can be deleted; physical interfaces are fixed.
-        if (kind !== 'svi' || name === 'Vlan1') ctx.invalid(1);
+        // Only SVIs and subinterfaces can be deleted; physical interfaces are fixed.
+        if (!parent && (kind !== 'svi' || name === 'Vlan1')) ctx.invalid(1);
         ctx.config.interfaces = ctx.config.interfaces.filter((i) => i.name !== name);
         return;
       }
-      // `interface vlan N` creates the SVI on first use, administratively down.
-      if (!ctx.config.interfaces.some((i) => i.name === name)) ctx.config.interfaces.push({ name, shutdown: true });
-      ctx.setMode('config-if', { interfaces: [name] });
+      const list = ctx.config.interfaces;
+      if (!list.some((i) => i.name === name)) {
+        if (parent) {
+          // A new subinterface is listed right after its parent and siblings; it starts enabled like its parent.
+          let at = list.findIndex((i) => i.name === parent);
+          while (at + 1 < list.length && parentOf((list[at + 1] as { name: string }).name) === parent) at++;
+          list.splice(at + 1, 0, { name, shutdown: false });
+        } else {
+          // `interface vlan N` creates the SVI on first use, administratively down.
+          list.push({ name, shutdown: true });
+        }
+      }
+      ctx.setMode(parent ? 'config-subif' : 'config-if', { interfaces: [name] });
     },
   },
   {

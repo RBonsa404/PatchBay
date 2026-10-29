@@ -2,6 +2,7 @@ import type { CommandDef } from '../types.js';
 import { fileCommands } from './files.js';
 import { globalCommands } from './global.js';
 import { interfaceCommands } from './interface.js';
+import { l3Commands } from './l3.js';
 import { lineCommands } from './line.js';
 import { sessionCommands } from './session.js';
 import { showCommands } from './show.js';
@@ -13,6 +14,7 @@ export const allCommands: CommandDef[] = [
   ...lineCommands,
   ...interfaceCommands,
   ...vlanCommands,
+  ...l3Commands,
   ...fileCommands,
   ...showCommands,
 ];
@@ -41,6 +43,12 @@ export const groupHelp: Record<string, string> = {
   'switchport trunk allowed vlan': 'Set allowed VLAN characteristics when interface is in trunking mode',
   'switchport trunk native vlan': 'Set native VLAN when interface is in trunking mode',
   'switchport access vlan': 'Set VLAN when interface is in access mode',
+  encapsulation: 'Set encapsulation type for an interface',
+  'encapsulation dot1q': 'IEEE 802.1Q Virtual LAN',
+  'ip route': 'Establish static routes',
+  ping: 'Send echo messages',
+  traceroute: 'Trace route to destination',
+  'clear arp-cache': 'Clear the entire ARP cache',
   'show ip': 'IP information',
   'show ip interface': 'IP interface status and configuration',
   line: 'Configure a terminal line',

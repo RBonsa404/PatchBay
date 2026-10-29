@@ -17,13 +17,24 @@ export interface SwitchportConfig {
 }
 
 export interface InterfaceConfig {
-  /** Canonical name, e.g. FastEthernet0/0 or Vlan99. */
+  /** Canonical name, e.g. FastEthernet0/0, FastEthernet0/1.10 (subinterface) or Vlan99. */
   name: string;
   description?: string;
   ip?: IpAddress;
   shutdown: boolean;
   clockRate?: number;
   switchport?: SwitchportConfig;
+  /** 802.1Q encapsulation of a router subinterface. */
+  encapsulation?: { vlan: number; native: boolean };
+}
+
+/** `ip route <network> <mask> <next-hop | interface> [distance]` */
+export interface StaticRoute {
+  network: string;
+  mask: string;
+  nextHop?: string;
+  iface?: string;
+  distance: number;
 }
 
 /** A VLAN created with the `vlan` command. VLAN 1 and the reserved 1002-1005 always exist and are not stored. */
@@ -53,6 +64,7 @@ export interface DeviceConfig {
   domainLookup: boolean;
   passwordEncryption: boolean;
   defaultGateway?: string;
+  staticRoutes: StaticRoute[];
   vlans: VlanConfig[];
   lines: LineConfig[];
   interfaces: InterfaceConfig[];
@@ -83,6 +95,7 @@ export function createDefaultConfig(profile: DeviceProfile): DeviceConfig {
     hostname: profile.defaultHostname,
     domainLookup: true,
     passwordEncryption: false,
+    staticRoutes: [],
     vlans: [],
     lines,
     interfaces: profile.groups.flatMap((g) =>
