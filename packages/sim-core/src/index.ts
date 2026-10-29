@@ -10,3 +10,5 @@ export type { DeviceKind, DeviceModel, PortKind, PortSpec } from './model/catalo
 export { Network } from './model/network.js';
 export type { Cable, CableEnd, ConnectError, ConnectResult, Device, NetworkOptions, NetworkSnapshot } from './model/network.js';
 export type { CableType } from './physical/rules.js';
+export type { ServiceResult } from './engine/l3.js';
+export type { HostConfig } from './model/network.js';

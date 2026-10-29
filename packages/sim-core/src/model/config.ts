@@ -26,6 +26,41 @@ export interface InterfaceConfig {
   switchport?: SwitchportConfig;
   /** 802.1Q encapsulation of a router subinterface. */
   encapsulation?: { vlan: number; native: boolean };
+  /** ACL applied to packets arriving on / leaving through this interface (name or number). */
+  aclIn?: string;
+  aclOut?: string;
+}
+
+export type AclAddr = { any: true } | { ip: string; wildcard: string };
+
+export interface PortMatch {
+  op: 'eq' | 'neq' | 'gt' | 'lt' | 'range';
+  port: number;
+  port2?: number;
+}
+
+/** One line of an ACL: a remark (no action) or a permit/deny rule. */
+export interface AclEntry {
+  seq: number;
+  remark?: string;
+  action?: 'permit' | 'deny';
+  /** Extended ACLs only. */
+  protocol?: 'ip' | 'icmp' | 'tcp' | 'udp';
+  src?: AclAddr;
+  dst?: AclAddr;
+  srcPort?: PortMatch;
+  dstPort?: PortMatch;
+  established?: boolean;
+  icmpType?: string;
+  log?: boolean;
+}
+
+export interface AclConfig {
+  /** Number (as text) or name. */
+  name: string;
+  kind: 'standard' | 'extended';
+  named: boolean;
+  entries: AclEntry[];
 }
 
 /** `ip route <network> <mask> <next-hop | interface> [distance]` */
@@ -52,6 +87,8 @@ export interface LineConfig {
   login: boolean;
   loggingSynchronous: boolean;
   execTimeout?: { minutes: number; seconds: number };
+  /** Standard ACL limiting who may open a session on this line (`access-class N in`). */
+  accessClassIn?: string;
 }
 
 /** Structured device configuration. `show running-config` is a rendering of this state, never the other way round. */
@@ -65,6 +102,7 @@ export interface DeviceConfig {
   passwordEncryption: boolean;
   defaultGateway?: string;
   staticRoutes: StaticRoute[];
+  acls: AclConfig[];
   vlans: VlanConfig[];
   lines: LineConfig[];
   interfaces: InterfaceConfig[];
@@ -96,6 +134,7 @@ export function createDefaultConfig(profile: DeviceProfile): DeviceConfig {
     domainLookup: true,
     passwordEncryption: false,
     staticRoutes: [],
+    acls: [],
     vlans: [],
     lines,
     interfaces: profile.groups.flatMap((g) =>

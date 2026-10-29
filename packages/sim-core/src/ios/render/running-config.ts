@@ -3,6 +3,7 @@ import { enableSecretHash, type7Encrypt } from '../crypto.js';
 import { parentOf } from '../interfaces.js';
 import { groupOf, type DeviceProfile } from '../profiles.js';
 import { formatVlanList } from '../vlan-list.js';
+import { formatConfigEntry } from '../../protocols/acl/acl.js';
 
 function renderInterface(profile: DeviceProfile, ifc: InterfaceConfig): string[] {
   const group = groupOf(profile, ifc.name);
@@ -12,6 +13,8 @@ function renderInterface(profile: DeviceProfile, ifc: InterfaceConfig): string[]
   if (ifc.encapsulation) out.push(` encapsulation dot1Q ${ifc.encapsulation.vlan}${ifc.encapsulation.native ? ' native' : ''}`);
   if (ifc.ip) out.push(` ip address ${ifc.ip.address} ${ifc.ip.mask}`);
   else if (group && group.layer === 3 && !sub) out.push(' no ip address');
+  if (ifc.aclIn !== undefined) out.push(` ip access-group ${ifc.aclIn} in`);
+  if (ifc.aclOut !== undefined) out.push(` ip access-group ${ifc.aclOut} out`);
   if (ifc.clockRate !== undefined) out.push(` clock rate ${ifc.clockRate}`);
   if (group?.kind === 'ethernet' && group.layer === 3 && !sub) out.push(' duplex auto', ' speed auto');
   const sw = ifc.switchport;
@@ -34,6 +37,7 @@ function renderLine(config: DeviceConfig, line: LineConfig): string[] {
     out.push(config.passwordEncryption ? ` password 7 ${type7Encrypt(line.password)}` : ` password ${line.password}`);
   }
   if (line.loggingSynchronous) out.push(' logging synchronous');
+  if (line.accessClassIn !== undefined) out.push(` access-class ${line.accessClassIn} in`);
   if (line.login) out.push(' login');
   return out;
 }
@@ -74,6 +78,17 @@ export function renderConfigBody(profile: DeviceProfile, config: DeviceConfig): 
     for (const r of config.staticRoutes) {
       out.push(`ip route ${r.network} ${r.mask} ${r.nextHop ?? r.iface}${r.distance === 1 ? '' : ` ${r.distance}`}`);
     }
+    out.push('!');
+  }
+
+  const numbered = config.acls.filter((a) => !a.named);
+  for (const acl of numbered) {
+    for (const e of acl.entries) out.push(`access-list ${acl.name} ${e.action ? formatConfigEntry(acl.kind, e) : `remark ${e.remark}`}`);
+  }
+  if (numbered.length > 0) out.push('!');
+  for (const acl of config.acls.filter((a) => a.named)) {
+    out.push(`ip access-list ${acl.kind} ${acl.name}`);
+    for (const e of acl.entries) out.push(` ${e.action ? formatConfigEntry(acl.kind, e) : `remark ${e.remark}`}`);
     out.push('!');
   }
 

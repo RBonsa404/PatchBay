@@ -34,6 +34,8 @@ export interface Selection {
   interfaces?: string[];
   /** VLAN id in config-vlan. */
   vlan?: number;
+  /** ACL name in config-std-nacl / config-ext-nacl. */
+  acl?: string;
   /** Line ids (see LineConfig.id) in config-line. */
   lines?: string[];
 }

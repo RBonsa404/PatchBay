@@ -52,6 +52,9 @@ export interface LinkEnvironment {
   traceroute(destination: string, maxHops?: number): TraceHop[];
   arpTable(): ArpEntry[];
   clearArp(): void;
+  /** Packets that matched this ACL line (see `show access-lists`). */
+  aclHits(aclName: string, seq: number): number;
+  clearAclHits(): void;
   /** Re-evaluate the links after a state change; returns the syslog lines this device must print now. */
   commit(): string[];
   /** Syslog lines queued for this device by events elsewhere (remote shutdown, cable plugged…). */
@@ -75,6 +78,8 @@ export function createIsolatedEnvironment(getConfig: () => DeviceConfig): LinkEn
     traceroute: () => [],
     arpTable: () => [],
     clearArp: () => undefined,
+    aclHits: () => 0,
+    clearAclHits: () => undefined,
     commit: () => [],
     drain: () => [],
   };

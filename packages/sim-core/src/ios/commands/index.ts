@@ -1,4 +1,5 @@
 import type { CommandDef } from '../types.js';
+import { aclCommands } from './acl.js';
 import { fileCommands } from './files.js';
 import { globalCommands } from './global.js';
 import { interfaceCommands } from './interface.js';
@@ -15,6 +16,7 @@ export const allCommands: CommandDef[] = [
   ...interfaceCommands,
   ...vlanCommands,
   ...l3Commands,
+  ...aclCommands,
   ...fileCommands,
   ...showCommands,
 ];
@@ -49,6 +51,12 @@ export const groupHelp: Record<string, string> = {
   ping: 'Send echo messages',
   traceroute: 'Trace route to destination',
   'clear arp-cache': 'Clear the entire ARP cache',
+  'access-list': 'Add an access list entry',
+  'ip access-list': 'Named access list',
+  'ip access-group': 'Specify access control for packets',
+  'show access-lists': 'List access lists',
+  'show ip access-lists': 'List IP access lists',
+  'clear access-list': 'Clear access list statistical information',
   'show ip': 'IP information',
   'show ip interface': 'IP interface status and configuration',
   line: 'Configure a terminal line',

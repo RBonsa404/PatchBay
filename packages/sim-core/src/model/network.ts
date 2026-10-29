@@ -1,5 +1,5 @@
 import { injectFrame, MacTables, memberOf, type EthernetFrame, type FrameTrace } from '../engine/l2.js';
-import { L3 } from '../engine/l3.js';
+import { L3, type ServiceResult } from '../engine/l3.js';
 import { Cli } from '../ios/cli.js';
 import { parentOf } from '../ios/interfaces.js';
 import type { LinkEnvironment, LinkState, PingResult } from '../ios/environment.js';
@@ -30,6 +30,8 @@ export interface HostConfig {
   ip?: string;
   mask?: string;
   gateway?: string;
+  /** Ports this host answers on, e.g. a web server: `{ tcp: [80, 443] }`. */
+  services?: { tcp?: number[]; udp?: number[] };
 }
 
 export interface Device {
@@ -128,6 +130,16 @@ export class Network {
   /** Echo requests from any device (PCs included); IOS devices use the `ping` command instead. */
   ping(deviceId: string, destination: string, count = 5): PingResult {
     return this.l3.ping(deviceId, destination, count);
+  }
+
+  /** Open a TCP connection from any device to `destination:port` (SYN, SYN-ACK or RST, with ACLs applied on the way). */
+  tcpConnect(deviceId: string, destination: string, port: number): ServiceResult {
+    return this.l3.tcpConnect(deviceId, destination, port);
+  }
+
+  /** Send one UDP datagram and wait for the service's answer. */
+  udpSend(deviceId: string, destination: string, port: number): ServiceResult {
+    return this.l3.udpSend(deviceId, destination, port);
   }
 
   /** Is the link at a host port up? True when a working cable reaches a live peer. */
@@ -264,6 +276,8 @@ export class Network {
       traceroute: (destination, maxHops) => this.l3.traceroute(device.id, destination, maxHops),
       arpTable: () => this.l3.arpTable(device.id),
       clearArp: () => this.l3.clearArp(device.id),
+      aclHits: (aclName, seq) => this.l3.aclHits(device.id, aclName, seq),
+      clearAclHits: () => this.l3.clearAclHits(device.id),
       commit: () => this.settle(device.id),
       drain: () => this.drainSyslog(device.id),
     };
