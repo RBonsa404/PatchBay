@@ -76,6 +76,34 @@ export const scenarios: Scenario[] = [
     },
   },
   {
+    id: 'ospf',
+    title: 'OSPF à trois routeurs (TP 11.6.1)',
+    brief:
+      'Triangle de liaisons série. Adresse les interfaces (voir le TP 11.6.1), mets l’horloge côté DCE (R1 s0/0/0 et s0/0/1, ' +
+      'R2 s0/0/1), puis active OSPF (`router ospf 1`, `network … area 0`). Regarde les adjacences apparaître et les deux chemins égaux.',
+    nodes: [
+      { id: 'R1', model: 'cisco-1841', x: 320, y: 70 },
+      { id: 'R2', model: 'cisco-1841', x: 140, y: 230 },
+      { id: 'R3', model: 'cisco-1841', x: 500, y: 230 },
+      { id: 'PC1', model: 'pc', x: 320, y: 20 },
+      { id: 'PC2', model: 'pc', x: 50, y: 300 },
+      { id: 'PC3', model: 'pc', x: 590, y: 300 },
+    ],
+    cables: [
+      { type: 'serial', a: ['R1', 'Serial0/0/0'], b: ['R2', 'Serial0/0/0'] },
+      { type: 'serial', a: ['R1', 'Serial0/0/1'], b: ['R3', 'Serial0/0/0'] },
+      { type: 'serial', a: ['R2', 'Serial0/0/1'], b: ['R3', 'Serial0/0/1'] },
+      { type: 'crossover', a: ['R1', 'FastEthernet0/0'], b: ['PC1', 'FastEthernet0'] },
+      { type: 'crossover', a: ['R2', 'FastEthernet0/0'], b: ['PC2', 'FastEthernet0'] },
+      { type: 'crossover', a: ['R3', 'FastEthernet0/0'], b: ['PC3', 'FastEthernet0'] },
+    ],
+    hosts: {
+      PC1: { ip: '172.16.1.20', mask: '255.255.255.240', gateway: '172.16.1.17' },
+      PC2: { ip: '10.10.10.10', mask: '255.255.255.0', gateway: '10.10.10.1' },
+      PC3: { ip: '172.16.1.35', mask: '255.255.255.248', gateway: '172.16.1.33' },
+    },
+  },
+  {
     id: 'lab152',
     title: 'Premier routeur (TP 1.5.2)',
     brief:

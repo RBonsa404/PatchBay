@@ -2,7 +2,7 @@
 
 Jeu web de formation réseau : l'étudiant reçoit une configuration Cisco (topologie + objectifs) et doit la reproduire « sur le terrain » : choisir le matériel, les câbles, les ports, puis configurer les équipements en console IOS simulée. Public initial : étudiants CCNA au Burkina Faso (PC modestes, connexion limitée → **tout doit fonctionner hors ligne**).
 
-Lis d'abord, dans cet ordre : `docs/00-vision.md`, `docs/01-architecture.md`, `docs/02-mvp-spec.md`, `docs/05-roadmap.md`. Le détail du mini-IOS est dans `docs/03-ios-cli-spec.md`, le format des niveaux dans `docs/04-level-format.md`. Les cours CCNA de l'utilisateur (PDF) sont dans `docs/references/` : ce sont la **source de vérité pour la syntaxe et la sortie des commandes**.
+Lis d'abord, dans cet ordre : `docs/00-vision.md`, `docs/01-architecture.md`, `docs/02-mvp-spec.md`, `docs/05-roadmap.md`. Toute interface visible suit la charte du Club Informatique de l'IST : `docs/06-charte-club-ist.md`. Le détail du mini-IOS est dans `docs/03-ios-cli-spec.md`, le format des niveaux dans `docs/04-level-format.md`. Les cours CCNA de l'utilisateur (PDF) sont dans `docs/references/` : ce sont la **source de vérité pour la syntaxe et la sortie des commandes**.
 
 ## Principes non négociables
 
