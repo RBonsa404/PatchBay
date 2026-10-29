@@ -29,6 +29,34 @@ export interface InterfaceConfig {
   /** ACL applied to packets arriving on / leaving through this interface (name or number). */
   aclIn?: string;
   aclOut?: string;
+  /** NAT role (`ip nat inside` / `ip nat outside`). */
+  natRole?: 'inside' | 'outside';
+}
+
+export interface NatStatic {
+  local: string;
+  global: string;
+}
+
+export interface NatPool {
+  name: string;
+  start: string;
+  end: string;
+  mask: string;
+}
+
+/** `ip nat inside source list <acl> pool <pool> | interface <if> [overload]` */
+export interface NatRule {
+  acl: string;
+  pool?: string;
+  iface?: string;
+  overload: boolean;
+}
+
+export interface NatConfig {
+  statics: NatStatic[];
+  pools: NatPool[];
+  rules: NatRule[];
 }
 
 export type AclAddr = { any: true } | { ip: string; wildcard: string };
@@ -103,6 +131,7 @@ export interface DeviceConfig {
   defaultGateway?: string;
   staticRoutes: StaticRoute[];
   acls: AclConfig[];
+  nat: NatConfig;
   vlans: VlanConfig[];
   lines: LineConfig[];
   interfaces: InterfaceConfig[];
@@ -135,6 +164,7 @@ export function createDefaultConfig(profile: DeviceProfile): DeviceConfig {
     passwordEncryption: false,
     staticRoutes: [],
     acls: [],
+    nat: { statics: [], pools: [], rules: [] },
     vlans: [],
     lines,
     interfaces: profile.groups.flatMap((g) =>

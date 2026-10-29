@@ -1,4 +1,5 @@
 import type { DeviceConfig } from '../model/config.js';
+import type { NatEntry } from '../protocols/nat/nat.js';
 
 export type LineStatus = 'up' | 'down' | 'administratively down';
 
@@ -55,6 +56,10 @@ export interface LinkEnvironment {
   /** Packets that matched this ACL line (see `show access-lists`). */
   aclHits(aclName: string, seq: number): number;
   clearAclHits(): void;
+  /** Dynamic NAT translations, hit/miss counters, and `clear ip nat translation *`. */
+  natTranslations(): NatEntry[];
+  natCounters(): { hits: number; misses: number };
+  clearNat(): void;
   /** Re-evaluate the links after a state change; returns the syslog lines this device must print now. */
   commit(): string[];
   /** Syslog lines queued for this device by events elsewhere (remote shutdown, cable plugged…). */
@@ -80,6 +85,9 @@ export function createIsolatedEnvironment(getConfig: () => DeviceConfig): LinkEn
     clearArp: () => undefined,
     aclHits: () => 0,
     clearAclHits: () => undefined,
+    natTranslations: () => [],
+    natCounters: () => ({ hits: 0, misses: 0 }),
+    clearNat: () => undefined,
     commit: () => [],
     drain: () => [],
   };

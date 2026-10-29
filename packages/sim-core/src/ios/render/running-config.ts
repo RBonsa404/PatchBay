@@ -13,6 +13,7 @@ function renderInterface(profile: DeviceProfile, ifc: InterfaceConfig): string[]
   if (ifc.encapsulation) out.push(` encapsulation dot1Q ${ifc.encapsulation.vlan}${ifc.encapsulation.native ? ' native' : ''}`);
   if (ifc.ip) out.push(` ip address ${ifc.ip.address} ${ifc.ip.mask}`);
   else if (group && group.layer === 3 && !sub) out.push(' no ip address');
+  if (ifc.natRole) out.push(` ip nat ${ifc.natRole}`);
   if (ifc.aclIn !== undefined) out.push(` ip access-group ${ifc.aclIn} in`);
   if (ifc.aclOut !== undefined) out.push(` ip access-group ${ifc.aclOut} out`);
   if (ifc.clockRate !== undefined) out.push(` clock rate ${ifc.clockRate}`);
@@ -73,6 +74,14 @@ export function renderConfigBody(profile: DeviceProfile, config: DeviceConfig): 
   for (const ifc of config.interfaces) out.push(...renderInterface(profile, ifc), '!');
 
   if (config.defaultGateway) out.push(`ip default-gateway ${config.defaultGateway}`, '!');
+
+  const { nat } = config;
+  for (const p of nat.pools) out.push(`ip nat pool ${p.name} ${p.start} ${p.end} netmask ${p.mask}`);
+  for (const r of nat.rules) {
+    out.push(`ip nat inside source list ${r.acl} ${r.iface ? `interface ${r.iface}` : `pool ${r.pool}`}${r.overload ? ' overload' : ''}`);
+  }
+  for (const s of nat.statics) out.push(`ip nat inside source static ${s.local} ${s.global}`);
+  if (nat.pools.length + nat.rules.length + nat.statics.length > 0) out.push('!');
 
   if (config.staticRoutes.length > 0) {
     for (const r of config.staticRoutes) {

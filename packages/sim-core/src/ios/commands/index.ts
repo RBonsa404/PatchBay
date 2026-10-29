@@ -5,6 +5,7 @@ import { globalCommands } from './global.js';
 import { interfaceCommands } from './interface.js';
 import { l3Commands } from './l3.js';
 import { lineCommands } from './line.js';
+import { natCommands } from './nat.js';
 import { sessionCommands } from './session.js';
 import { showCommands } from './show.js';
 import { vlanCommands } from './vlan.js';
@@ -17,6 +18,7 @@ export const allCommands: CommandDef[] = [
   ...vlanCommands,
   ...l3Commands,
   ...aclCommands,
+  ...natCommands,
   ...fileCommands,
   ...showCommands,
 ];
@@ -57,6 +59,14 @@ export const groupHelp: Record<string, string> = {
   'show access-lists': 'List access lists',
   'show ip access-lists': 'List IP access lists',
   'clear access-list': 'Clear access list statistical information',
+  'ip nat': 'NAT configuration commands',
+  'ip nat inside': 'Inside address translation',
+  'ip nat inside source': 'Source address translation',
+  'ip nat inside source list': 'Specify access list describing local addresses',
+  'ip nat pool': 'Define pool of addresses',
+  'show ip nat': 'IP NAT information',
+  'clear ip nat': 'Clear NAT',
+  'clear ip nat translation': 'Clear dynamic translation',
   'show ip': 'IP information',
   'show ip interface': 'IP interface status and configuration',
   line: 'Configure a terminal line',

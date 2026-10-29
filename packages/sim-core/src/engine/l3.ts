@@ -3,6 +3,7 @@ import { parentOf } from '../ios/interfaces.js';
 import { groupOf } from '../ios/profiles.js';
 import type { Network } from '../model/network.js';
 import { evaluate, type AclPacket } from '../protocols/acl/acl.js';
+import { allocatePort, poolAddresses, type NatEntry } from '../protocols/nat/nat.js';
 import { sameSubnet } from '../protocols/l3/ip.js';
 import { buildRoutingTable, lookup } from '../protocols/l3/routing.js';
 import { BROADCAST_MAC, injectFromSwitch, type EthernetFrame } from './l2.js';
@@ -65,6 +66,12 @@ interface ProbeReply {
   from: string;
 }
 
+/**
+ * A TCP client sends its SYN, then retransmits it (Linux: 1 + 5 retries). Each router that has to ARP for a next hop
+ * drops the packet that triggered the request, so a long cold path needs several attempts. UDP clients retry likewise.
+ */
+const SYN_ATTEMPTS = 6;
+
 /** Outcome of a TCP connection attempt or UDP exchange started with `tcpConnect` / `udpSend`. */
 export type ServiceResult = 'open' | 'refused' | 'unreachable' | 'timeout';
 
@@ -76,6 +83,24 @@ const toAclPacket = (p: IpPacket): AclPacket => {
   const type = (p.icmp as IcmpMessage).type;
   return { src: p.src, dst: p.dst, protocol: 'icmp', icmpType: type === 'echo-request' ? 'echo' : type };
 };
+
+const protoOf = (p: IpPacket): 'icmp' | 'tcp' | 'udp' => (p.icmp ? 'icmp' : p.tcp ? 'tcp' : 'udp');
+
+/** The "port" NAT overloads on: ICMP query id, or the TCP/UDP source port (forward) / destination port (reverse). */
+const forwardPort = (p: IpPacket): number => (p.icmp ? p.icmp.id : (p.tcp ?? p.udp)!.srcPort);
+const reversePort = (p: IpPacket): number => (p.icmp ? p.icmp.id : (p.tcp ?? p.udp)!.dstPort);
+
+function withSrc(p: IpPacket, ip: string, port: number): IpPacket {
+  if (p.icmp) return { ...p, src: ip, icmp: { ...p.icmp, id: port } };
+  if (p.tcp) return { ...p, src: ip, tcp: { ...p.tcp, srcPort: port } };
+  return { ...p, src: ip, udp: { ...p.udp!, srcPort: port } };
+}
+
+function withDst(p: IpPacket, ip: string, port: number): IpPacket {
+  if (p.icmp) return { ...p, dst: ip, icmp: { ...p.icmp, id: port } };
+  if (p.tcp) return { ...p, dst: ip, tcp: { ...p.tcp, dstPort: port } };
+  return { ...p, dst: ip, udp: { ...p.udp!, dstPort: port } };
+}
 
 /** Key under which an answer to this packet will be recorded. TCP/UDP probes are matched by source port. */
 const probeKey = (deviceId: string, p: IpPacket): string => {
@@ -96,6 +121,9 @@ export class L3 {
   private readonly arp = new Map<string, Map<string, { mac: string; iface: string }>>();
   private readonly probes = new Map<string, ProbeReply>();
   private readonly hits = new Map<string, number>();
+  /** device -> dynamic NAT translations, in creation order. */
+  private readonly nat = new Map<string, NatEntry[]>();
+  private readonly natCount = new Map<string, { hits: number; misses: number }>();
   private nextId = 1;
   private nextPort = 49152;
 
@@ -178,6 +206,20 @@ export class L3 {
     for (const key of [...this.hits.keys()]) if (key.startsWith(`${deviceId}|`)) this.hits.delete(key);
   }
 
+  /** Dynamic NAT translations of a router (static mappings live in its configuration). */
+  natTranslations(deviceId: string): NatEntry[] {
+    return [...(this.nat.get(deviceId) ?? [])];
+  }
+
+  natCounters(deviceId: string): { hits: number; misses: number } {
+    return { ...(this.natCount.get(deviceId) ?? { hits: 0, misses: 0 }) };
+  }
+
+  /** `clear ip nat translation *`: dynamic entries only. */
+  clearNat(deviceId: string): void {
+    this.nat.delete(deviceId);
+  }
+
   // ---- receiving -------------------------------------------------------------------------------------------------
 
   /** A frame reached `deviceId`, on a physical port (hosts, routers) or inside a switch VLAN (management SVI). */
@@ -196,31 +238,130 @@ export class L3 {
 
   private onArp(deviceId: string, ifc: L3Interface, arp: Extract<L3Payload, { type: 'arp' }>): void {
     this.learn(deviceId, arp.senderIp, arp.senderMac, ifc.name);
-    if (arp.op === 'request' && arp.targetIp === ifc.ip) {
-      this.emit(deviceId, ifc, {
-        src: ifc.mac,
-        dst: arp.senderMac,
-        payload: { type: 'arp', op: 'reply', senderIp: ifc.ip, senderMac: ifc.mac, targetIp: arp.senderIp } satisfies L3Payload,
-      });
-    }
+    if (arp.op !== 'request') return;
+    // A NAT router also answers for the inside global addresses it owns on its outside interfaces.
+    const owned = arp.targetIp === ifc.ip || (this.natRole(deviceId, ifc.name) === 'outside' && this.ownsGlobal(deviceId, arp.targetIp));
+    if (!owned) return;
+    this.emit(deviceId, ifc, {
+      src: ifc.mac,
+      dst: arp.senderMac,
+      payload: { type: 'arp', op: 'reply', senderIp: arp.targetIp, senderMac: ifc.mac, targetIp: arp.senderIp } satisfies L3Payload,
+    });
   }
 
+  /**
+   * Order of operations on a router, as in IOS: inbound ACL (original addresses), outside-to-inside NAT, routing,
+   * inside-to-outside NAT, outbound ACL (translated addresses).
+   */
   private onIp(deviceId: string, ifc: L3Interface, packet: IpPacket): void {
     const device = this.net.device(deviceId);
     const router = device.model.kind === 'router' && !!device.cli;
 
-    // Inbound ACL: sees the packet as it arrived, before NAT and routing.
     if (router && !this.permits(deviceId, ifc.name, 'aclIn', packet)) return this.icmpError(deviceId, ifc, packet, 'unreachable');
 
-    if (this.interfaces(deviceId).some((i) => i.ip === packet.dst)) return this.deliverLocal(deviceId, packet);
+    let pkt = packet;
+    if (router && this.natRole(deviceId, ifc.name) === 'outside') pkt = this.natReverse(deviceId, pkt);
+
+    if (this.interfaces(deviceId).some((i) => i.ip === pkt.dst)) return this.deliverLocal(deviceId, pkt);
     if (!router) return; // hosts and switches never forward
 
-    const ttl = packet.ttl - 1;
-    if (ttl <= 0) return this.icmpError(deviceId, ifc, packet, 'time-exceeded');
-    const egress = this.routeFor(deviceId, packet.dst);
-    if (!egress) return this.icmpError(deviceId, ifc, packet, 'unreachable');
-    if (!this.permits(deviceId, egress.ifc.name, 'aclOut', packet)) return this.icmpError(deviceId, ifc, packet, 'unreachable');
-    this.sendIp(deviceId, egress, { ...packet, ttl });
+    const ttl = pkt.ttl - 1;
+    if (ttl <= 0) return this.icmpError(deviceId, ifc, pkt, 'time-exceeded');
+    const egress = this.routeFor(deviceId, pkt.dst);
+    if (!egress) return this.icmpError(deviceId, ifc, pkt, 'unreachable');
+
+    if (this.natRole(deviceId, ifc.name) === 'inside' && this.natRole(deviceId, egress.ifc.name) === 'outside') {
+      const translated = this.natForward(deviceId, pkt);
+      if (!translated) return this.icmpError(deviceId, ifc, pkt, 'unreachable'); // pool exhausted
+      pkt = translated;
+    }
+
+    if (!this.permits(deviceId, egress.ifc.name, 'aclOut', pkt)) return this.icmpError(deviceId, ifc, packet, 'unreachable');
+    this.sendIp(deviceId, egress, { ...pkt, ttl });
+  }
+
+  // ---- NAT -------------------------------------------------------------------------------------------------------
+
+  private natRole(deviceId: string, interfaceName: string): 'inside' | 'outside' | undefined {
+    return this.net.device(deviceId).cli?.config.interfaces.find((i) => i.name === interfaceName)?.natRole;
+  }
+
+  private ownsGlobal(deviceId: string, ip: string): boolean {
+    const config = this.net.device(deviceId).cli!.config;
+    return config.nat.statics.some((s) => s.global === ip) || (this.nat.get(deviceId) ?? []).some((e) => e.insideGlobal === ip);
+  }
+
+  private count(deviceId: string, what: 'hits' | 'misses'): void {
+    const c = this.natCount.get(deviceId) ?? { hits: 0, misses: 0 };
+    c[what]++;
+    this.natCount.set(deviceId, c);
+  }
+
+  /** Outside to inside: rewrite the destination of answers (and of traffic to static mappings). */
+  private natReverse(deviceId: string, pkt: IpPacket): IpPacket {
+    const port = reversePort(pkt);
+    const proto = protoOf(pkt);
+    // ICMP errors carry the translated id/port of the TCP, UDP or echo packet that caused them.
+    const error = pkt.icmp !== undefined && pkt.icmp.type !== 'echo-request' && pkt.icmp.type !== 'echo-reply';
+    const hit = (this.nat.get(deviceId) ?? []).find(
+      (e) => e.insideGlobal === pkt.dst && (e.insideGlobalPort === undefined || ((e.proto === proto || error) && e.insideGlobalPort === port)),
+    );
+    if (hit) {
+      this.count(deviceId, 'hits');
+      return withDst(pkt, hit.insideLocal, hit.insideLocalPort ?? port);
+    }
+    const mapping = this.net.device(deviceId).cli!.config.nat.statics.find((s) => s.global === pkt.dst);
+    if (!mapping) return pkt;
+    this.count(deviceId, 'hits');
+    return withDst(pkt, mapping.local, port);
+  }
+
+  /** Inside to outside: rewrite the source. Returns null when the packet must be dropped (pool exhausted). */
+  private natForward(deviceId: string, pkt: IpPacket): IpPacket | null {
+    const config = this.net.device(deviceId).cli!.config;
+    const port = forwardPort(pkt);
+    const proto = protoOf(pkt);
+
+    const mapping = config.nat.statics.find((s) => s.local === pkt.src);
+    if (mapping) {
+      this.count(deviceId, 'hits');
+      return withSrc(pkt, mapping.global, port);
+    }
+
+    const entries = this.nat.get(deviceId) ?? [];
+    this.nat.set(deviceId, entries);
+    const existing = entries.find((e) => e.insideLocal === pkt.src && (e.insideLocalPort === undefined || (e.proto === proto && e.insideLocalPort === port)));
+    if (existing) {
+      this.count(deviceId, 'hits');
+      return withSrc(pkt, existing.insideGlobal, existing.insideGlobalPort ?? port);
+    }
+
+    for (const rule of config.nat.rules) {
+      const acl = config.acls.find((a) => a.name === rule.acl);
+      if (!acl || evaluate(acl, toAclPacket(pkt)).action !== 'permit') continue;
+      this.count(deviceId, 'misses');
+
+      let global: string | undefined;
+      if (rule.iface !== undefined) {
+        global = config.interfaces.find((i) => i.name === rule.iface)?.ip?.address;
+      } else {
+        const pool = config.nat.pools.find((p) => p.name === rule.pool);
+        const addresses = pool ? poolAddresses(pool) : [];
+        global = rule.overload ? addresses[0] : addresses.find((a) => !entries.some((e) => e.insideGlobal === a));
+      }
+      if (global === undefined) return null;
+
+      if (rule.overload) {
+        const insideGlobal = global;
+        const globalPort = allocatePort(port, (p) => entries.some((e) => e.insideGlobal === insideGlobal && e.proto === proto && e.insideGlobalPort === p));
+        const outsidePort = pkt.icmp ? port : (pkt.tcp ?? pkt.udp)!.dstPort;
+        entries.push({ proto, insideLocal: pkt.src, insideLocalPort: port, insideGlobal, insideGlobalPort: globalPort, outside: pkt.dst, outsidePort });
+        return withSrc(pkt, insideGlobal, globalPort);
+      }
+      entries.push({ proto: 'ip', insideLocal: pkt.src, insideGlobal: global, outside: pkt.dst });
+      return withSrc(pkt, global, port);
+    }
+    return pkt; // no rule matches: the packet leaves untranslated
   }
 
   /** Apply the ACL bound to an interface in one direction. An unbound or undefined ACL permits everything. */
@@ -392,9 +533,9 @@ export class L3 {
     return hops;
   }
 
-  /** Open a TCP connection (SYN, like a real client: it retries once ARP has resolved the next hop). */
+  /** Open a TCP connection: SYN, retransmitted until an answer comes back or the attempts run out. */
   tcpConnect(deviceId: string, destination: string, port: number): ServiceResult {
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < SYN_ATTEMPTS; attempt++) {
       const srcPort = this.nextPort++;
       const r = this.probe(deviceId, destination, (src) => ({ src, dst: destination, ttl: 255, tcp: { srcPort, dstPort: port, flags: { syn: true } } }));
       if (r === 'timeout') continue;
@@ -405,7 +546,7 @@ export class L3 {
 
   /** Send one UDP datagram and wait for the service's answer. */
   udpSend(deviceId: string, destination: string, port: number): ServiceResult {
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < SYN_ATTEMPTS; attempt++) {
       const srcPort = this.nextPort++;
       this.probes.set(`${deviceId}|${srcPort}|pending`, { type: 'udp-reply', from: '' });
       const r = this.probe(deviceId, destination, (src) => ({ src, dst: destination, ttl: 255, udp: { srcPort, dstPort: port } }));

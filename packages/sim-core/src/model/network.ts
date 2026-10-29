@@ -278,6 +278,9 @@ export class Network {
       clearArp: () => this.l3.clearArp(device.id),
       aclHits: (aclName, seq) => this.l3.aclHits(device.id, aclName, seq),
       clearAclHits: () => this.l3.clearAclHits(device.id),
+      natTranslations: () => this.l3.natTranslations(device.id),
+      natCounters: () => this.l3.natCounters(device.id),
+      clearNat: () => this.l3.clearNat(device.id),
       commit: () => this.settle(device.id),
       drain: () => this.drainSyslog(device.id),
     };
