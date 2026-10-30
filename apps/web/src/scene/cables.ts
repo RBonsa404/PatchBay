@@ -6,10 +6,10 @@ import type { Stage } from './stage.js';
 
 /** Cable colours: the usual workshop habits (blue straight, amber crossover, light-blue console, dark serial). */
 export const CABLE_STYLE: Record<CableType, { colour: string; radius: number }> = {
-  straight: { colour: '#2563eb', radius: 0.0032 },
-  crossover: { colour: '#f59e0b', radius: 0.0032 },
-  console: { colour: '#2f9fd6', radius: 0.0028 },
-  serial: { colour: '#334155', radius: 0.0045 },
+  straight: { colour: '#3b82f6', radius: 0.0036 },
+  crossover: { colour: '#f59e0b', radius: 0.0036 },
+  console: { colour: '#22d3ee', radius: 0.0032 },
+  serial: { colour: '#e11d48', radius: 0.0045 },
 };
 
 const keyOf = (c: Cable): string => `${c.type}|${c.a.device}:${c.a.port}|${c.b.device}:${c.b.port}`;
@@ -303,7 +303,8 @@ export class CableLayer {
   private build(type: CableType, a: { point: THREE.Vector3; normal: THREE.Vector3 }, b: { point: THREE.Vector3; normal: THREE.Vector3 }, curves: THREE.CatmullRomCurve3[]): THREE.Group {
     const style = CABLE_STYLE[type];
     const group = new THREE.Group();
-    const material = new THREE.MeshStandardMaterial({ color: style.colour, roughness: 0.45, metalness: 0.05 });
+    // A little of its own light: a cable keeps its colour in the shade of the rack.
+    const material = new THREE.MeshStandardMaterial({ color: style.colour, roughness: 0.45, metalness: 0.05, emissive: style.colour, emissiveIntensity: 0.22 });
     const pa = plug(type);
     const pb = plug(type);
     placePlug(pa, a.point, a.normal);

@@ -475,7 +475,7 @@ export class Mission {
     this.pointer.set(((x - rect.left) / rect.width) * 2 - 1, -((y - rect.top) / rect.height) * 2 + 1);
     const e = { clientX: x, clientY: y };
     const { port, device, board } = this.pick();
-    if (this.hovered && this.hovered !== port) highlightSocket(this.hovered, 'none');
+    if (this.hovered && this.hovered !== port) highlightSocket(this.hovered, this.hinted(this.hovered) ? 'hint' : 'none');
     this.hovered = port ?? null;
 
     if (port) {
@@ -523,6 +523,18 @@ export class Mission {
     return canPlug(this.selected, this.firstEnd.spec, port.spec) ? null : t('error.incompatible');
   }
 
+  /** Whether to show `port` as a place for the cable in hand. An exam gives no such help. */
+  private hinted(port: PortView): boolean {
+    return !this.exam && this.selected !== null && this.canTake(port) === null;
+  }
+
+  /** Light every socket where the cable in hand can go, and only those. */
+  private showHints(): void {
+    for (const view of [...this.devices.values(), ...this.panels.values()]) {
+      for (const port of view.ports.values()) highlightSocket(port, this.hinted(port) ? 'hint' : 'none');
+    }
+  }
+
   private onClick(): void {
     const { port, device, board } = this.pick();
     if (board) return this.toggleBoard();
@@ -554,6 +566,7 @@ export class Mission {
     }
     if (!this.firstEnd) {
       this.firstEnd = port;
+      this.showHints();
       sound.play('plug');
       this.hud.toast(type === 'serial' ? t('cable.firstSerial') : t('cable.first'));
       this.coach?.update();
@@ -939,6 +952,7 @@ export class Mission {
     this.firstEnd = null;
     this.cables.showPreview('straight', null, null);
     this.hud.setInventory(this.inventoryLeft(), this.selected);
+    this.showHints();
     this.coach?.update();
   }
 
@@ -1019,6 +1033,7 @@ export class Mission {
 
   /** After every cable or command: redraw cables, LEDs, inventory, and the objectives that need no traffic. */
   private afterChange(): void {
+    this.showHints();
     const drawn = [
       ...this.net.cables.filter((c) => !this.cordOf(c.a)),
       ...this.cords.map((c) => ({ type: c.type, a: { device: c.end.device, port: c.end.port }, b: { device: c.panel.device, port: c.panel.port } })),

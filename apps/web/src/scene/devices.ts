@@ -73,12 +73,13 @@ const keys = (): THREE.Texture => (keysMap ??= keyboardTexture());
 
 function materials(): Materials {
   return {
-    chassis: new THREE.MeshStandardMaterial({ color: '#37404f', metalness: 0.7, roughness: 0.62, roughnessMap: brushed() }),
-    panel: new THREE.MeshStandardMaterial({ color: '#232c3a', metalness: 0.6, roughness: 0.68, roughnessMap: brushed() }),
+    chassis: new THREE.MeshStandardMaterial({ color: '#7c8796', metalness: 0.35, roughness: 0.62, roughnessMap: brushed() }),
+    // Light faces, whatever the light in the rack: the dark sockets must read at a glance.
+    panel: new THREE.MeshStandardMaterial({ color: '#c6ccd5', metalness: 0.1, roughness: 0.7, roughnessMap: brushed(), emissive: '#8a93a0', emissiveIntensity: 0.14 }),
     socket: new THREE.MeshStandardMaterial({ map: rj45(), roughness: 0.6 }),
-    frame: new THREE.MeshStandardMaterial({ color: '#9aa4b2', metalness: 0.9, roughness: 0.25 }),
-    consoleFrame: new THREE.MeshStandardMaterial({ color: '#7dd3fc', metalness: 0.2, roughness: 0.5 }),
-    serialPlate: new THREE.MeshStandardMaterial({ color: '#13254a', metalness: 0.5, roughness: 0.4 }),
+    frame: new THREE.MeshStandardMaterial({ color: '#111827', metalness: 0.2, roughness: 0.5 }),
+    consoleFrame: new THREE.MeshStandardMaterial({ color: '#0ea5e9', metalness: 0.1, roughness: 0.5, emissive: '#0ea5e9', emissiveIntensity: 0.25 }),
+    serialPlate: new THREE.MeshStandardMaterial({ color: '#93b4dd', metalness: 0.1, roughness: 0.55 }),
     pick: new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }),
     plastic: new THREE.MeshStandardMaterial({ color: '#1c222c', metalness: 0.15, roughness: 0.48 }),
   };
@@ -140,7 +141,7 @@ function addSocket(
   return view;
 }
 
-function label(parent: THREE.Object3D, text: string, x: number, y: number, face: number, w: number, h: number, color = '#cbd5e1'): void {
+function label(parent: THREE.Object3D, text: string, x: number, y: number, face: number, w: number, h: number, color = '#1e293b'): void {
   const p = plane(w, h, textTexture(text, { width: Math.round(w * 6000), height: Math.round(h * 6000), color, font: `600 ${Math.round(h * 3600)}px Inter, sans-serif` }));
   p.position.set(x, y, face + 0.0015);
   parent.add(p);
@@ -179,7 +180,7 @@ function buildRouter(id: string, model: DeviceModel, m: Materials, view: DeviceV
   const face = d / 2 + 0.002;
   const y = h / 2 - (h > 0.06 ? 0.012 : 0.002);
 
-  label(view.root, `${id} · ${name}`, -w / 2 + 0.055, h / 2 + 0.006, face, 0.08, 0.014, '#e2e8f0');
+  label(view.root, `${id} · ${name}`, -w / 2 + 0.055, h / 2 + 0.006, face, 0.08, 0.014, '#0f172a');
   powerLed(view.root, -w / 2 + 0.018, h / 2 - 0.008, face);
 
   const eth = model.ports.filter((p) => p.kind === 'ethernet');
@@ -194,7 +195,7 @@ function buildRouter(id: string, model: DeviceModel, m: Materials, view: DeviceV
     const plate = mesh(new THREE.BoxGeometry(0.1, Math.min(h - 0.01, 0.038), 0.002), m.serialPlate, false);
     plate.position.set(cx, y, face + 0.0003);
     view.root.add(plate);
-    label(view.root, 'HWIC-2T', cx - 0.03, y + 0.014, face + 0.001, 0.03, 0.006, '#7dd3fc');
+    label(view.root, 'HWIC-2T', cx - 0.03, y + 0.014, face + 0.001, 0.03, 0.006, '#075985');
     serial.forEach((p, i) => {
       const x = cx - 0.022 + i * 0.044;
       view.ports.set(p.name, addSocket(view.root, m, id, p, x, y, face + 0.001, 'above'));
@@ -206,7 +207,7 @@ function buildRouter(id: string, model: DeviceModel, m: Materials, view: DeviceV
   if (consolePort) {
     const x = w / 2 - 0.035;
     view.ports.set(consolePort.name, addSocket(view.root, m, id, consolePort, x, y, face, 'none'));
-    label(view.root, 'CONSOLE', x, y - 0.0125, face, 0.03, 0.006, '#7dd3fc');
+    label(view.root, 'CONSOLE', x, y - 0.0125, face, 0.03, 0.006, '#075985');
   }
   if (aux) {
     const x = w / 2 - 0.07;
@@ -214,7 +215,7 @@ function buildRouter(id: string, model: DeviceModel, m: Materials, view: DeviceV
     label(view.root, 'AUX', x, y - 0.0125, face, 0.02, 0.006);
   }
   // Status LEDs with their silkscreen, panel screws, and on the 2U chassis the empty module slots under their plates.
-  label(view.root, 'SYS', -w / 2 + 0.018, h / 2 - 0.016, face, 0.016, 0.005, '#94a3b8');
+  label(view.root, 'SYS', -w / 2 + 0.018, h / 2 - 0.016, face, 0.016, 0.005, '#334155');
   for (const [sx, sy] of [[-w / 2 + 0.007, h - 0.007], [w / 2 - 0.007, h - 0.007], [-w / 2 + 0.007, 0.007], [w / 2 - 0.007, 0.007]] as const) panelScrew(view.root, m, sx, sy, face);
   if (h > 0.06) {
     for (const [i, slot] of ['EHWIC 1', 'EHWIC 2'].entries()) {
@@ -222,10 +223,10 @@ function buildRouter(id: string, model: DeviceModel, m: Materials, view: DeviceV
       const blank = mesh(new THREE.BoxGeometry(0.145, 0.022, 0.0015), m.chassis, false);
       blank.position.set(cx, h - 0.016, face + 0.0003);
       view.root.add(blank);
-      label(view.root, slot, cx - 0.045, h - 0.016, face + 0.0008, 0.034, 0.007, '#94a3b8');
+      label(view.root, slot, cx - 0.045, h - 0.016, face + 0.0008, 0.034, 0.007, '#334155');
       for (const dx of [-0.067, 0.067]) panelScrew(view.root, m, cx + dx, h - 0.016, face + 0.0006);
     }
-    label(view.root, 'SERVICE · USB', -w / 2 + 0.05, 0.012, face, 0.05, 0.006, '#64748b');
+    label(view.root, 'SERVICE · USB', -w / 2 + 0.05, 0.012, face, 0.05, 0.006, '#475569');
   }
   view.height = h;
   view.width = w;
@@ -242,7 +243,7 @@ function buildSwitch(id: string, model: DeviceModel, m: Materials, view: DeviceV
   addVents(view.root, w, h, d);
   view.depth = d;
   const face = d / 2 + 0.002;
-  label(view.root, `${id} · 2960`, -w / 2 + 0.045, h / 2 + 0.008, face, 0.07, 0.012, '#e2e8f0');
+  label(view.root, `${id} · 2960`, -w / 2 + 0.045, h / 2 + 0.008, face, 0.07, 0.012, '#0f172a');
   powerLed(view.root, -w / 2 + 0.015, h / 2 - 0.006, face);
 
   const fast = model.ports.filter((p) => p.name.startsWith('FastEthernet'));
@@ -254,7 +255,7 @@ function buildSwitch(id: string, model: DeviceModel, m: Materials, view: DeviceV
     const y = h / 2 + (top ? 0.0092 : -0.0092);
     view.ports.set(p.name, addSocket(view.root, m, id, p, x, y, face, top ? 'above' : 'below'));
   });
-  label(view.root, '1 – 24', -0.135 + 5.5 * 0.0172, h / 2 - 0.0185, face, 0.03, 0.005, '#94a3b8');
+  label(view.root, '1 – 24', -0.135 + 5.5 * 0.0172, h / 2 - 0.0185, face, 0.03, 0.005, '#334155');
   // The mode button and its column of status LEDs, as on the real panel.
   const mode = mesh(new THREE.BoxGeometry(0.009, 0.005, 0.002), m.frame, false);
   mode.position.set(-w / 2 + 0.018, h / 2 - 0.016, face + 0.001);
@@ -263,7 +264,7 @@ function buildSwitch(id: string, model: DeviceModel, m: Materials, view: DeviceV
     const led = mesh(new THREE.BoxGeometry(0.003, 0.002, 0.0015), new THREE.MeshStandardMaterial({ color: i === 0 ? '#10b981' : '#1f2937', emissive: i === 0 ? '#10b981' : '#000000', emissiveIntensity: 2 }), false);
     led.position.set(-w / 2 + 0.032 + i * 0.014, h / 2 - 0.012, face + 0.001);
     view.root.add(led);
-    label(view.root, name, -w / 2 + 0.032 + i * 0.014, h / 2 - 0.0175, face, 0.013, 0.004, '#94a3b8');
+    label(view.root, name, -w / 2 + 0.032 + i * 0.014, h / 2 - 0.0175, face, 0.013, 0.004, '#334155');
   });
   model.ports
     .filter((p) => p.name.startsWith('GigabitEthernet'))
@@ -276,7 +277,7 @@ function buildSwitch(id: string, model: DeviceModel, m: Materials, view: DeviceV
   if (consolePort) {
     const x = w / 2 - 0.025;
     view.ports.set(consolePort.name, addSocket(view.root, m, id, consolePort, x, h / 2 + 0.004, face, 'none'));
-    label(view.root, 'CON', x, h / 2 - 0.0105, face, 0.016, 0.005, '#7dd3fc');
+    label(view.root, 'CON', x, h / 2 - 0.0105, face, 0.016, 0.005, '#075985');
   }
   view.height = h;
   view.width = w;
@@ -284,7 +285,7 @@ function buildSwitch(id: string, model: DeviceModel, m: Materials, view: DeviceV
 
 function buildDesktop(id: string, model: DeviceModel, m: Materials, view: DeviceView, caption: string): void {
   // Tower on the right, monitor on the left; the tower's ports face the player.
-  const tower = roundedChassis(0.17, 0.36, 0.34, m.plastic);
+  const tower = roundedChassis(0.17, 0.36, 0.34, m.panel);
   tower.position.set(0.2, 0.18, 0);
   const stripe = mesh(new THREE.BoxGeometry(0.004, 0.28, 0.002), new THREE.MeshStandardMaterial({ color: '#38bdf8', emissive: '#38bdf8', emissiveIntensity: 1.6 }), false);
   stripe.position.set(0.15, 0.2, 0.171);
@@ -319,9 +320,9 @@ function buildDesktop(id: string, model: DeviceModel, m: Materials, view: Device
   }
   if (rs232) {
     view.ports.set(rs232.name, addSocket(view.root, m, id, rs232, 0.2, 0.045, face, 'none'));
-    label(view.root, 'RS232', 0.2, 0.03, face, 0.024, 0.006, '#7dd3fc');
+    label(view.root, 'RS232', 0.2, 0.03, face, 0.024, 0.006, '#075985');
   }
-  label(view.root, id, 0.2, 0.33, face, 0.05, 0.012, '#e2e8f0');
+  label(view.root, id, 0.2, 0.33, face, 0.05, 0.012, '#0f172a');
   view.height = 0.42;
   view.width = 0.6;
 }
@@ -350,7 +351,7 @@ function buildLaptop(id: string, model: DeviceModel, m: Materials, view: DeviceV
   const nic = model.ports.find((p) => p.kind === 'ethernet');
   if (rs232) {
     view.ports.set(rs232.name, addSocket(view.root, m, id, rs232, 0.1, 0.01, face, 'none'));
-    label(view.root, 'RS232', 0.1, -0.003, face, 0.024, 0.006, '#7dd3fc');
+    label(view.root, 'RS232', 0.1, -0.003, face, 0.024, 0.006, '#075985');
   }
   if (nic) view.ports.set(nic.name, addSocket(view.root, m, id, nic, 0.05, 0.01, face, 'above'));
   view.height = 0.24;
@@ -412,19 +413,19 @@ export function buildPatchPanel(id: string, ports: { name: string; label: string
   const [w, h, d] = [0.445, 0.044, 0.05];
   const view: DeviceView = { id, shape: 'switch', root: new THREE.Group(), ports: new Map(), body: [], height: h, width: w, depth: d, inRack: true, roomZ, roomY };
   view.root.name = id;
-  const chassis = mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color: '#0f141c', metalness: 0.6, roughness: 0.45 }));
+  const chassis = mesh(new THREE.BoxGeometry(w, h, d), m.panel);
   chassis.position.y = h / 2;
   view.root.add(chassis);
   view.body.push(chassis);
   addRackEars(view.root, w, h, d);
   const face = d / 2 + 0.001;
-  label(view.root, id, -w / 2 + 0.04, h / 2, face, 0.06, 0.012, '#fbbf24');
+  label(view.root, id, -w / 2 + 0.04, h / 2, face, 0.06, 0.012, '#92400e');
   ports.forEach((p, i) => {
     const x = w / 2 - 0.07 - (ports.length - 1 - i) * 0.05;
     const spec: PortSpec = { name: p.name, kind: 'ethernet' };
     view.ports.set(p.name, addSocket(view.root, m, id, spec, x, h / 2 + 0.005, face, 'none'));
-    label(view.root, String(i + 1), x, h / 2 - 0.012, face, 0.012, 0.007, '#e2e8f0');
-    if (p.label) label(view.root, p.label, x, h / 2 + 0.0165, face, 0.046, 0.006, '#cbd5e1');
+    label(view.root, String(i + 1), x, h / 2 - 0.012, face, 0.012, 0.007, '#0f172a');
+    if (p.label) label(view.root, p.label, x, h / 2 + 0.0165, face, 0.046, 0.006, '#1e293b');
   });
   view.root.position.set(0, PANEL_Y + roomY, RACK.frontZ - d / 2 + roomZ);
   for (const b of view.body) {
@@ -451,10 +452,10 @@ export function setLed(port: PortView, state: LedState): void {
   material.emissiveIntensity = intensity;
 }
 
-/** Tint a socket: cyan when it can take the cable in hand, red when it cannot, soft white when only pointed at. */
-export function highlightSocket(port: PortView, mode: 'none' | 'hover' | 'ok' | 'bad'): void {
+/** Tint a socket: green where the cable in hand can go, cyan when pointed at and able to take it, red when not, soft white with empty hands. */
+export function highlightSocket(port: PortView, mode: 'none' | 'hint' | 'hover' | 'ok' | 'bad'): void {
   const material = port.socket.material as THREE.MeshStandardMaterial;
-  const colour = mode === 'ok' ? '#38bdf8' : mode === 'bad' ? '#ef4444' : mode === 'hover' ? '#e2e8f0' : '#000000';
+  const colour = mode === 'hint' ? '#22c55e' : mode === 'ok' ? '#38bdf8' : mode === 'bad' ? '#ef4444' : mode === 'hover' ? '#e2e8f0' : '#000000';
   material.emissive.set(colour);
-  material.emissiveIntensity = mode === 'none' ? 0 : mode === 'hover' ? 0.7 : 1.8;
+  material.emissiveIntensity = mode === 'none' ? 0 : mode === 'hover' ? 0.7 : mode === 'hint' ? 1.1 : 1.8;
 }

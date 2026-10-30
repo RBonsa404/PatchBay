@@ -165,7 +165,11 @@ export class Stage {
     // Ambient occlusion: the soft darkening where objects meet, which anchors them in the room.
     this.ao = new GTAOPass(this.scene, this.camera, 1, 1);
     this.ao.blendIntensity = 0.85;
-    this.ao.updateGtaoMaterial({ radius: 0.3, distanceExponent: 1.4, thickness: 1, scale: 1.1, samples: 10, distanceFallOff: 1, screenSpaceRadius: false });
+    this.ao.updateGtaoMaterial({ radius: 0.3, distanceExponent: 1.4, thickness: 1, scale: 1.1, samples: 14, distanceFallOff: 1, screenSpaceRadius: false });
+    this.ao.updatePdMaterial({ lumaPhi: 1.5, samples: 16, rings: 2, radius: 16 });
+    // By far the dearest effect of the frame, and a soft one: half the resolution does not show, and costs a quarter.
+    const sizeAo = this.ao.setSize.bind(this.ao);
+    this.ao.setSize = (w, h) => sizeAo(Math.ceil(w / 2), Math.ceil(h / 2));
     this.composer.addPass(this.ao);
     // High threshold: only LEDs, screens and ceiling panels glow, not the lit walls.
     this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.28, 0.5, 1);
@@ -260,13 +264,13 @@ export class Stage {
     const fps = this.frames / this.sampled;
     this.sampled = 0;
     this.frames = 0;
-    if (fps >= 42 || this.relief >= 3) return;
+    if (fps >= 50 || this.relief >= 3) return;
     this.relief++;
     if (this.relief === 1) {
+      this.ao.enabled = false;
+    } else if (this.relief === 2) {
       this.renderer.setPixelRatio(1);
       this.resize();
-    } else if (this.relief === 2) {
-      this.ao.enabled = false;
     } else {
       this.frontKey.castShadow = false;
       this.scene.traverse((o) => {
