@@ -77,4 +77,4 @@ Le jeu sera alors sur `https://rbonsa404.github.io/PatchBay/`. Ce site doit êtr
 - L'offre gratuite de Cloudflare Pages limite le nombre de constructions (500 par mois d'après sa documentation) et la taille d'un fichier (25 Mio). PatchBay en est loin. Les chiffres peuvent changer : voir https://developers.cloudflare.com/pages/platform/limits/.
 - Le nom des boutons de Cloudflare change parfois : si un libellé diffère, cherche l'équivalent.
 - Les notes et le meilleur score restent dans le navigateur de chaque joueur : il n'y a pas de comptes ni de classement commun pour l'instant.
-- Un téléchargement d'environ 25 Mio au premier lancement : les musiques ne se chargent qu'au moment de les jouer.
+- Le site pèse environ 25 Mio, presque tout en musique. Le jeu lui-même fait moins de 2 Mio, et chaque morceau ne se charge qu'au moment de le jouer.
