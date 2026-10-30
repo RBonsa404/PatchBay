@@ -12,7 +12,7 @@ Un projet du **Club Informatique de l'IST**, Ouagadougou
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
 ![Three.js](https://img.shields.io/badge/Three.js-0.170-000000?logo=threedotjs&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-Build-646CFF?logo=vite&logoColor=white)
-![Vitest](https://img.shields.io/badge/Tests-222-6E9F18?logo=vitest&logoColor=white)
+![Vitest](https://img.shields.io/badge/Tests-229-6E9F18?logo=vitest&logoColor=white)
 ![PWA](https://img.shields.io/badge/PWA-hors_ligne-5A0FC8?logo=pwa&logoColor=white)
 
 <img src="docs/captures/13-salle-technique-rangee.png" alt="La salle technique du jeu : établi, baie, rayonnages" width="820" />
@@ -56,7 +56,7 @@ Trois principes guident le projet :
 | Réseau | VLAN, trunk 802.1Q, router-on-a-stick, routage statique, OSPF, ACL, NAT, DHCP, ARP, ICMP |
 | Poste client | invite de commandes : `ipconfig`, `ipconfig /renew`, `ping`, `tracert`, `arp -a` |
 | Évaluation | chrono, note sur 100 (objectifs et rapidité), rangs S à D, trois étoiles, mode examen |
-| Accompagnement | tutoriel guidé, indices, schéma de la mission au tableau blanc, Aïcha qui répond aux questions hors ligne |
+| Accompagnement | tutoriel guidé, indices, schéma de la mission au tableau blanc, Aïcha qui répond avec sa fiche hors ligne, et avec une IA en option |
 | Visualisation | paquets animés sur les câbles : ARP, requêtes, réponses, erreurs, DHCP |
 | Accessibilité | jeu complet au clavier (liste des ports), mouvement réduit, contraste renforcé, tactile et manette |
 
@@ -126,7 +126,7 @@ Le jeu s'ouvre sur http://127.0.0.1:5180.
 
 ## Tests et contrôles qualité
 
-222 tests couvrent le moteur et les missions : sessions IOS comparées à des sorties de référence, commutation, routage, OSPF, ACL, NAT, DHCP, et résolution complète de chaque mission. GitHub Actions les relance à chaque envoi, avec le contrôle des types, l'analyse statique et la construction.
+229 tests couvrent le moteur et les missions : sessions IOS comparées à des sorties de référence, commutation, routage, OSPF, ACL, NAT, DHCP, et résolution complète de chaque mission. GitHub Actions les relance à chaque envoi, avec le contrôle des types, l'analyse statique et la construction.
 
 ## Déploiement
 
@@ -148,6 +148,7 @@ PatchBay/
 ├── packages/
 │   ├── sim-core/       le moteur de simulation et ses tests
 │   └── content/        les missions et leur schéma
+├── functions/        l'API d'Aïcha (Cloudflare Pages Functions), facultative
 ├── docs/               vision, spécifications, décisions, captures
 └── .github/workflows/  intégration continue
 ```

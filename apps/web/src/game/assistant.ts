@@ -1,6 +1,7 @@
 /**
- * Aïcha answers the student's questions. No online service: it works offline, costs nothing and cannot invent IOS
- * commands. Questions are matched against a course sheet written by hand; what it does not know, it says so.
+ * Aïcha answers the student's questions, first from a course sheet written by hand: it works offline, costs nothing
+ * and cannot invent IOS commands. What the sheet does not cover goes to the online service (see `askOnline`); when
+ * that is out of reach, she says what she does not know.
  */
 
 export interface AssistantContext {
@@ -8,6 +9,8 @@ export interface AssistantContext {
   next: { label: string; hint?: string } | null;
   /** Time left, already formatted. */
   timeLeft: string;
+  /** The mission's title. */
+  mission: string;
 }
 
 interface Entry {
@@ -58,7 +61,12 @@ const TIME_WORDS = ['temps', 'chrono', 'minute', 'reste-t-il'];
 
 const normalise = (text: string): string => text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[’']/g, ' ').replace(/\s+/g, ' ').trim();
 
-export function answer(question: string, context: AssistantContext): string {
+/** Longer than this, a question is too precise for a keyword to answer it well. */
+const SHORT_QUESTION = 6;
+const NOT_IN_SHEET = 'Je n’ai pas cette réponse dans ma fiche. Essaie avec le nom d’une commande ou d’un câble (par exemple « route statique » ou « câble croisé »), ou tape ? dans la console.';
+
+/** What the sheet says about a question, or null when it has nothing good to say. */
+export function fromSheet(question: string, context: AssistantContext): string | null {
   const q = normalise(question);
   if (NEXT_WORDS.some((w) => q.includes(w))) {
     if (!context.next) return 'Tout est fait. Clique sur « Vérifier la mission » pour rendre ton travail !';
@@ -77,7 +85,42 @@ export function answer(question: string, context: AssistantContext): string {
       }
     }
   }
-  return best?.answer ?? 'Je n’ai pas cette réponse dans ma fiche. Essaie avec le nom d’une commande ou d’un câble (par exemple « route statique » ou « câble croisé »), ou tape ? dans la console.';
+  if (!best) return null;
+  return best.answer;
+}
+
+/** The sheet's answer, or an honest admission: for when the online service is out of reach. */
+export function answer(question: string, context: AssistantContext): string {
+  return fromSheet(question, context) ?? NOT_IN_SHEET;
+}
+
+/** Whether this question should go online: the sheet has nothing, or the question is too precise for a keyword. */
+export function needsOnline(question: string, context: AssistantContext): boolean {
+  const q = normalise(question);
+  if (NEXT_WORDS.some((w) => q.includes(w)) || TIME_WORDS.some((w) => q.includes(w))) return false;
+  return fromSheet(question, context) === null || q.split(' ').length > SHORT_QUESTION;
+}
+
+export type OnlineReply = { answer: string } | { blocked: true } | { limited: true } | { failed: true };
+
+/** Ask the online service (functions/api/aicha.ts). Never throws: a failure means falling back on the sheet. */
+export async function askOnline(question: string, context: AssistantContext, history: { role: 'user' | 'assistant'; content: string }[]): Promise<OnlineReply> {
+  if (!navigator.onLine) return { failed: true };
+  try {
+    const response = await fetch(`${import.meta.env.BASE_URL}api/aicha`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, mission: context.mission, objective: context.next?.label ?? '', history }),
+      signal: AbortSignal.timeout(25000),
+    });
+    if (response.status === 429) return { limited: true };
+    if (!response.ok) return { failed: true };
+    const body = (await response.json()) as { answer?: unknown; blocked?: unknown };
+    if (body.blocked === true) return { blocked: true };
+    return typeof body.answer === 'string' && body.answer ? { answer: body.answer.replace(/[*`#]/g, '') } : { failed: true };
+  } catch {
+    return { failed: true };
+  }
 }
 
 /** Questions proposed to get the conversation started. */

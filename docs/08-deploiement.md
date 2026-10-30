@@ -78,3 +78,41 @@ Le jeu sera alors sur `https://rbonsa404.github.io/PatchBay/`. Ce site doit êtr
 - Le nom des boutons de Cloudflare change parfois : si un libellé diffère, cherche l'équivalent.
 - Les notes et le meilleur score restent dans le navigateur de chaque joueur : il n'y a pas de comptes ni de classement commun pour l'instant.
 - Le site pèse environ 25 Mio, presque tout en musique. Le jeu lui-même fait moins de 2 Mio, et chaque morceau ne se charge qu'au moment de le jouer.
+
+## Brancher Aïcha sur DeepSeek (facultatif)
+
+Sans cette étape, le jeu marche : Aïcha répond avec sa fiche de cours. Avec elle, ce que la fiche ne couvre pas part vers DeepSeek. Ta clé reste dans Cloudflare, jamais dans le jeu ni sur GitHub.
+
+### 1. Créer la clé
+
+1. Crée un compte sur https://platform.deepseek.com.
+2. Dans **Top up**, ajoute un petit crédit : 2 à 5 dollars suffisent pour commencer. Il n'y a pas d'offre gratuite générale, et **ce crédit est ton plafond de dépense**.
+3. Dans **API keys**, crée une clé et copie-la. Ne la mets jamais dans le code, dans un message ni sur GitHub.
+
+Au tarif d'octobre 2026 du modèle `deepseek-flash`, une question coûte environ 0,0005 dollar au prix fort : 1 dollar représente de l'ordre de 2 000 questions. Tarifs à jour : https://api-docs.deepseek.com/quick_start/pricing.
+
+### 2. La donner à Cloudflare
+
+1. Dans ton projet Pages : **Settings**, **Variables and Secrets**, **Add**.
+2. Type : **Secret**. Nom : `DEEPSEEK_API_KEY`. Valeur : ta clé. Fais-le pour la **Production** (et **Preview** si tu veux tester sur une branche).
+3. Enregistre, puis dans **Deployments**, relance le dernier déploiement avec **Retry deployment** : le secret ne compte qu'à partir du déploiement suivant.
+
+### 3. Vérifier
+
+Dans une mission, touche H, puis :
+
+| Question | Résultat attendu |
+|---|---|
+| `Quelle est la différence entre OSPF et EIGRP pour un petit réseau d'entreprise ?` | une vraie réponse |
+| `Quelle est la capitale du Mali ?` | le refus d'Aïcha |
+| `Comment sauvegarder ?` | la fiche, sans appel payant |
+
+Si Aïcha dit qu'elle n'a pas la réponse dans sa fiche pour la première question : vérifie le nom du secret, le crédit, et que tu as bien redéployé. Le tableau de bord de DeepSeek montre la consommation.
+
+### Limites à connaître
+
+- **Le blocage n'est pas absolu.** Le filtre repose sur les consignes données au modèle : un élève obstiné peut parfois obtenir une réponse hors sujet. Le coût reste borné, car chaque réponse est courte et le crédit est prépayé.
+- **Quota approximatif.** 15 questions par 5 minutes et par visiteur, compté séparément par serveur Cloudflare. Pour un vrai verrou, ajoute une règle de limitation de débit dans Cloudflare.
+- **Confidentialité.** Les questions partent chez DeepSeek, une société basée en Chine. Le jeu n'envoie que la question, les derniers échanges, le titre de la mission et le prochain objectif, et demande aux élèves de ne rien écrire de personnel. Parles-en à ton professeur si le jeu est utilisé en cours.
+- **Erreurs possibles.** Une IA peut se tromper sur une commande : Aïcha le dit dans ses consignes, mais la réponse n'est pas vérifiée. La console et le moteur du jeu restent la référence.
+- **Examen.** Aïcha reste désactivée en mode examen, et n'est pas disponible hors ligne (la fiche prend le relais).

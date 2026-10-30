@@ -136,7 +136,7 @@ export class Mission {
     this.remaining = this.limit;
     this.aicha = new AskAicha(() => {
       const failing = this.level.objectives.find((o) => !evaluate(this.net, [o]).complete);
-      return { timeLeft: clock(this.remaining), next: failing ? { label: tx(failing.label), ...(failing.hint ? { hint: tx(failing.hint) } : {}) } : null };
+      return { timeLeft: clock(this.remaining), mission: tx(this.level.title), next: failing ? { label: tx(failing.label), ...(failing.hint ? { hint: tx(failing.hint) } : {}) } : null };
     });
     stage.clearLevel();
     resetHostShells();
