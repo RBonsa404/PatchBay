@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { campaign } from '@patchbay/content';
 import { catalog, type Level } from '@patchbay/sim-core';
 import { sound } from './audio.js';
+import { Avatar } from './game/avatar.js';
 import { startGamepad } from './game/gamepad.js';
 import { Mission } from './game/mission.js';
 import { buildDevice } from './scene/devices.js';
@@ -49,9 +50,16 @@ function showcase(): void {
   stage.clearLevel();
   const level = campaign[0]!;
   for (const d of level.devices) stage.level.add(buildDevice(d.id, catalog[d.model]!, d.position, d.id).root);
+  // The technician stands behind the bench beside the rack, breathing, glancing around.
+  const avatar = new Avatar();
+  avatar.place(0.78, -0.8, -Math.PI * 0.2);
+  stage.level.add(avatar.root);
   stage.controls.enabled = false;
   const target = new THREE.Vector3(0, 1.05, -0.2);
-  stopShowcase = stage.onFrame((_, time) => {
+  const still = { x: 0, y: 0, run: false };
+  const ahead = new THREE.Vector3(0, 0, -1);
+  stopShowcase = stage.onFrame((dt, time) => {
+    avatar.update(dt, still, ahead);
     const a = Math.sin(time * 0.11) * 0.55;
     stage.camera.position.set(Math.sin(a) * 2.6, 1.55 + Math.sin(time * 0.17) * 0.12, Math.cos(a) * 2.6);
     stage.controls.target.copy(target);

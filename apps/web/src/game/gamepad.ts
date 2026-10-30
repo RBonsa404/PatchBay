@@ -20,6 +20,8 @@ export interface GameTarget {
   overview(): void;
   cancel(): void;
   cycleCable(step: 1 | -1): void;
+  /** In a mission, the left stick walks the character (the d-pad then moves the cursor). */
+  walk?(x: number, y: number): void;
 }
 
 const DEAD_ZONE = 0.18;
@@ -115,8 +117,12 @@ export function startGamepad(stage: Stage, notify: (text: string) => void): void
 
     // Cursor: stick for speed, d-pad for precise steps.
     const speed = CURSOR_SPEED * window.innerHeight * dt;
-    const moveX = lx * Math.abs(lx) * speed + dpadX * speed * 0.25;
-    const moveY = ly * Math.abs(ly) * speed + dpadY * speed * 0.25;
+    const walking = !!target?.walk;
+    target?.walk?.(lx, ly);
+    const stick = walking ? 0 : 1;
+    const step = walking ? 0.7 : 0.25;
+    const moveX = lx * Math.abs(lx) * speed * stick + dpadX * speed * step;
+    const moveY = ly * Math.abs(ly) * speed * stick + dpadY * speed * step;
     if (moveX || moveY) {
       x = Math.min(window.innerWidth - 1, Math.max(0, x + moveX));
       y = Math.min(window.innerHeight - 1, Math.max(0, y + moveY));

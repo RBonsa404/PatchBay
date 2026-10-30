@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { buildLevel, canPlug, catalog, evaluate, type CableEnd, type CableType, type EthernetFrame, type Evaluation, type L3Payload, type Level, type Network, type ObjectiveResult, type PortSpec } from '@patchbay/sim-core';
 import { sound } from '../audio.js';
 import { t, tx } from '../i18n.js';
+import { Avatar, type MoveInput } from './avatar.js';
 import { Coach, type CoachView } from './coach.js';
 import { setGameTarget, type GameTarget } from './gamepad.js';
 import { CableLayer, portFrame } from '../scene/cables.js';
@@ -12,6 +13,12 @@ import { CABLE_ORDER, Hud } from '../ui/hud.js';
 import { closePanel, Consoles, openPanelKey, resetHostShells, showHostPanel, showNotice } from '../ui/panels.js';
 
 const HOME = { position: new THREE.Vector3(0, 1.78, 2.45), target: new THREE.Vector3(0, 0.86, 0.02) };
+/** How far the character can reach a device from, in metres (seen from above). */
+const REACH = 2.0;
+/** Movement keys, by physical position (ZQSD on a French keyboard, WASD on an English one), and the arrows. */
+const KEYS: Record<string, [number, number]> = {
+  KeyW: [0, 1], ArrowUp: [0, 1], KeyS: [0, -1], ArrowDown: [0, -1], KeyA: [-1, 0], ArrowLeft: [-1, 0], KeyD: [1, 0], ArrowRight: [1, 0],
+};
 const ACCEPTS: Record<CableType, PortSpec['kind'][]> = {
   straight: ['ethernet'],
   crossover: ['ethernet'],
@@ -63,6 +70,12 @@ export class Mission {
   private recording = false;
   private hops: { from: CableEnd; to: CableEnd; frame: EthernetFrame }[] = [];
   private doneCount = -1;
+  private readonly avatar = new Avatar();
+  private readonly held = new Set<string>();
+  private padWalk: [number, number] = [0, 0];
+  /** The camera follows the character, except while it flies to a device or after a zoom on one. */
+  private following = false;
+  private flying = false;
 
   constructor(private readonly stage: Stage, readonly level: Level, private readonly events: MissionEvents, index = 0) {
     stage.clearLevel();
@@ -84,8 +97,11 @@ export class Mission {
       }),
     );
     stage.level.add(this.cables.group, buildWhiteboard(level));
+    this.avatar.place(0, 1.1);
+    stage.level.add(this.avatar.root);
     stage.controls.enabled = true;
-    void stage.flyTo(HOME.position, HOME.target, 1.4);
+    this.overview(1.4);
+    this.cleanup.push(stage.onFrame((dt) => this.walk(dt)));
 
     this.consoles = new Consoles(this.net, () => this.afterChange(), (action) => this.recordTraffic(action));
     this.cleanup.push(
@@ -97,7 +113,7 @@ export class Mission {
       check: () => this.check(),
       hint: () => this.hint(),
       menu: () => events.menu(),
-      overview: () => void stage.flyTo(HOME.position, HOME.target),
+      overview: () => this.overview(),
       cycleQuality: () => this.cycleQuality(),
       selectCable: (type) => this.select(type),
     }, stage.currentQuality, index);
@@ -207,7 +223,18 @@ export class Mission {
       if (!pressed) this.onUnplug();
     });
     on(canvas, 'dblclick', () => this.onFocus());
+    on(window, 'keyup', (e) => {
+      this.held.delete(e.code);
+      if (e.code.startsWith('Shift')) this.held.delete('Shift');
+    });
+    on(window, 'blur', () => this.held.clear());
     on(window, 'keydown', (e) => {
+      const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+      if (KEYS[e.code] && !typing) {
+        this.held.add(e.code);
+        e.preventDefault();
+      }
+      if (e.code.startsWith('Shift')) this.held.add('Shift');
       if (e.key === 'Escape') this.select(null);
       // 1-4 pick a cable from the inventory (not while typing in a console).
       const slot = /^[1-4]$/.test(e.key) && !(e.target instanceof HTMLInputElement) ? CABLE_ORDER.filter((type) => this.level.inventory.cables[type] !== undefined)[Number(e.key) - 1] : undefined;
@@ -224,7 +251,8 @@ export class Mission {
       act: () => this.onClick(),
       unplug: () => this.onUnplug(),
       focus: () => this.onFocus(),
-      overview: () => void this.stage.flyTo(HOME.position, HOME.target),
+      overview: () => this.overview(),
+      walk: (x, y) => (this.padWalk = [x, y]),
       cancel: () => (openPanelKey() ? closePanel() : this.select(null)),
       cycleCable: (step) => {
         const types = (Object.keys(ACCEPTS) as CableType[]).filter((type) => this.left(type) > 0);
@@ -294,9 +322,22 @@ export class Mission {
 
   private onClick(): void {
     const { port, device } = this.pick();
-    if (port && this.selected) return this.plugEnd(port);
     const id = port?.device ?? device;
+    if (id && !this.inReach(id)) return;
+    if (port && this.selected) return this.plugEnd(port);
     if (id) this.openDevice(id);
+  }
+
+  /** Whether the character stands close enough to `device` to touch it; says so when not. */
+  private inReach(device: string): boolean {
+    const view = this.devices.get(device);
+    if (!view) return true;
+    const p = view.root.getWorldPosition(new THREE.Vector3());
+    const a = this.avatar.position;
+    if (Math.hypot(p.x - a.x, p.z - a.z) <= REACH) return true;
+    this.hud.toast(t('avatar.tooFar', { device }), 'bad');
+    sound.play('error');
+    return false;
   }
 
   private plugEnd(port: PortView): void {
@@ -334,6 +375,7 @@ export class Mission {
       this.select(null);
       return;
     }
+    if (!this.inReach(port.device)) return;
     if (this.net.disconnect({ device: port.device, port: port.port })) {
       sound.play('unplug');
       this.hud.toast(t('cable.unplugged'));
@@ -347,7 +389,67 @@ export class Mission {
     if (!view) return;
     const target = view.root.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, view.height * 0.6, 0));
     const distance = Math.max(0.42, view.width * 1.25);
-    void this.stage.flyTo(target.clone().add(new THREE.Vector3(0, distance * 0.35, distance)), target, 0.9);
+    this.following = false;
+    this.flying = true;
+    void this.stage.flyTo(target.clone().add(new THREE.Vector3(0, distance * 0.35, distance)), target, 0.9).then(() => (this.flying = false));
+  }
+
+  // ---- the character ---------------------------------------------------------------------------------------------
+
+  /** Where the camera looks when following: over the character's right shoulder, so the bench stays in view. */
+  private followTarget(right: THREE.Vector3): THREE.Vector3 {
+    return this.avatar.position.clone().add(new THREE.Vector3(0, 1.05, 0)).addScaledVector(right, 0.55);
+  }
+
+  /** Put the camera back behind the character. */
+  private overview(seconds = 1.1): void {
+    const forward = new THREE.Vector3(Math.sin(this.avatar.facing), 0, Math.cos(this.avatar.facing));
+    const right = new THREE.Vector3(-forward.z, 0, forward.x);
+    const target = this.followTarget(right);
+    const position = target.clone().addScaledVector(forward, -2.3).add(new THREE.Vector3(0, 1.0, 0));
+    this.following = false;
+    this.flying = true;
+    void this.stage.flyTo(position, target, seconds).then(() => {
+      this.flying = false;
+      this.following = true;
+    });
+  }
+
+  private moveInput(): MoveInput {
+    let x = this.padWalk[0];
+    let y = -this.padWalk[1];
+    for (const code of this.held) {
+      const k = KEYS[code];
+      if (k) {
+        x += k[0];
+        y += k[1];
+      }
+    }
+    const n = Math.hypot(x, y);
+    const run = this.held.has('Shift');
+    return n > 1 ? { x: x / n, y: y / n, run } : { x, y, run };
+  }
+
+  /** Every frame: move the character, keep the camera on it, hide it when the camera is inside it. */
+  private walk(dt: number): void {
+    const camera = this.stage.camera;
+    const forward = camera.getWorldDirection(new THREE.Vector3()).setY(0).normalize();
+    const moved = this.avatar.update(dt, this.moveInput(), forward);
+    if (moved && !this.following && !this.flying) this.overview(0.5);
+    if (this.following) {
+      const right = new THREE.Vector3(-forward.z, 0, forward.x);
+      const delta = this.followTarget(right).sub(this.stage.controls.target).multiplyScalar(1 - Math.exp(-dt * 8));
+      this.stage.controls.target.add(delta);
+      camera.position.add(delta);
+    }
+    // Never let the camera leave the room (it would see through the walls).
+    camera.position.set(
+      THREE.MathUtils.clamp(camera.position.x, -3.35, 3.35),
+      THREE.MathUtils.clamp(camera.position.y, 0.3, 2.85),
+      THREE.MathUtils.clamp(camera.position.z, -1.45, 3.45),
+    );
+    const head = this.avatar.position.clone().setY(1.5);
+    this.avatar.root.visible = camera.position.distanceTo(head) > 0.5;
   }
 
   private select(type: CableType | null): void {
@@ -458,6 +560,8 @@ export class Mission {
       this.hud.showTooltip(null);
       closePanel();
       // The camera pulls back for the finale; the results never wait on it (animation pauses in background tabs).
+      this.following = false;
+      this.flying = true;
       const finale = this.stage.flyTo(new THREE.Vector3(0, 1.9, 2.8), HOME.target, 1.6);
       void Promise.race([finale, new Promise((resolve) => setTimeout(resolve, 1800))]).then(() => this.events.complete(evaluation));
       return;

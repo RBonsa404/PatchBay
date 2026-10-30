@@ -111,8 +111,8 @@ Retours du porteur de projet après la première version jouable (à traiter qua
 
 État après la première passe (2026-10-29) — fait : interface, icônes Lucide, logo PatchBay et logo du club, salle réaliste, équipements ancrés, câbles rangés, personnage d'Aïcha (portrait + texte qui s'écrit). Reste à faire :
 - Interface validée par le porteur de projet (2026-10-29) : « beaucoup plus pro ». Garder cette direction, l'affiner sans tout casser.
-- **Personnage jouable** (demande du porteur de projet) : aujourd'hui on dirige la caméra. Il veut incarner un personnage qui se déplace dans la salle (vue à la troisième personne, ZQSD/flèches, manette), et qui s'approche de l'établi pour travailler.
-- **Physique des câbles** (demande du porteur de projet) : les câbles traversent les objets. Ils doivent contourner les équipements posés sur l'établi.
+- ✔ **Personnage jouable** (2026-10-30, `game/avatar.ts`) : technicien du club en polo (logo au dos, casque), vue à la troisième personne par-dessus l'épaule ; ZQSD ou flèches (touches physiques : WASD sur un clavier anglais), Maj pour courir, stick gauche de la manette (la croix déplace alors le curseur) ; cycle de marche procédural ; collisions avec l'établi, la baie, l'armoire et les murs ; caméra qui suit et reste dans la salle ; il faut être à moins de 2 m d'un équipement pour le brancher ou l'ouvrir. Il attend aussi derrière l'établi sur l'écran titre. Pistes : animation des bras quand il branche, choix du personnage (fille/garçon, tenue), s'asseoir devant le portable pour la console.
+- ✔ **Physique des câbles** (2026-10-30) : les câbles posés contournent les équipements de l'établi (objets voisins regroupés). Reste : collisions des câbles en l'air (boucles de brassage dans la baie) et câble tenu en main.
 - Baie : panneaux d'obturation dans les unités vides selon le niveau (la baie du niveau 2 paraît vide), guide-câbles verticaux.
 - Équipements plus fins (sérigraphie, faces arrière) ou modèles GLB CC0.
 - Aïcha en 3D ou animée (expressions, voix synthétisée en option), et un assistant qui répond aux questions de l'élève.
