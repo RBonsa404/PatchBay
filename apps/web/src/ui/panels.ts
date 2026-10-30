@@ -234,6 +234,7 @@ export function showHostPanel(net: Network, deviceId: string, onChange: () => vo
       'div',
       { class: 'title-actions', style: { justifyContent: 'flex-start', marginBottom: '10px' } },
       h('button', { class: 'btn small', onclick: apply }, t('host.apply')),
+      h('button', { class: 'btn small', onclick: () => run('ipconfig /renew') }, t('host.dhcp')),
       openConsole ? h('button', { class: 'btn small', onclick: openConsole }, t('host.openConsole')) : null,
       status,
     ),

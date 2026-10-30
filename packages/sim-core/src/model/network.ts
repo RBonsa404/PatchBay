@@ -33,6 +33,10 @@ export interface HostConfig {
   ip?: string;
   mask?: string;
   gateway?: string;
+  /** Set by DHCP. */
+  dns?: string;
+  /** The address comes from a DHCP server (`ipconfig /renew`). */
+  dhcp?: boolean;
   /** Ports this host answers on, e.g. a web server: `{ tcp: [80, 443] }`. */
   services?: { tcp?: number[]; udp?: number[] };
 }
@@ -172,6 +176,31 @@ export class Network {
     }
     if (config.mask !== undefined && maskToPrefix(config.mask) === null) throw new Error(`${deviceId}: non-contiguous mask "${config.mask}"`);
     device.host = { ...config };
+  }
+
+  /** `ipconfig /renew`: the host asks for an address on the network. Returns false when no server answers. */
+  dhcpRenew(deviceId: string): boolean {
+    const device = this.device(deviceId);
+    if (!device.host) throw new Error(`${deviceId} is not a host`);
+    const nic = device.model.ports.find((p) => p.kind === 'ethernet');
+    if (!nic || !this.hostLinkUp({ device: deviceId, port: nic.name })) return false;
+    const lease = this.l3.dhcpRequest(deviceId, nic.name);
+    const { services } = device.host;
+    if (!lease) {
+      device.host = { dhcp: true, ...(services ? { services } : {}) };
+      return false;
+    }
+    device.host = { dhcp: true, ip: lease.ip, mask: lease.mask, ...(lease.gateway ? { gateway: lease.gateway } : {}), ...(lease.dns ? { dns: lease.dns } : {}), ...(services ? { services } : {}) };
+    return true;
+  }
+
+  /** `ipconfig /release`. */
+  dhcpRelease(deviceId: string): void {
+    const device = this.device(deviceId);
+    const nic = device.model.ports.find((p) => p.kind === 'ethernet');
+    if (nic) this.l3.dhcpRelease(this.macOf(deviceId, nic.name));
+    const { services } = device.host ?? {};
+    device.host = { dhcp: true, ...(services ? { services } : {}) };
   }
 
   /** Echo requests from any device (PCs included); IOS devices use the `ping` command instead. */
@@ -330,6 +359,8 @@ export class Network {
       aclHits: (aclName, seq) => this.l3.aclHits(device.id, aclName, seq),
       clearAclHits: () => this.l3.clearAclHits(device.id),
       natTranslations: () => this.l3.natTranslations(device.id),
+      dhcpBindings: () => this.l3.dhcpBindings(device.id),
+      clearDhcpBindings: () => this.l3.clearDhcp(device.id),
       natCounters: () => this.l3.natCounters(device.id),
       clearNat: () => this.l3.clearNat(device.id),
       reset: () => {

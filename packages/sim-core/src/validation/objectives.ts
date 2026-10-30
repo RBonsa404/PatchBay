@@ -1,3 +1,4 @@
+import { networkOf } from '../protocols/l3/ip.js';
 import { sameConfig } from '../model/config.js';
 import type { Network } from '../model/network.js';
 import type { CableType } from '../physical/rules.js';
@@ -30,10 +31,11 @@ export type Objective = Base &
     | { type: 'console'; from: string; to: string }
     | { type: 'link-up'; device: string; port: string }
     | { type: 'config'; device: string; check: ConfigCheck }
-    | { type: 'ping'; from: string; to: string; expect: 'success' | 'fail' }
+    | { type: 'ping'; from: string; to: string; /** Ping this host wherever DHCP put it, rather than `to`. */ toHost?: string; expect: 'success' | 'fail' }
     | { type: 'tcp'; from: string; to: string; port: number; expect: ServiceResult }
     | { type: 'route'; device: string; prefix: string; protocol?: RouteCode }
     | { type: 'saved'; device: string }
+    | { type: 'dhcp-lease'; device: string; network: string; mask: string }
   );
 
 /** Why an objective failed, as a stable code the interface translates. */
@@ -121,8 +123,9 @@ function check(net: Network, o: Objective): Omit<ObjectiveResult, 'id' | 'points
     }
     case 'ping': {
       // ARP may cost the first packets of a cold path: three answers out of five count as reachable.
-      const received = net.ping(o.from, o.to).received;
-      if (o.expect === 'success') return received >= 3 || net.ping(o.from, o.to).received >= 3 ? ok : fail('unreachable');
+      const to = (o.toHost && net.device(o.toHost).host?.ip) || o.to;
+      const received = net.ping(o.from, to).received;
+      if (o.expect === 'success') return received >= 3 || net.ping(o.from, to).received >= 3 ? ok : fail('unreachable');
       return received === 0 ? ok : fail('reachable');
     }
     case 'tcp':
@@ -139,6 +142,11 @@ function check(net: Network, o: Objective): Omit<ObjectiveResult, 'id' | 'points
         (r) => r.network === network && r.prefix === Number(prefix) && (o.protocol === undefined || r.code === o.protocol),
       );
       return found ? ok : fail('no-route');
+    }
+    case 'dhcp-lease': {
+      const host = net.device(o.device).host;
+      if (!host?.dhcp || !host.ip || !host.mask) return fail('missing-config');
+      return networkOf(host.ip, host.mask) === o.network && host.mask === o.mask ? ok : fail('missing-config');
     }
     case 'saved': {
       const cli = net.device(o.device).cli;

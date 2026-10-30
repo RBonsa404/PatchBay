@@ -6,7 +6,7 @@ import { Player, type MoveInput } from './player.js';
 import { Coach, type CoachView } from './coach.js';
 import { setGameTarget, type GameTarget } from './gamepad.js';
 import { CableLayer, portFrame } from '../scene/cables.js';
-import { buildDevice, highlightSocket, rackOccupied, setLed, type DeviceView, type PortView } from '../scene/devices.js';
+import { buildDevice, buildPatchPanel, highlightSocket, rackOccupied, setLed, type DeviceView, type PortView } from '../scene/devices.js';
 import { buildWhiteboard } from '../scene/details.js';
 import { buildAnnex } from '../scene/annex.js';
 import { BUILDING, rackFillers, setMainDoorOpen } from '../scene/room.js';
@@ -33,8 +33,18 @@ const ZOOM_MAX = 4.5;
 /** Where the eyes go to read the whiteboard (see `buildWhiteboard`), in a room's own coordinates. */
 const BOARD_CENTRE = new THREE.Vector3(-1.75, 1.62, -1.56);
 const BOARD_VIEW = new THREE.Vector3(-1.75, 1.62, -0.5);
-/** Which part of the building a position along z is in. */
-const zoneOf = (z: number): 'room' | 'corridor' | 'lab' => (z > BUILDING.corridor.front ? 'room' : z < BUILDING.corridor.back ? 'lab' : 'corridor');
+type Origin = { y: number; z: number };
+/** Where each room of a level sits in the building. */
+const ORIGINS: Record<string, Origin> = { '': { y: 0, z: 0 }, annexe: { y: 0, z: BUILDING.annexZ }, etage: { y: BUILDING.floorY, z: 0 } };
+type Zone = 'room' | 'corridor' | 'lab' | 'stairs' | 'corridor1' | 'office';
+/** Which part of the building a position is in. */
+function zoneOf(x: number, y: number, z: number): Zone {
+  if (x > 4.5) return 'stairs';
+  const upper = y > BUILDING.floorY - 0.5;
+  if (z > BUILDING.corridor.front) return upper ? 'office' : 'room';
+  if (z < BUILDING.corridor.back) return 'lab';
+  return upper ? 'corridor1' : 'corridor';
+}
 /** How long it takes to walk in from the door when a mission starts. */
 const ENTRANCE_SECONDS = 3.4;
 /** Time allowed when a level does not say, and the share of it left in an exam. */
@@ -56,6 +66,7 @@ function packetColour(frame: EthernetFrame): string {
   const payload = frame.payload as L3Payload | undefined;
   if (!payload) return '#e2e8f0';
   if (payload.type === 'arp') return '#fbbf24';
+  if (payload.type === 'dhcp') return '#a78bfa';
   const p = payload.packet;
   if (p.icmp?.type === 'echo-request') return '#38bdf8';
   if (p.icmp?.type === 'echo-reply') return '#10b981';
@@ -104,6 +115,9 @@ export class Mission {
   /** After a zoom on a device: where the head stays until the player walks away. */
   private anchor: THREE.Vector3 | null = null;
   private zoom = ZOOM_REST;
+  /** Patch panels: not in the engine. Two cords joined by a link between panels make one cable of the network. */
+  private readonly panels = new Map<string, DeviceView>();
+  private cords: { type: CableType; end: PortView; panel: PortView }[] = [];
   private building = false;
   private lastZone: string | null = null;
   private boardView: THREE.Vector3 | null = null;
@@ -130,7 +144,8 @@ export class Mission {
     for (const d of level.devices) {
       const host = this.net.device(d.id).host;
       const caption = host?.ip ? `${d.id} · ${host.ip}` : d.id;
-      const view = buildDevice(d.id, catalog[d.model]!, d.position, caption, d.room ? BUILDING.annexZ : 0);
+      const origin = ORIGINS[d.room ?? ''] as Origin;
+      const view = buildDevice(d.id, catalog[d.model]!, d.position, caption, origin.z, origin.y);
       this.devices.set(d.id, view);
       stage.level.add(view.root);
       this.picks.push(...view.body, ...[...view.ports.values()].map((p) => p.hit));
@@ -142,18 +157,32 @@ export class Mission {
         return v.body.map((mesh) => new THREE.Box3().setFromObject(mesh));
       }),
     );
-    const whiteboard = buildWhiteboard(level);
-    this.picks.push(...whiteboard.children.filter((o) => o.userData.whiteboard));
-    stage.level.add(this.cables.group, whiteboard, rackFillers(rackOccupied([...this.devices.values()])));
+    // A whiteboard, and the rack's fillers, in each room the mission uses.
+    const rooms = [...new Set(['', ...level.devices.map((d) => d.room ?? '')])];
+    this.building = rooms.length > 1;
+    const floors = rooms.includes('etage');
+    for (const panel of level.panels ?? []) {
+      const origin = ORIGINS[panel.room ?? ''] as Origin;
+      const ports = (level.patchLinks ?? []).flatMap((l) => [l.a, l.b]).filter((e) => e.startsWith(`${panel.id}:`)).map((e) => ({ name: e.split(':')[1] as string, label: tx((level.patchLinks ?? []).find((l) => l.a === e)?.label) }));
+      const view = buildPatchPanel(panel.id, ports, origin.z, origin.y);
+      this.panels.set(panel.id, view);
+      stage.level.add(view.root);
+      this.picks.push(...view.body, ...[...view.ports.values()].map((p) => p.hit));
+    }
+    const racked = [...this.devices.values(), ...this.panels.values()];
+    for (const room of rooms) {
+      const origin = ORIGINS[room] as Origin;
+      const board = buildWhiteboard(level, origin.z, origin.y);
+      this.picks.push(...board.children.filter((o) => o.userData.whiteboard));
+      stage.level.add(board, rackFillers(rackOccupied(racked, origin.z, origin.y), origin.z, origin.y));
+    }
+    stage.level.add(this.cables.group);
     // A mission across rooms opens the door at the back of the technical room.
-    this.building = level.devices.some((d) => d.room);
     setMainDoorOpen(this.building);
-    stage.setRigZ(0);
+    stage.setRig(0, 0);
     if (this.building) {
-      this.player.enterBuilding();
-      const labBoard = buildWhiteboard(level, BUILDING.annexZ);
-      this.picks.push(...labBoard.children.filter((o) => o.userData.whiteboard));
-      stage.level.add(buildAnnex(), labBoard, rackFillers(rackOccupied([...this.devices.values()], BUILDING.annexZ), BUILDING.annexZ));
+      this.player.enterBuilding(floors);
+      stage.level.add(buildAnnex(floors));
     }
     stage.controls.enabled = false;
     stage.manualCamera = true;
@@ -209,7 +238,17 @@ export class Mission {
     } finally {
       this.recording = false;
     }
-    this.hops.forEach((hop, i) => this.cables.pulse(hop.from, hop.to, packetColour(hop.frame), i * HOP_GAP));
+    this.hops.forEach((hop, i) => {
+      const colour = packetColour(hop.frame);
+      const [from, to] = [this.cordOf(hop.from), this.cordOf(hop.to)];
+      if (from && to) {
+        // Across the panels: along one cord, through the walls, along the other.
+        this.cables.pulse(hop.from, { device: from.panel.device, port: from.panel.port }, colour, i * HOP_GAP);
+        this.cables.pulse({ device: to.panel.device, port: to.panel.port }, hop.to, colour, i * HOP_GAP + 0.4);
+      } else {
+        this.cables.pulse(hop.from, hop.to, colour, i * HOP_GAP);
+      }
+    });
     for (let i = 0; i < Math.min(this.hops.length, 6); i++) setTimeout(() => sound.play('packet'), i * HOP_GAP * 1000);
   }
 
@@ -221,7 +260,7 @@ export class Mission {
     closePanel();
     this.stage.manualCamera = false;
     this.stage.zoom = 1;
-    this.stage.setRigZ(0);
+    this.stage.setRig(0, 0);
     setMainDoorOpen(false);
     this.stage.clearLevel();
   }
@@ -373,7 +412,7 @@ export class Mission {
     this.raycaster.setFromCamera(this.pointer, this.stage.camera);
     for (const hit of this.raycaster.intersectObjects(this.picks, false)) {
       // There is no seeing, or reaching, through the walls.
-      if (zoneOf(hit.point.z) !== zoneOf(this.player.z)) continue;
+      if (zoneOf(hit.point.x, hit.point.y, hit.point.z) !== zoneOf(this.player.x, this.player.floorY + 0.1, this.player.z)) continue;
       const port = hit.object.userData.port as PortView | undefined;
       if (port) return { port };
       const device = hit.object.userData.device as string | undefined;
@@ -424,10 +463,14 @@ export class Mission {
   /** Why the cable in hand cannot go into `port`, or null when it can. */
   private canTake(port: PortView): string | null {
     if (!this.selected) return null;
-    if (this.net.cableAt({ device: port.device, port: port.port })) return t('error.busy');
+    if (this.isBusy(port)) return t('error.busy');
     if (!this.firstEnd) return ACCEPTS[this.selected].includes(port.spec.kind) ? null : t('error.incompatible');
     if (port === this.firstEnd) return t('error.samePort');
     if (port.device === this.firstEnd.device) return t('error.sameDevice');
+    if (this.panels.has(port.device) || this.panels.has(this.firstEnd.device)) {
+      // A cord goes between a panel and a device: panels are only joined by the building's own cabling.
+      return this.panels.has(port.device) && this.panels.has(this.firstEnd.device) ? t('error.panelToPanel') : this.selected === 'straight' || this.selected === 'crossover' ? null : t('error.incompatible');
+    }
     return canPlug(this.selected, this.firstEnd.spec, port.spec) ? null : t('error.incompatible');
   }
 
@@ -437,15 +480,16 @@ export class Mission {
     const id = port?.device ?? device;
     if (id && !this.inReach(id)) return;
     if (port && this.selected) return this.plugEnd(port);
+    if (id && this.panels.has(id)) return showNotice(id, t('panel.patch'));
     if (id) this.openDevice(id);
   }
 
   /** Whether the character stands close enough to `device` to touch it; says so when not. */
   private inReach(device: string): boolean {
-    const view = this.devices.get(device);
+    const view = this.devices.get(device) ?? this.panels.get(device);
     if (!view) return true;
     const p = view.root.getWorldPosition(new THREE.Vector3());
-    if (Math.hypot(p.x - this.player.x, p.z - this.player.z) <= REACH) return true;
+    if (Math.hypot(p.x - this.player.x, p.z - this.player.z) <= REACH && Math.abs(view.roomY - this.player.floorY) < 1) return true;
     this.hud.toast(t('avatar.tooFar', { device }), 'bad');
     sound.play('error');
     return false;
@@ -467,9 +511,19 @@ export class Mission {
       return;
     }
     const a = this.firstEnd;
-    const r = this.net.connect(type, { device: a.device, port: a.port }, { device: port.device, port: port.port });
     this.firstEnd = null;
     this.cables.showPreview(type, null, null);
+    if (this.panels.has(a.device) || this.panels.has(port.device)) {
+      const [panel, end] = this.panels.has(a.device) ? [a, port] : [port, a];
+      this.cords.push({ type, end, panel });
+      this.joinCords();
+      this.hud.toast(t('cable.plugged'), 'good');
+      sound.play('plug');
+      if (this.left(type) === 0) this.selected = null;
+      this.afterChange();
+      return;
+    }
+    const r = this.net.connect(type, { device: a.device, port: a.port }, { device: port.device, port: port.port });
     if (!r.ok) {
       this.hud.toast(t('error.incompatible'), 'bad');
       return;
@@ -480,6 +534,49 @@ export class Mission {
     this.afterChange();
   }
 
+  private isBusy(port: PortView): boolean {
+    return this.cords.some((c) => c.end === port || c.panel === port) || (!this.panels.has(port.device) && this.net.cableAt({ device: port.device, port: port.port }) !== undefined);
+  }
+
+  /** The panel port at the other end of the building's cabling. */
+  private peerPanelPort(panel: PortView): PortView | undefined {
+    const key = `${panel.device}:${panel.port}`;
+    const link = this.level.patchLinks?.find((l) => l.a === key || l.b === key);
+    const other = link && (link.a === key ? link.b : link.a);
+    if (!other) return undefined;
+    const [device, port] = other.split(':') as [string, string];
+    return this.panels.get(device)?.ports.get(port);
+  }
+
+  /** When both ends of a link between panels have their cord, the network gets one cable between the two devices. */
+  private joinCords(): void {
+    for (const cord of this.cords) {
+      const peer = this.peerPanelPort(cord.panel);
+      const other = peer && this.cords.find((c) => c.panel === peer);
+      if (!other) continue;
+      const [a, b] = [{ device: cord.end.device, port: cord.end.port }, { device: other.end.device, port: other.end.port }];
+      if (this.net.cableAt(a)) continue;
+      // Two identical cords make a straight link, one crossover among them a crossed one.
+      this.net.connect(cord.type === other.type ? 'straight' : 'crossover', a, b);
+    }
+  }
+
+  /** The two cords of a joined link, seen from one of its two device ports. */
+  private cordOf(end: CableEnd): { type: CableType; end: PortView; panel: PortView } | undefined {
+    return this.cords.find((c) => c.end.device === end.device && c.end.port === end.port);
+  }
+
+  /** Take out the cable or cord at `port`. Returns whether anything was plugged there. */
+  private unplug(port: PortView): boolean {
+    const cord = this.cords.find((c) => c.end === port || c.panel === port);
+    if (cord) {
+      if (this.net.cableAt({ device: cord.end.device, port: cord.end.port })) this.net.disconnect({ device: cord.end.device, port: cord.end.port });
+      this.cords = this.cords.filter((c) => c !== cord);
+      return true;
+    }
+    return !this.panels.has(port.device) && this.net.disconnect({ device: port.device, port: port.port });
+  }
+
   private onUnplug(): void {
     const { port } = this.pick();
     if (!port) {
@@ -487,7 +584,7 @@ export class Mission {
       return;
     }
     if (!this.inReach(port.device)) return;
-    if (this.net.disconnect({ device: port.device, port: port.port })) {
+    if (this.unplug(port)) {
       sound.play('unplug');
       this.hud.toast(t('cable.unplugged'));
       this.afterChange();
@@ -496,7 +593,7 @@ export class Mission {
 
   private onFocus(): void {
     const { port, device } = this.pick();
-    const view = this.devices.get(port?.device ?? device ?? '');
+    const view = this.devices.get(port?.device ?? device ?? '') ?? this.panels.get(port?.device ?? device ?? '');
     if (!view) return;
     const target = view.root.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, view.height * 0.6, 0));
     const distance = Math.max(0.42, view.width * 1.25);
@@ -526,16 +623,16 @@ export class Mission {
   /** The keyboard's way to play: every port as a button, doing what a click on it would do. */
   private showPorts(): void {
     showPortList(
-      [...this.devices.values()].map((view) => ({
+      [...this.devices.values(), ...this.panels.values()].map((view) => ({
         id: view.id,
-        open: () => this.openDevice(view.id),
-        ports: [...view.ports.values()].filter((p) => !this.selected || ACCEPTS[this.selected].includes(p.spec.kind) || this.net.cableAt({ device: p.device, port: p.port })).map((p) => {
-          const busy = this.net.cableAt({ device: p.device, port: p.port }) !== undefined;
+        open: () => (this.panels.has(view.id) ? showNotice(view.id, t('panel.patch')) : this.openDevice(view.id)),
+        ports: [...view.ports.values()].filter((p) => !this.selected || ACCEPTS[this.selected].includes(p.spec.kind) || this.isBusy(p)).map((p) => {
+          const busy = this.isBusy(p);
           return {
             name: p.port,
             busy,
             pick: () => {
-              if (busy) this.net.disconnect({ device: p.device, port: p.port });
+              if (busy) this.unplug(p);
               else if (this.selected) this.plugEnd(p);
               else this.hud.toast(t('ports.hint'));
               if (busy) {
@@ -596,9 +693,11 @@ export class Mission {
   private toggleBoard(): void {
     if (this.anchor && this.anchor === this.boardView) return this.overview(0.7);
     if (this.flying) return;
-    const roomZ = zoneOf(this.player.z) === 'lab' ? BUILDING.annexZ : 0;
-    const view = BOARD_VIEW.clone().setZ(BOARD_VIEW.z + roomZ);
-    const centre = BOARD_CENTRE.clone().setZ(BOARD_CENTRE.z + roomZ);
+    const zone = zoneOf(this.player.x, this.player.floorY + 0.1, this.player.z);
+    const origin = (zone === 'lab' ? ORIGINS.annexe : zone === 'office' || zone === 'corridor1' ? ORIGINS.etage : ORIGINS['']) as Origin;
+    const shift = new THREE.Vector3(0, origin.y, origin.z);
+    const view = BOARD_VIEW.clone().add(shift);
+    const centre = BOARD_CENTRE.clone().add(shift);
     this.boardView = view;
     this.fly(view, centre, 0.9, () => {
       this.anchor = view;
@@ -662,11 +761,13 @@ export class Mission {
   /** Going through a door: the lights follow, and the player is told where they are. */
   private followZone(): void {
     if (!this.building) return;
-    const zone = zoneOf(this.player.z);
+    const zone = zoneOf(this.player.x, this.player.floorY + 0.1, this.player.z);
     if (zone === this.lastZone) return;
     if (this.lastZone !== null) this.hud.toast(t(`zone.${zone}`));
     this.lastZone = zone;
-    if (zone !== 'corridor') this.stage.setRigZ(zone === 'lab' ? BUILDING.annexZ : 0);
+    if (zone === 'room') this.stage.setRig(0, 0);
+    if (zone === 'lab') this.stage.setRig(0, BUILDING.annexZ);
+    if (zone === 'office') this.stage.setRig(BUILDING.floorY, 0);
   }
 
   /** Every frame: walk, turn the head, and put the camera where the eyes are. */
@@ -773,7 +874,8 @@ export class Mission {
 
   private left(type: CableType): number {
     const initial = this.level.initial.cables.filter((c) => c.type === type).length;
-    const used = this.net.cables.filter((c) => c.type === type).length - initial;
+    // A joined pair of cords is one network cable but two cords taken from the inventory.
+    const used = this.net.cables.filter((c) => c.type === type && !this.cordOf(c.a)).length - initial + this.cords.filter((c) => c.type === type).length;
     return Math.max(0, (this.level.inventory.cables[type] ?? 0) - used);
   }
 
@@ -799,7 +901,11 @@ export class Mission {
 
   /** After every cable or command: redraw cables, LEDs, inventory, and the objectives that need no traffic. */
   private afterChange(): void {
-    this.cables.sync(this.net.cables, (device, port) => this.devices.get(device)?.ports.get(port));
+    const drawn = [
+      ...this.net.cables.filter((c) => !this.cordOf(c.a)),
+      ...this.cords.map((c) => ({ type: c.type, a: { device: c.end.device, port: c.end.port }, b: { device: c.panel.device, port: c.panel.port } })),
+    ] as typeof this.net.cables;
+    this.cables.sync(drawn, (device, port) => (this.devices.get(device) ?? this.panels.get(device))?.ports.get(port));
     this.updateLeds();
     this.consoles.collectSyslog();
     this.hud.setInventory(this.inventoryLeft(), this.selected);
@@ -847,8 +953,9 @@ export class Mission {
     this.following = false;
     this.flying = true;
     this.flight++;
-    const finaleZ = zoneOf(this.player.z) === 'lab' ? BUILDING.annexZ : 0;
-    const finale = this.stage.flyTo(new THREE.Vector3(0, 1.9, 2.8 + finaleZ), HOME.target.clone().setZ(HOME.target.z + finaleZ), 1.6);
+    const zone = zoneOf(this.player.x, this.player.floorY + 0.1, this.player.z);
+    const origin = (zone === 'lab' ? ORIGINS.annexe : zone === 'office' ? ORIGINS.etage : ORIGINS['']) as Origin;
+    const finale = this.stage.flyTo(new THREE.Vector3(0, 1.9 + origin.y, 2.8 + origin.z), HOME.target.clone().add(new THREE.Vector3(0, origin.y, origin.z)), 1.6);
     const result = grade(evaluation, this.remaining, this.limit, timedOut, this.exam);
     void Promise.race([finale, new Promise((resolve) => setTimeout(resolve, 1800))]).then(() => this.events.complete(result));
   }

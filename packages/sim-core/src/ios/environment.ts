@@ -1,3 +1,4 @@
+import type { DhcpBinding } from '../engine/l3.js';
 import type { DeviceConfig } from '../model/config.js';
 import type { NatEntry } from '../protocols/nat/nat.js';
 import type { OspfRouterView } from '../engine/ospf.js';
@@ -55,6 +56,9 @@ export interface LinkEnvironment {
   ping(destination: string, count?: number): PingResult;
   traceroute(destination: string, maxHops?: number): TraceHop[];
   arpTable(): ArpEntry[];
+  /** Addresses this router's DHCP server has handed out. */
+  dhcpBindings(): DhcpBinding[];
+  clearDhcpBindings(): void;
   clearArp(): void;
   /** Packets that matched this ACL line (see `show access-lists`). */
   aclHits(aclName: string, seq: number): number;
@@ -92,6 +96,8 @@ export function createIsolatedEnvironment(getConfig: () => DeviceConfig): LinkEn
     ping: (_destination, count = 5) => ({ symbols: '.'.repeat(count), sent: count, received: 0 }),
     traceroute: () => [],
     arpTable: () => [],
+    dhcpBindings: () => [],
+    clearDhcpBindings: () => undefined,
     clearArp: () => undefined,
     aclHits: () => 0,
     clearAclHits: () => undefined,

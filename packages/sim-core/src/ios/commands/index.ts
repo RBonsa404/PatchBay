@@ -1,5 +1,6 @@
 import type { CommandDef } from '../types.js';
 import { aclCommands } from './acl.js';
+import { dhcpCommands } from './dhcp.js';
 import { fileCommands } from './files.js';
 import { globalCommands } from './global.js';
 import { interfaceCommands } from './interface.js';
@@ -20,6 +21,7 @@ export const allCommands: CommandDef[] = [
   ...l3Commands,
   ...aclCommands,
   ...natCommands,
+  ...dhcpCommands,
   ...ospfCommands,
   ...fileCommands,
   ...showCommands,

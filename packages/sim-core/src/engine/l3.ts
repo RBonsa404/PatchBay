@@ -4,7 +4,7 @@ import { groupOf } from '../ios/profiles.js';
 import type { Network } from '../model/network.js';
 import { evaluate, type AclPacket } from '../protocols/acl/acl.js';
 import { allocatePort, poolAddresses, type NatEntry } from '../protocols/nat/nat.js';
-import { sameSubnet } from '../protocols/l3/ip.js';
+import { maskToPrefix, networkOf, sameSubnet } from '../protocols/l3/ip.js';
 import { buildRoutingTable, lookup } from '../protocols/l3/routing.js';
 import { BROADCAST_MAC, injectFromSwitch, type EthernetFrame } from './l2.js';
 
@@ -34,9 +34,24 @@ export interface IpPacket {
   udp?: UdpDatagram;
 }
 
+/** An address handed out by a router's DHCP server. */
+export interface DhcpBinding {
+  ip: string;
+  mac: string;
+  pool: string;
+}
+
+export interface DhcpLease {
+  ip: string;
+  mask: string;
+  gateway?: string;
+  dns?: string;
+}
+
 export type L3Payload =
   | { type: 'arp'; op: 'request' | 'reply'; senderIp: string; senderMac: string; targetIp: string }
-  | { type: 'ip'; packet: IpPacket };
+  | { type: 'ip'; packet: IpPacket }
+  | { type: 'dhcp'; client: string; mac: string };
 
 /** An addressed interface as the L3 engine sees it: where it sits on the wire and what it answers to. */
 export interface L3Interface {
@@ -128,6 +143,8 @@ export class L3 {
   /** device -> dynamic NAT translations, in creation order. */
   private readonly nat = new Map<string, NatEntry[]>();
   private readonly natCount = new Map<string, { hits: number; misses: number }>();
+  private readonly leases = new Map<string, DhcpBinding[]>();
+  private offer: DhcpLease | null = null;
   private nextId = 1;
   private nextPort = 49152;
 
@@ -228,6 +245,7 @@ export class L3 {
     this.arp.delete(deviceId);
     this.nat.delete(deviceId);
     this.natCount.delete(deviceId);
+    this.leases.delete(deviceId);
     this.clearAclHits(deviceId);
   }
 
@@ -256,6 +274,68 @@ export class L3 {
 
     if (payload.type === 'arp') this.onArp(deviceId, ifc, payload);
     else if (payload.type === 'ip') this.onIp(deviceId, ifc, payload.packet);
+    else if (payload.type === 'dhcp') this.onDhcp(deviceId, ifc, payload);
+  }
+
+  // ---- DHCP ------------------------------------------------------------------------------------------------------
+
+  dhcpBindings(deviceId: string): DhcpBinding[] {
+    return this.leases.get(deviceId) ?? [];
+  }
+
+  /** `clear ip dhcp binding *`. */
+  clearDhcp(deviceId: string): void {
+    this.leases.delete(deviceId);
+  }
+
+  /** A client gives its address back. */
+  dhcpRelease(mac: string): void {
+    for (const [device, list] of this.leases) this.leases.set(device, list.filter((b) => b.mac !== mac));
+  }
+
+  /**
+   * A client broadcasts for an address. The request really travels: through the cables, the VLANs and the trunks, up
+   * to a router interface. Only a server on the client's own broadcast domain can answer (no relay agent here).
+   */
+  dhcpRequest(hostId: string, port: string): DhcpLease | null {
+    this.offer = null;
+    const mac = this.net.macOf(hostId, port);
+    this.net.sendFrame({ device: hostId, port }, { src: mac, dst: BROADCAST_MAC, payload: { type: 'dhcp', client: hostId, mac } satisfies L3Payload });
+    return this.offer;
+  }
+
+  private onDhcp(deviceId: string, ifc: L3Interface, request: Extract<L3Payload, { type: 'dhcp' }>): void {
+    const config = this.net.device(deviceId).cli?.config;
+    if (!config || this.offer) return;
+    const network = networkOf(ifc.ip, ifc.mask);
+    const pool = config.dhcp.pools.find((p) => p.network === network && p.mask === ifc.mask);
+    if (!pool?.network || !pool.mask) return;
+    const list = this.leases.get(deviceId) ?? [];
+    let binding = list.find((b) => b.mac === request.mac && b.pool === pool.name);
+    if (!binding) {
+      const ip = this.freeAddress(deviceId, pool.network, pool.mask, list);
+      if (!ip) return;
+      binding = { ip, mac: request.mac, pool: pool.name };
+      list.push(binding);
+      this.leases.set(deviceId, list);
+    }
+    this.offer = { ip: binding.ip, mask: pool.mask, ...(pool.router ? { gateway: pool.router } : {}), ...(pool.dns ? { dns: pool.dns } : {}) };
+  }
+
+  /** The lowest address of the pool that is neither excluded, nor in use, nor the router's own. */
+  private freeAddress(deviceId: string, network: string, mask: string, used: DhcpBinding[]): string | null {
+    const toNumber = (ip: string): number => ip.split('.').reduce((n, o) => n * 256 + Number(o), 0);
+    const toIp = (n: number): string => [24, 16, 8, 0].map((shift) => Math.floor(n / 2 ** shift) % 256).join('.');
+    const first = toNumber(network);
+    const size = 2 ** (32 - (maskToPrefix(mask) ?? 32));
+    const config = this.net.device(deviceId).cli!.config;
+    for (let n = first + 1; n < first + size - 1; n++) {
+      const ip = toIp(n);
+      if (config.dhcp.excluded.some((r) => n >= toNumber(r.from) && n <= toNumber(r.to))) continue;
+      if (used.some((b) => b.ip === ip) || config.interfaces.some((i) => i.ip?.address === ip)) continue;
+      return ip;
+    }
+    return null;
   }
 
   private onArp(deviceId: string, ifc: L3Interface, arp: Extract<L3Payload, { type: 'arp' }>): void {

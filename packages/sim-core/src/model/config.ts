@@ -145,6 +145,21 @@ export interface LineConfig {
 }
 
 /** Structured device configuration. `show running-config` is a rendering of this state, never the other way round. */
+/** A DHCP pool of a router: `ip dhcp pool`. */
+export interface DhcpPool {
+  name: string;
+  network?: string;
+  mask?: string;
+  router?: string;
+  dns?: string;
+}
+
+export interface DhcpConfig {
+  /** `ip dhcp excluded-address`: ranges never handed out. */
+  excluded: { from: string; to: string }[];
+  pools: DhcpPool[];
+}
+
 export interface DeviceConfig {
   hostname: string;
   enableSecret?: string;
@@ -157,6 +172,7 @@ export interface DeviceConfig {
   staticRoutes: StaticRoute[];
   acls: AclConfig[];
   nat: NatConfig;
+  dhcp: DhcpConfig;
   ospf?: OspfConfig;
   vlans: VlanConfig[];
   lines: LineConfig[];
@@ -191,6 +207,7 @@ export function createDefaultConfig(profile: DeviceProfile): DeviceConfig {
     staticRoutes: [],
     acls: [],
     nat: { statics: [], pools: [], rules: [] },
+    dhcp: { excluded: [], pools: [] },
     vlans: [],
     lines,
     interfaces: profile.groups.flatMap((g) =>

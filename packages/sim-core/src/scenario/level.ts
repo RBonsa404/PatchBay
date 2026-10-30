@@ -23,7 +23,7 @@ export interface LevelDevice {
   /** Where the 3D scene places it (metres). Optional: the engine does not care. */
   position?: [number, number, number];
   /** The other room of the building; the position is then relative to it. */
-  room?: 'annexe';
+  room?: 'annexe' | 'etage';
 }
 
 /**
@@ -57,7 +57,15 @@ export interface Level {
     cables: LevelCable[];
     commands: Record<string, string[]>;
     hosts?: Record<string, HostConfig>;
+    /** Hosts that ask for their address by DHCP once everything else is in place. */
+    renew?: string[];
   };
+  /**
+   * Patch panels: the building's fixed cabling. A panel is passive and unknown to the engine: two cords joined by a
+   * link between panels make one cable in the `Network`.
+   */
+  panels?: { id: string; room?: 'annexe' | 'etage' }[];
+  patchLinks?: { a: string; b: string; label: Text }[];
 }
 
 export function parseEnd(text: string): CableEnd {
@@ -97,4 +105,5 @@ export function applySolution(net: Network, level: Level): void {
   plug(net, level.solution.cables);
   for (const [id, host] of Object.entries(level.solution.hosts ?? {})) net.configureHost(id, host);
   type(net, level.solution.commands);
+  for (const id of level.solution.renew ?? []) net.dhcpRenew(id);
 }

@@ -31,6 +31,7 @@ const PROMPT_SUFFIX: Record<CliMode, string> = {
   'config-line': '(config-line)#',
   'config-vlan': '(config-vlan)#',
   'config-router': '(config-router)#',
+  'dhcp-config': '(dhcp-config)#',
   'config-std-nacl': '(config-std-nacl)#',
   'config-ext-nacl': '(config-ext-nacl)#',
 };

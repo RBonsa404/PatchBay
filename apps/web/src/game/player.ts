@@ -12,13 +12,10 @@ const OBSTACLES: [number, number, number, number][] = [
   [2.45, 3.05, -1.55, -0.65], // server cabinet
   [-3.5, -3.3, -0.75, -0.45], // fire extinguisher
   [-3.5, -3.0, 0.1, 2.1], // shelving
-  [-2.85, -2.25, 0.75, 1.78], // cartons
   [2.82, 3.5, -0.4, 1.65], // row of cabinets
   [2.97, 3.5, 1.95, 3.25], // cupboard under the pegboard
-  [1.9, 2.5, 0.53, 0.97], // tool trolley
   [-1.65, -0.15, 2.85, 3.6], // desk
   [-1.25, -0.65, 2.2, 2.8], // chair
-  [1.7, 2.2, -1.6, -1.4], // stepladder
   [0.1, 0.4, 3.15, 3.45], // bin
 ];
 const ROOM = { x0: -3.5, x1: 3.5, z0: -1.6, z1: 3.6 };
@@ -32,8 +29,22 @@ const DOORWAYS = [
 const LAB_OBSTACLES: [number, number, number, number][] = [
   [-1.6, 1.6, -7.3, -6.2], // bench
   [-0.36, 0.36, -7.96, -7.33], // rack
-  [2.05, 3.5, -7.65, -4.3], // students' tables and stools
+  [1.95, 3.5, -8.5, -4.05], // workstations
+  [-3.5, -2.95, -8.6, -7.3], // lockers
 ];
+const OFFICE_OBSTACLES: [number, number, number, number][] = [
+  [-1.6, 1.6, -0.3, 0.8], // bench
+  [-0.36, 0.36, -0.96, -0.33], // rack
+  [1.95, 3.5, -1.45, 2.35], // workstations
+  [-3.5, -2.95, -0.1, 2.5], // low cabinet
+];
+/** The stairs: two flights either side of z = -2.5, joined by a landing (see `BUILDING.stairs`), already narrowed. */
+const FLIGHT_UP = { x0: 4.2, x1: 7, z0: -3.16, z1: -2.74 };
+const FLIGHT_DOWN = { x0: 4.2, x1: 7, z0: -2.26, z1: -1.84 };
+const LANDING = { x0: 6.9, x1: 7.76, z0: -3.16, z1: -1.84 };
+const STAIR_START = 4.5;
+const STAIR_RUN = 2.5;
+const FLOOR_HEIGHT = 3.3;
 const RADIUS = 0.24;
 const WALK = 1.35;
 const RUN = 2.6;
@@ -58,15 +69,40 @@ export class Player {
   private speed = 0;
   private phase = 0;
   private building = false;
+  private stairs = false;
+  /** 0 on the ground floor (and on the lower flight), 1 upstairs (and on the upper flight). */
+  private floor = 0;
+  private y = 0;
 
-  /** Open the whole building to the player (otherwise, the technical room only). */
-  enterBuilding(): void {
+  /** Open the building to the player (otherwise, the technical room only); `stairs` adds the first floor. */
+  enterBuilding(stairs: boolean): void {
     this.building = true;
+    this.stairs = stairs;
+  }
+
+  /** Height of the floor under the player. */
+  get floorY(): number {
+    return this.y;
+  }
+
+  private inBox(x: number, z: number, b: { x0: number; x1: number; z0: number; z1: number }): boolean {
+    return x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1;
+  }
+
+  /** The floor's height at (x, z), for the part of the building the player is in. */
+  private heightAt(x: number, z: number): number {
+    if (this.stairs) {
+      if (this.inBox(x, z, LANDING)) return FLOOR_HEIGHT / 2;
+      const along = Math.min(1, Math.max(0, (x - STAIR_START) / STAIR_RUN));
+      if (this.floor === 0 && this.inBox(x, z, FLIGHT_UP)) return (along * FLOOR_HEIGHT) / 2;
+      if (this.floor === 1 && this.inBox(x, z, FLIGHT_DOWN)) return FLOOR_HEIGHT / 2 + ((1 - along) * FLOOR_HEIGHT) / 2;
+    }
+    return this.floor === 1 ? FLOOR_HEIGHT : 0;
   }
 
   /** Where the eyes are, with the slight bob of walking. */
   get eye(): THREE.Vector3 {
-    return new THREE.Vector3(this.x, EYE + Math.sin(this.phase * 2) * 0.012 * Math.min(1, this.speed / WALK), this.z);
+    return new THREE.Vector3(this.x, this.y + EYE + Math.sin(this.phase * 2) * 0.012 * Math.min(1, this.speed / WALK), this.z);
   }
 
   /** The direction the player looks in. */
@@ -114,7 +150,17 @@ export class Player {
     const inArea = (x: number, z: number, area: typeof ROOM): boolean => x > area.x0 + RADIUS && x < area.x1 - RADIUS && z > area.z0 + RADIUS && z < area.z1 - RADIUS;
     const inDoorway = (x: number, z: number): boolean => DOORWAYS.some((d) => x > d.x0 && x < d.x1 && z > d.z0 && z < d.z1);
     const blocked = (x: number, z: number, list: typeof OBSTACLES): boolean => list.some(([x0, x1, z0, z1]) => x > x0 - RADIUS && x < x1 + RADIUS && z > z0 - RADIUS && z < z1 + RADIUS);
+    const onLanding = this.inBox(this.x, this.z, LANDING);
     const free = (x: number, z: number): boolean => {
+      if (this.stairs) {
+        if (this.inBox(x, z, LANDING)) return true;
+        if ((this.floor === 0 || onLanding) && this.inBox(x, z, FLIGHT_UP)) return true;
+        if ((this.floor === 1 || onLanding) && this.inBox(x, z, FLIGHT_DOWN)) return true;
+      }
+      if (this.floor === 1) {
+        if (blocked(x, z, OFFICE_OBSTACLES)) return false;
+        return inArea(x, z, ROOM) || inArea(x, z, CORRIDOR) || (x > (DOORWAYS[0] as typeof ROOM).x0 && x < (DOORWAYS[0] as typeof ROOM).x1 && z > (DOORWAYS[0] as typeof ROOM).z0 && z < (DOORWAYS[0] as typeof ROOM).z1);
+      }
       if (blocked(x, z, OBSTACLES)) return false;
       if (inArea(x, z, ROOM)) return true;
       if (!this.building) return false;
@@ -125,6 +171,14 @@ export class Player {
     if (free(x + dx, z + dz)) [this.x, this.z] = [x + dx, z + dz];
     else if (free(x + dx, z)) this.x = x + dx;
     else if (free(x, z + dz)) this.z = z + dz;
+    if (this.stairs) {
+      // The flight you step on decides which floor you are heading for.
+      if (!this.inBox(this.x, this.z, LANDING)) {
+        if (this.inBox(this.x, this.z, FLIGHT_UP) && (this.floor === 0 || this.inBox(x, z, LANDING))) this.floor = 0;
+        if (this.inBox(this.x, this.z, FLIGHT_DOWN) && (this.floor === 1 || this.inBox(x, z, LANDING))) this.floor = 1;
+      }
+      this.y = this.heightAt(this.x, this.z);
+    }
     return this.x !== x || this.z !== z;
   }
 }

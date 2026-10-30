@@ -13,6 +13,8 @@ const host = z
     ip: ipv4.optional(),
     mask: ipv4.optional(),
     gateway: ipv4.optional(),
+    dns: ipv4.optional(),
+    dhcp: z.boolean().optional(),
     services: z.object({ tcp: z.array(z.number().int()).optional(), udp: z.array(z.number().int()).optional() }).strict().optional(),
   })
   .strict();
@@ -35,10 +37,11 @@ const objective = z.discriminatedUnion('type', [
   z.object({ ...base, type: z.literal('console'), from: z.string(), to: z.string() }).strict(),
   z.object({ ...base, type: z.literal('link-up'), device: z.string(), port: z.string() }).strict(),
   z.object({ ...base, type: z.literal('config'), device: z.string(), check: configCheck }).strict(),
-  z.object({ ...base, type: z.literal('ping'), from: z.string(), to: ipv4, expect: z.enum(['success', 'fail']) }).strict(),
+  z.object({ ...base, type: z.literal('ping'), from: z.string(), to: ipv4, toHost: z.string().optional(), expect: z.enum(['success', 'fail']) }).strict(),
   z.object({ ...base, type: z.literal('tcp'), from: z.string(), to: ipv4, port: z.number().int(), expect: z.enum(['open', 'refused', 'unreachable', 'timeout']) }).strict(),
   z.object({ ...base, type: z.literal('route'), device: z.string(), prefix: z.string().regex(/^[\d.]+\/\d{1,2}$/), protocol: z.enum(['C', 'S', 'O', 'O IA', 'O E2']).optional() }).strict(),
   z.object({ ...base, type: z.literal('saved'), device: z.string() }).strict(),
+  z.object({ ...base, type: z.literal('dhcp-lease'), device: z.string(), network: ipv4, mask: ipv4 }).strict(),
 ]);
 
 export const levelSchema = z
@@ -59,11 +62,13 @@ export const levelSchema = z
             model: z.string().min(1),
             label: text.optional(),
             position: z.tuple([z.number(), z.number(), z.number()]).optional(),
-            room: z.literal('annexe').optional(),
+            room: z.enum(['annexe', 'etage']).optional(),
           })
           .strict(),
       )
       .min(1),
+    panels: z.array(z.object({ id: z.string().min(1), room: z.enum(['annexe', 'etage']).optional() }).strict()).optional(),
+    patchLinks: z.array(z.object({ a: end, b: end, label: text }).strict()).optional(),
     inventory: z.object({ cables: z.record(cableType, z.number().int().min(0)) }).strict(),
     initial: z
       .object({
@@ -79,6 +84,7 @@ export const levelSchema = z
         cables: z.array(cable),
         commands: z.record(z.string(), z.array(z.string())),
         hosts: z.record(z.string(), host).optional(),
+        renew: z.array(z.string()).optional(),
       })
       .strict(),
   })

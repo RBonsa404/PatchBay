@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { Cable, CableEnd, CableType } from '@patchbay/sim-core';
 import type { PortView } from './devices.js';
-import { BENCH_TOP, BUILDING, MANAGER, RACK } from './room.js';
+import { BENCH_TOP, MANAGER, RACK, roomOrigin } from './room.js';
 import type { Stage } from './stage.js';
 
 /** Cable colours: the usual workshop habits (blue straight, amber crossover, light-blue console, dark serial). */
@@ -29,7 +29,7 @@ function curveBetween(a: THREE.Vector3, na: THREE.Vector3, b: THREE.Vector3, nb:
   const b1 = b.clone().addScaledVector(nb, lead);
   const span = a1.distanceTo(b1);
   const mid = a1.clone().lerp(b1, 0.5);
-  mid.y = Math.max(Math.min(a1.y, b1.y) - 0.04 - span * 0.18, BENCH_TOP + 0.015);
+  mid.y = Math.max(Math.min(a1.y, b1.y) - 0.04 - span * 0.18, BENCH_TOP + 0.015 + roomOrigin(a.y, a.z).y);
   mid.z = Math.max(a1.z, b1.z) + 0.04 + span * 0.05;
   // Held over whatever stands between the two ends, rather than through it.
   const margin = 0.02;
@@ -37,21 +37,6 @@ function curveBetween(a: THREE.Vector3, na: THREE.Vector3, b: THREE.Vector3, nb:
     if (segmentHitsRect(a1, b1, box.min.x - margin, box.max.x + margin, box.min.z - margin, box.max.z + margin) !== null) mid.y = Math.max(mid.y, box.max.y + 0.04);
   }
   return new THREE.CatmullRomCurve3([a, a1, mid, b1, b], false, 'centripetal', 0.5);
-}
-
-/** Two ends further apart than this are in different rooms: the cable goes up and runs through the cable trays. */
-const ROOMS_APART = 3.5;
-/** Height of the trays. */
-const TRAY_Y = 2.49;
-
-const rackRoomZ = (p: THREE.Vector3): number => (p.z < BUILDING.corridor.back ? BUILDING.annexZ : 0);
-
-/** From a port up to the tray above the rack: along the gear, up the cable manager, along the tray. */
-function toTray(p: THREE.Vector3, lane: number): THREE.Vector3[] {
-  const x = RACK.x + MANAGER.x;
-  const z = RACK.frontZ + rackRoomZ(p) + 0.03;
-  const drift = (lane % 4) * 0.006;
-  return [new THREE.Vector3(x - 0.04, p.y - 0.012, z), new THREE.Vector3(x + drift, p.y + 0.05, z), new THREE.Vector3(x + drift, TRAY_Y - 0.15, z), new THREE.Vector3(x + drift, TRAY_Y, z + (p.z < BUILDING.corridor.back ? 0.2 : -0.2))];
 }
 
 /** Space between two cables lying side by side on the bench. */
@@ -66,10 +51,7 @@ function routeBetween(a: THREE.Vector3, na: THREE.Vector3, b: THREE.Vector3, nb:
   const lead = 0.05;
   const a1 = a.clone().addScaledVector(na, lead);
   const b1 = b.clone().addScaledVector(nb, lead);
-  if (Math.abs(a.z - b.z) > ROOMS_APART) {
-    return new THREE.CatmullRomCurve3([a, a1, ...toTray(a1, lane), ...toTray(b1, lane).reverse(), b1, b], false, 'centripetal', 0.5);
-  }
-  const frontZ = RACK.frontZ + rackRoomZ(a);
+  const frontZ = RACK.frontZ;
   const rest = BENCH_TOP + radius + 0.001;
   const highA = a.y - BENCH_TOP > 0.1;
   const highB = b.y - BENCH_TOP > 0.1;
@@ -78,11 +60,11 @@ function routeBetween(a: THREE.Vector3, na: THREE.Vector3, b: THREE.Vector3, nb:
   if (highA && highB && a1.distanceTo(b1) < 0.6) {
     // Patch cord: along the gear to the nearest cable manager, along the manager, and back along the other device.
     const side = (a1.x + b1.x) / 2 < RACK.x ? -1 : 1;
-    const x = RACK.x + side * (MANAGER.x - 0.012 + (lane % 4) * 0.006);
+    // A soft bow towards the manager, staying inside the rack's width whatever the distance between the ports.
+    const x = RACK.x + side * (MANAGER.x - 0.045 + (lane % 4) * 0.005);
     const z = frontZ + 0.03;
-    const drop = 0.018 + (lane % 4) * 0.004;
-    const [topY, bottomY] = [a1.y - drop, b1.y - drop];
-    return new THREE.CatmullRomCurve3([a, a1, new THREE.Vector3(x - side * 0.05, topY, z), new THREE.Vector3(x, topY - 0.02, z), new THREE.Vector3(x, bottomY + 0.02, z), new THREE.Vector3(x - side * 0.05, bottomY, z), b1, b], false, 'centripetal', 0.5);
+    const drop = 0.016 + (lane % 4) * 0.004;
+    return new THREE.CatmullRomCurve3([a, a1, new THREE.Vector3(x - side * 0.08, a1.y - drop, z), new THREE.Vector3(x, (a1.y + b1.y) / 2 - drop, z), new THREE.Vector3(x - side * 0.08, b1.y - drop, z), b1, b], false, 'centripetal', 0.5);
   }
 
   // Touch-down points on the bench, just past each port, shifted into this cable's lane.
@@ -120,6 +102,14 @@ function routeBetween(a: THREE.Vector3, na: THREE.Vector3, b: THREE.Vector3, nb:
   const smooth = new THREE.CatmullRomCurve3([a, a1, ...da, ...run, ...db, b1, b], false, 'centripetal', 0.5);
   const flattened = smooth.getPoints(120).map((p) => p.setY(Math.max(p.y, rest)));
   return new THREE.CatmullRomCurve3(flattened, false, 'centripetal', 0.5);
+}
+
+const originKey = (o: { y: number; z: number }): string => `${o.y}|${o.z}`;
+const FORWARD_NORMAL = new THREE.Vector3(0, 0, 1);
+
+/** A socket of the rack's own patch panel (see `rack()` in room.ts), for links laid in the walls. */
+function panelSocket(index: number): THREE.Vector3 {
+  return new THREE.Vector3(RACK.x - 0.19 + (index % 12) * 0.016, 1.3573, RACK.frontZ + 0.0006);
 }
 
 /** Clearance kept between a cable lying on the bench and the objects standing on it. */
@@ -212,30 +202,50 @@ export class CableLayer {
   private readonly paths = new Map<string, { cable: Cable; curve: THREE.CatmullRomCurve3 }>();
   private readonly lanes = new Map<string, number>();
   /** Boxes of the objects standing on the bench, which cables lying on it must go around. */
-  private obstacles: THREE.Box3[] = [];
+  private obstacles = new Map<string, THREE.Box3[]>();
 
   /** Objects standing on the bench (world-space boxes). Call before the first `sync`. */
   setObstacles(boxes: THREE.Box3[]): void {
-    // Objects close enough that no cable fits between them (a monitor beside its tower) count as one block, so
-    // detours go round the whole group instead of zigzagging through it.
-    const merged = boxes.filter((b) => b.min.y < BENCH_TOP + 0.05 && b.max.y > BENCH_TOP).map((b) => b.clone());
-    const near = (p: THREE.Box3, q: THREE.Box3): boolean =>
-      p.min.x - CLEARANCE * 2 < q.max.x && q.min.x - CLEARANCE * 2 < p.max.x && p.min.z - CLEARANCE * 2 < q.max.z && q.min.z - CLEARANCE * 2 < p.max.z;
-    for (let changed = true; changed; ) {
-      changed = false;
-      for (let i = 0; i < merged.length && !changed; i++) {
-        for (let j = i + 1; j < merged.length; j++) {
-          if (near(merged[i] as THREE.Box3, merged[j] as THREE.Box3)) {
-            (merged[i] as THREE.Box3).union(merged[j] as THREE.Box3);
-            merged.splice(j, 1);
-            changed = true;
-            break;
+    this.obstacles.clear();
+    // Each room is handled in its own coordinates, as if it were the technical room.
+    const byRoom = new Map<string, THREE.Box3[]>();
+    for (const box of boxes) {
+      const o = roomOrigin(box.min.y, box.min.z);
+      const local = box.clone().translate(new THREE.Vector3(0, -o.y, -o.z));
+      byRoom.set(originKey(o), [...(byRoom.get(originKey(o)) ?? []), local]);
+    }
+    for (const [key, list] of byRoom) {
+      // Objects close enough that no cable fits between them (a monitor beside its tower) count as one block, so
+      // detours go round the whole group instead of zigzagging through it.
+      const merged = list.filter((b) => b.min.y < BENCH_TOP + 0.05 && b.max.y > BENCH_TOP);
+      const near = (p: THREE.Box3, q: THREE.Box3): boolean =>
+        p.min.x - CLEARANCE * 2 < q.max.x && q.min.x - CLEARANCE * 2 < p.max.x && p.min.z - CLEARANCE * 2 < q.max.z && q.min.z - CLEARANCE * 2 < p.max.z;
+      for (let changed = true; changed; ) {
+        changed = false;
+        for (let i = 0; i < merged.length && !changed; i++) {
+          for (let j = i + 1; j < merged.length; j++) {
+            if (near(merged[i] as THREE.Box3, merged[j] as THREE.Box3)) {
+              (merged[i] as THREE.Box3).union(merged[j] as THREE.Box3);
+              merged.splice(j, 1);
+              changed = true;
+              break;
+            }
           }
         }
       }
+      this.obstacles.set(key, merged);
     }
-    this.obstacles = merged;
   }
+
+  /** A path within one room: computed in the room's own coordinates, then put back in place. */
+  private routeInRoom(a: THREE.Vector3, na: THREE.Vector3, b: THREE.Vector3, nb: THREE.Vector3, lane: number, radius: number): THREE.CatmullRomCurve3 {
+    const o = roomOrigin(a.y, a.z);
+    const shift = new THREE.Vector3(0, o.y, o.z);
+    const curve = routeBetween(a.clone().sub(shift), na, b.clone().sub(shift), nb, lane, radius, this.obstacles.get(originKey(o)) ?? []);
+    for (const p of curve.points) p.add(shift);
+    return curve;
+  }
+
   private preview: THREE.Mesh | null = null;
   private previewPlug: THREE.Group | null = null;
 
@@ -264,35 +274,56 @@ export class CableLayer {
       let lane = 0;
       while (used.has(lane)) lane++;
       this.lanes.set(key, lane);
-      const curve = routeBetween(a.point, a.normal, b.point, b.normal, lane, CABLE_STYLE[cable.type].radius, this.obstacles);
-      const view = this.build(cable.type, a, b, curve);
+      const radius = CABLE_STYLE[cable.type].radius;
+      const [oa, ob] = [roomOrigin(a.point.y, a.point.z), roomOrigin(b.point.y, b.point.z)];
+      let curve: THREE.CatmullRomCurve3;
+      let view: THREE.Group;
+      if (originKey(oa) === originKey(ob)) {
+        curve = this.routeInRoom(a.point, a.normal, b.point, b.normal, lane, radius);
+        view = this.build(cable.type, a, b, [curve]);
+      } else {
+        // Between rooms, what shows is a patch cord to the rack's panel at each end: the rest is in the walls.
+        const end = (p: { point: THREE.Vector3; normal: THREE.Vector3 }, o: { y: number; z: number }): { point: THREE.Vector3; normal: THREE.Vector3 } => ({ point: panelSocket(lane).add(new THREE.Vector3(0, o.y, o.z)), normal: FORWARD_NORMAL.clone() });
+        const [pa, pb] = [end(a, oa), end(b, ob)];
+        const cordA = this.routeInRoom(a.point, a.normal, pa.point, pa.normal, lane, radius);
+        const cordB = this.routeInRoom(pb.point, pb.normal, b.point, b.normal, lane, radius);
+        curve = new THREE.CatmullRomCurve3([...cordA.points, ...cordB.points], false, 'centripetal', 0.5);
+        view = this.build(cable.type, a, b, [cordA, cordB]);
+        const plugs = [plug(cable.type), plug(cable.type)];
+        placePlug(plugs[0] as THREE.Group, pa.point, pa.normal);
+        placePlug(plugs[1] as THREE.Group, pb.point, pb.normal);
+        view.add(...plugs);
+      }
       this.views.set(key, view);
       this.paths.set(key, { cable, curve });
       this.group.add(view);
     }
   }
 
-  private build(type: CableType, a: { point: THREE.Vector3; normal: THREE.Vector3 }, b: { point: THREE.Vector3; normal: THREE.Vector3 }, curve: THREE.CatmullRomCurve3): THREE.Group {
+  private build(type: CableType, a: { point: THREE.Vector3; normal: THREE.Vector3 }, b: { point: THREE.Vector3; normal: THREE.Vector3 }, curves: THREE.CatmullRomCurve3[]): THREE.Group {
     const style = CABLE_STYLE[type];
     const group = new THREE.Group();
-    const geometry = new THREE.TubeGeometry(curve, curve.getLength() > 4 ? 520 : 160, style.radius, 10, false);
-    const tube = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: style.colour, roughness: 0.45, metalness: 0.05 }));
-    tube.castShadow = true;
+    const material = new THREE.MeshStandardMaterial({ color: style.colour, roughness: 0.45, metalness: 0.05 });
     const pa = plug(type);
     const pb = plug(type);
     placePlug(pa, a.point, a.normal);
     placePlug(pb, b.point, b.normal);
-    group.add(tube, pa, pb);
-
-    // Unroll: grow the drawn part of the tube, then show the far plug.
-    const total = geometry.index ? geometry.index.count : 0;
-    geometry.setDrawRange(0, 0);
+    group.add(pa, pb);
     pb.visible = false;
-    void this.stage
-      .animate(0.55, (t) => geometry.setDrawRange(0, Math.floor(total * t)))
-      .then(() => {
-        pb.visible = true;
-      });
+    // Unroll: grow the drawn part of each tube, then show the far plug.
+    for (const curve of curves) {
+      const geometry = new THREE.TubeGeometry(curve, 200, style.radius, 10, false);
+      const tube = new THREE.Mesh(geometry, material);
+      tube.castShadow = true;
+      group.add(tube);
+      const total = geometry.index ? geometry.index.count : 0;
+      geometry.setDrawRange(0, 0);
+      void this.stage
+        .animate(0.55, (t) => geometry.setDrawRange(0, Math.floor(total * t)))
+        .then(() => {
+          pb.visible = true;
+        });
+    }
     return group;
   }
 
@@ -340,8 +371,8 @@ export class CableLayer {
     const a = portFrame(from);
     // The hand stays above the bench, even when the pointer aims below it.
     const hand = pointer.clone();
-    hand.y = Math.max(hand.y, BENCH_TOP + 0.02);
-    const curve = curveBetween(a.point, a.normal, hand, new THREE.Vector3(0, 1, 0), this.obstacles);
+    hand.y = Math.max(hand.y, BENCH_TOP + 0.02 + roomOrigin(a.point.y, a.point.z).y);
+    const curve = curveBetween(a.point, a.normal, hand, new THREE.Vector3(0, 1, 0), []);
     this.preview = new THREE.Mesh(
       new THREE.TubeGeometry(curve, 64, CABLE_STYLE[type].radius, 8, false),
       new THREE.MeshStandardMaterial({ color: CABLE_STYLE[type].colour, emissive: '#38bdf8', emissiveIntensity: 0.35, transparent: true, opacity: 0.85 }),

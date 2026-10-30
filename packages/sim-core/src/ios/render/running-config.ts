@@ -108,6 +108,17 @@ export function renderConfigBody(profile: DeviceProfile, config: DeviceConfig): 
   for (const s of nat.statics) out.push(`ip nat inside source static ${s.local} ${s.global}`);
   if (nat.pools.length + nat.rules.length + nat.statics.length > 0) out.push('!');
 
+  const { dhcp } = config;
+  for (const r of dhcp.excluded) out.push(`ip dhcp excluded-address ${r.from}${r.to === r.from ? '' : ` ${r.to}`}`);
+  if (dhcp.excluded.length > 0) out.push('!');
+  for (const p of dhcp.pools) {
+    out.push(`ip dhcp pool ${p.name}`);
+    if (p.network) out.push(` network ${p.network} ${p.mask}`);
+    if (p.router) out.push(` default-router ${p.router}`);
+    if (p.dns) out.push(` dns-server ${p.dns}`);
+    out.push('!');
+  }
+
   const numbered = config.acls.filter((a) => !a.named);
   for (const acl of numbered) {
     for (const e of acl.entries) out.push(`access-list ${acl.name} ${e.action ? formatConfigEntry(acl.kind, e) : `remark ${e.remark}`}`);

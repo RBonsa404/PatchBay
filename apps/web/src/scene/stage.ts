@@ -18,10 +18,11 @@ const easeInOut = (t: number): number => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t 
 
 /** A guess good enough to start with; the player can change it from the HUD. */
 export function detectQuality(): Quality {
-  const cores = navigator.hardwareConcurrency ?? 4;
-  const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 4;
+  // The reference machine has 8 GB: everything is on by default. Only a really small machine starts lower.
+  const cores = navigator.hardwareConcurrency ?? 8;
+  const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8;
   if (cores <= 2 || memory <= 2) return 'low';
-  if (cores <= 4 || memory <= 4) return 'medium';
+  if (cores <= 3 || memory <= 4) return 'medium';
   return 'high';
 }
 
@@ -45,9 +46,10 @@ export class Stage {
   private quality: Quality;
   private flightId = 0;
   private rigZ = 0;
+  private rigY = 0;
   private zoomFactor = 1;
   /** Lights that cost too much on modest machines. */
-  private readonly extraLights: THREE.Light[] = [];
+  private readonly extraLights: THREE.SpotLight[] = [];
   private readonly accents: THREE.Light[] = [];
   private readonly frontKey: THREE.SpotLight;
   private readonly ao: GTAOPass;
@@ -90,13 +92,13 @@ export class Stage {
     this.key = new THREE.SpotLight('#ffe9cf', 15, 0, 0.82, 0.85, 1.6);
     this.key.position.set(0.4, 2.95, 0.6);
     this.key.target.position.set(0, 0.8, -0.1);
-    this.key.shadow.mapSize.set(2048, 2048);
+    this.key.shadow.mapSize.set(4096, 4096);
     this.key.shadow.bias = -0.0004;
     this.key.shadow.normalBias = 0.02;
     this.frontKey = new THREE.SpotLight('#f1f5ff', 9, 0, 0.95, 1, 1.6);
     this.frontKey.position.set(0.4, 2.95, 2.4);
     this.frontKey.target.position.set(0.1, 0, 1.3);
-    this.frontKey.shadow.mapSize.set(1024, 1024);
+    this.frontKey.shadow.mapSize.set(2048, 2048);
     this.frontKey.shadow.bias = -0.0005;
     this.frontKey.shadow.normalBias = 0.03;
     this.scene.add(this.key, this.key.target, this.frontKey, this.frontKey.target);
@@ -126,7 +128,7 @@ export class Stage {
     // Ambient occlusion: the soft darkening where objects meet, which anchors them in the room.
     this.ao = new GTAOPass(this.scene, this.camera, 1, 1);
     this.ao.blendIntensity = 0.85;
-    this.ao.updateGtaoMaterial({ radius: 0.22, distanceExponent: 1.4, thickness: 1, scale: 1.1, samples: 12, distanceFallOff: 1, screenSpaceRadius: false });
+    this.ao.updateGtaoMaterial({ radius: 0.22, distanceExponent: 1.4, thickness: 1, scale: 1.1, samples: 16, distanceFallOff: 1, screenSpaceRadius: false });
     this.composer.addPass(this.ao);
     // High threshold: only LEDs, screens and ceiling panels glow, not the lit walls.
     this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.4, 0.35, 0.97);
@@ -152,13 +154,15 @@ export class Stage {
     this.renderer.setPixelRatio(q === 'low' ? 1 : Math.min(window.devicePixelRatio, q === 'high' ? 2 : 1.5));
     this.renderer.shadowMap.enabled = q !== 'low';
     this.key.castShadow = q !== 'low';
-    this.frontKey.castShadow = q === 'high';
-    this.key.shadow.mapSize.set(q === 'high' ? 2048 : 1024, q === 'high' ? 2048 : 1024);
+    this.frontKey.castShadow = q !== 'low';
+    this.key.shadow.mapSize.set(q === 'high' ? 4096 : 2048, q === 'high' ? 4096 : 2048);
+    this.key.shadow.map?.dispose();
+    this.key.shadow.map = null;
     this.bloom.enabled = q !== 'low';
-    this.ao.enabled = q === 'high';
+    this.ao.enabled = q !== 'low';
     this.vignette.enabled = q !== 'low';
     for (const light of this.extraLights) light.visible = q !== 'low';
-    for (const light of this.accents) light.visible = q === 'high';
+    for (const light of this.accents) light.visible = q !== 'low';
     this.scene.traverse((o) => {
       const m = (o as THREE.Mesh).material as THREE.Material | undefined;
       if (m) m.needsUpdate = true;
@@ -199,15 +203,18 @@ export class Stage {
     this.applyFov();
   }
 
-  /** Move the ceiling lights over the room at `z`: only the occupied room is really lit. */
-  setRigZ(z: number): void {
-    if (z === this.rigZ) return;
-    const delta = z - this.rigZ;
+  /** Move the ceiling lights over the room at this height and depth: only the occupied room is fully lit. */
+  setRig(y: number, z: number): void {
+    if (y === this.rigY && z === this.rigZ) return;
+    const [dy, dz] = [y - this.rigY, z - this.rigZ];
+    this.rigY = y;
     this.rigZ = z;
     // The coloured glows belong to the technical room's machines: they stay there.
     for (const light of [this.key, this.frontKey, ...this.extraLights]) {
-      light.position.z += delta;
-      (light as THREE.SpotLight).target?.position.setZ((light as THREE.SpotLight).target.position.z + delta);
+      light.position.y += dy;
+      light.position.z += dz;
+      light.target.position.y += dy;
+      light.target.position.z += dz;
     }
   }
 

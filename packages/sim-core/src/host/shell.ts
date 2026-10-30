@@ -18,6 +18,8 @@ const NOT_RECOGNISED = (cmd: string): string =>
 const HELP = [
   'Commandes disponibles :',
   '  ipconfig [/all]      Affiche la configuration IP de la carte réseau',
+  '  ipconfig /renew      Demande une adresse au serveur DHCP',
+  '  ipconfig /release    Rend l’adresse au serveur DHCP',
   '  ping [-n N] <IP>     Teste la connectivité vers une adresse',
   '  tracert <IP>         Affiche les routeurs traversés jusqu’à une adresse',
   '  arp -a               Affiche la table ARP (adresses IP et MAC connues)',
@@ -42,10 +44,11 @@ function ipconfig(net: Network, deviceId: string, all: boolean): string {
     return lines.join('\n');
   }
   lines.push('   Suffixe DNS propre à la connexion. . . :');
-  if (all && nic) lines.push(`   Adresse physique . . . . . . . . . . . : ${dashed(net.macOf(deviceId, nic.name))}`, '   DHCP activé. . . . . . . . . . . . . . : Non');
+  if (all && nic) lines.push(`   Adresse physique . . . . . . . . . . . : ${dashed(net.macOf(deviceId, nic.name))}`, `   DHCP activé. . . . . . . . . . . . . . : ${host.dhcp ? 'Oui' : 'Non'}`);
   if (host.ip) lines.push(`   Adresse IPv4. . . . . . . . . . . . . .: ${host.ip}`);
   if (host.mask) lines.push(`   Masque de sous-réseau. . . . . . . . . : ${host.mask}`);
   lines.push(`   Passerelle par défaut. . . . . . . . . : ${host.gateway ?? ''}`);
+  if (all && host.dns) lines.push(`   Serveurs DNS. . . . . . . . . . . . . .: ${host.dns}`);
   return lines.join('\n');
 }
 
@@ -112,6 +115,14 @@ export function runHostCommand(net: Network, deviceId: string, line: string): Sh
       return { output: deviceId };
     case 'ipconfig':
       if (args.length === 0 || args[0] === '/all') return { output: ipconfig(net, deviceId, args[0] === '/all') };
+      if (args[0] === '/renew') {
+        if (net.dhcpRenew(deviceId)) return { output: ipconfig(net, deviceId, false) };
+        return { output: 'Une erreur s’est produite lors du renouvellement de l’interface Ethernet :\nimpossible de contacter votre serveur DHCP. La demande a expiré.' };
+      }
+      if (args[0] === '/release') {
+        net.dhcpRelease(deviceId);
+        return { output: ipconfig(net, deviceId, false) };
+      }
       return { output: 'Erreur : option non reconnue. Utilisez ipconfig ou ipconfig /all.' };
     case 'ping': {
       let count = 4;

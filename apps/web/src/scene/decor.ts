@@ -16,9 +16,8 @@ const M = {
   paintedGrey: lit('#94a3b8', 0.65, 0.2),
   white: lit('#e8ebef', 0.7),
   trunking: lit('#d6dae0', 0.6),
-  cardboard: lit('#a9805a', 0.95),
-  cardboardDark: lit('#8f6a48', 0.95),
-  tape: lit('#d9c79e', 0.5),
+  crate: lit('#334155', 0.6, 0.1),
+  crateLid: lit('#1d4ed8', 0.55, 0.1),
   black: lit('#0e1116', 0.7, 0.2),
   plastic: lit('#20262f', 0.45),
   wood: lit('#b08a5e', 0.7),
@@ -64,21 +63,6 @@ function sign(w: number, h: number, background: string, color: string, lines: st
   return new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: texture, roughness: 0.75 }));
 }
 
-/** A closed cardboard box with its strip of tape; a `label` is printed on the front (+z). */
-function carton(w: number, h: number, d: number, x: number, y: number, z: number, turn = 0, label?: string): THREE.Group {
-  const g = new THREE.Group();
-  g.add(box(w, h, d, turn % 2 ? M.cardboardDark : M.cardboard, 0, h / 2, 0));
-  g.add(box(w + 0.001, 0.003, 0.05, M.tape, 0, h + 0.001, 0, false));
-  if (label) {
-    const tag = sign(Math.min(w * 0.6, 0.2), 0.06, '#f8fafc', '#0b1e3f', [label]);
-    tag.position.set(0, h * 0.6, d / 2 + 0.002);
-    g.add(tag);
-  }
-  g.position.set(x, y, z);
-  g.rotation.y = turn * 0.07;
-  return g;
-}
-
 /** A spool of cable lying on its side. */
 function spool(colour: string, x: number, y: number, z: number): THREE.Group {
   const g = new THREE.Group();
@@ -104,7 +88,19 @@ function coil(colour: string, x: number, y: number): THREE.Group {
   return g;
 }
 
-/** Steel shelving along the left wall, loaded with stock: cartons, spools and spare gear. */
+/** A labelled storage crate: all the same size and lined up, as in a kept stockroom. */
+function crate(x: number, y: number, z: number, label: string, w = 0.36, h = 0.26, d = 0.5): THREE.Group {
+  const g = new THREE.Group();
+  g.add(box(w, h, d, M.crate, 0, h / 2, 0), box(w + 0.012, 0.018, d + 0.012, M.crateLid, 0, h, 0));
+  const tag = sign(0.26, 0.09, '#f8fafc', '#0b1e3f', [label]);
+  tag.rotation.y = Math.PI / 2;
+  tag.position.set(w / 2 + 0.002, h * 0.55, 0);
+  g.add(tag);
+  g.position.set(x, y, z);
+  return g;
+}
+
+/** Steel shelving along the left wall: labelled crates in straight rows, spools and spare switches in their place. */
 function shelving(): THREE.Group {
   const g = new THREE.Group();
   const [x, z0, z1, depth] = [-3.24, 0.15, 2.05, 0.46];
@@ -114,23 +110,14 @@ function shelving(): THREE.Group {
   }
   for (const y of levels) g.add(box(depth, 0.025, z1 - z0, M.paintedGrey, x, y, (z0 + z1) / 2));
   const on = (level: number): number => (levels[level] as number) + 0.0125;
-  g.add(
-    carton(0.36, 0.3, 0.42, x, on(0), 0.42, 0, 'RJ45 CAT6'),
-    carton(0.36, 0.26, 0.36, x + 0.01, on(0), 0.95, 1),
-    carton(0.34, 0.34, 0.44, x, on(0), 1.5, 2, 'PATCH 2 m'),
-    spool('#2563eb', x, on(1), 0.42),
-    spool('#f59e0b', x, on(1), 0.8),
-    spool('#94a3b8', x, on(1), 1.18),
-    carton(0.34, 0.28, 0.42, x, on(1), 1.68, 3, 'SFP'),
-    carton(0.34, 0.22, 0.34, x, on(2), 0.42, 4, 'CONSOLE'),
-    carton(0.34, 0.32, 0.4, x, on(2), 1.02, 1),
-    carton(0.3, 0.2, 0.3, x, on(3), 1.5, 2),
-    carton(0.34, 0.36, 0.5, x, on(3), 0.55, 3, 'ARCHIVES'),
-  );
-  // Spare switches stacked on the shelf: dark 1U boxes with a row of ports.
+  const rows = [0.48, 1.1, 1.72];
+  const stock = [['RJ45 CAT6', 'PATCH 1 m', 'PATCH 2 m'], [], ['CONSOLE', 'SÉRIE V.35', 'SFP'], ['ÉTIQUETTES', 'COLLIERS', 'VIS DE BAIE']];
+  stock.forEach((labels, level) => labels.forEach((label, i) => g.add(crate(x, on(level), rows[i] as number, label))));
+  // Cable spools on the second shelf, and a spare switch on top of each other at the end of it.
+  g.add(spool('#2563eb', x, on(1), 0.48), spool('#f59e0b', x, on(1), 1.1));
   for (let i = 0; i < 3; i++) {
-    g.add(box(0.33, 0.044, 0.44, M.darkSteel, x, on(2) + 0.024 + i * 0.047, 1.62));
-    for (let k = 0; k < 8; k++) g.add(box(0.002, 0.014, 0.018, M.black, x + 0.166, on(2) + 0.024 + i * 0.047, 1.48 + k * 0.04, false));
+    g.add(box(0.33, 0.044, 0.44, M.darkSteel, x, on(1) + 0.024 + i * 0.047, 1.72));
+    for (let k = 0; k < 8; k++) g.add(box(0.002, 0.014, 0.018, M.black, x + 0.166, on(1) + 0.024 + i * 0.047, 1.58 + k * 0.04, false));
   }
   const shadow = contactShadow(depth + 0.3, z1 - z0 + 0.3, 0.55);
   shadow.position.set(x, 0.003, (z0 + z1) / 2);
@@ -265,7 +252,8 @@ function walls(): THREE.Group {
   g.add(box(0.46, 0.03, 1.28, M.wood, 3.25, 0.865, 2.6));
   g.add(box(0.004, 0.75, 0.003, M.black, 3.031, 0.42, 2.6, false));
   for (const dz of [-0.06, 0.06]) g.add(box(0.016, 0.12, 0.016, M.steel, 3.025, 0.5, 2.6 + dz, false));
-  g.add(carton(0.3, 0.16, 0.26, 3.25, 0.88, 2.25, 1), box(0.22, 0.12, 0.3, M.red, 3.25, 0.94, 2.9));
+  // Two identical tool cases, squared up on the cupboard.
+  for (const dz of [-0.28, 0.28]) g.add(box(0.26, 0.13, 0.42, M.red, 3.25, 0.945, 2.6 + dz), box(0.03, 0.02, 0.14, M.steel, 3.25, 1.02, 2.6 + dz, false));
   const cupboardShadow = contactShadow(0.8, 1.6, 0.5);
   cupboardShadow.position.set(3.2, 0.003, 2.6);
   g.add(cupboardShadow);
@@ -310,49 +298,26 @@ function walls(): THREE.Group {
   return g;
 }
 
-/** Things standing on the floor: cartons, a tool trolley, a bin, a stepladder, safety tape, and the bench's lower shelf. */
+/** The floor stays clear: only the safety tape, a bin beside the desk, and tidy crates on the bench's lower shelf. */
 function floor(): THREE.Group {
   const g = new THREE.Group();
-
-  // Cartons awaiting unpacking, near the door end of the room.
-  g.add(carton(0.52, 0.4, 0.42, -2.55, 0, 1.0, 1, 'CISCO 2911'), carton(0.46, 0.36, 0.4, -2.58, 0.4, 1.02, 2, 'CAT 2960'), carton(0.44, 0.3, 0.38, -2.5, 0, 1.55, 3));
-  const stackShadow = contactShadow(0.9, 1.2, 0.5);
-  stackShadow.position.set(-2.53, 0.003, 1.28);
-  g.add(stackShadow);
-
-  // Tool trolley to the right of the bench.
-  const [tx, tz] = [2.2, 0.75];
-  for (const dx of [-0.26, 0.26]) {
-    for (const dz of [-0.18, 0.18]) {
-      g.add(box(0.022, 0.8, 0.022, M.steel, tx + dx, 0.47, tz + dz), cylinder(0.035, 0.03, M.black, tx + dx, 0.035, tz + dz, 'x'));
-    }
-  }
-  for (const y of [0.22, 0.5, 0.86]) g.add(box(0.56, 0.02, 0.4, M.blue, tx, y, tz));
-  g.add(box(0.36, 0.14, 0.2, M.red, tx - 0.05, 0.94, tz), box(0.14, 0.018, 0.018, M.steel, tx - 0.05, 1.03, tz, false), box(0.17, 0.1, 0.14, M.amber, tx - 0.05, 0.56, tz), spool('#2563eb', tx + 0.15, 0.23, tz));
-  const trolleyShadow = contactShadow(0.85, 0.7, 0.5);
-  trolleyShadow.position.set(tx, 0.003, tz);
-  g.add(trolleyShadow);
-
-  // Bin, and a small stepladder folded against the wall.
   const bin = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.12, 0.38, 20), M.darkSteel);
   bin.position.set(0.25, 0.19, 3.3);
   bin.castShadow = true;
   const binShadow = contactShadow(0.5, 0.5, 0.5);
   binShadow.position.set(0.25, 0.003, 3.3);
   g.add(bin, binShadow);
-  const ladder = new THREE.Group();
-  for (const dx of [-0.2, 0.2]) ladder.add(box(0.035, 1.8, 0.018, M.amber, dx, 0.9, 0));
-  for (let i = 0; i < 5; i++) ladder.add(box(0.4, 0.02, 0.06, M.steel, 0, 0.32 + i * 0.32, 0.01));
-  ladder.position.set(1.95, 0.002, -1.5);
-  ladder.rotation.x = -0.05;
-  g.add(ladder);
 
-  // Yellow and black floor tape marking the clearance in front of the cabinets.
+  // Yellow floor tape marking the clearance in front of the cabinets.
   const tape = lit('#eab308', 0.7);
   g.add(box(0.05, 0.002, 2.2, tape, 2.6, 0.003, 0.62, false), box(0.05, 0.002, 1.1, tape, 2.2, 0.003, -1.05, false));
 
-  // The bench's lower shelf: cartons and spools, as in any lab.
-  g.add(carton(0.4, 0.26, 0.34, -1.05, 0.17, 0.25, 1), carton(0.3, 0.22, 0.3, -0.6, 0.17, 0.3, 2, 'CÂBLES'), spool('#f59e0b', 0.0, 0.17, 0.3), spool('#2563eb', 0.35, 0.17, 0.3));
+  // The bench's lower shelf: three crates in a row, labels to the front.
+  ['OUTILLAGE', 'TESTEURS', 'CORDONS'].forEach((label, i) => {
+    const c = crate(-1.15 + i * 0.68, 0.17, 0.3, label, 0.5, 0.24, 0.42);
+    c.rotation.y = -Math.PI / 2;
+    g.add(c);
+  });
   return g;
 }
 

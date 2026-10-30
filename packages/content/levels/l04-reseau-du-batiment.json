@@ -1,0 +1,147 @@
+{
+  "id": "l04-reseau-du-batiment",
+  "version": 1,
+  "title": { "fr": "Le réseau du bâtiment", "en": "The building's network" },
+  "story": {
+    "fr": "L'administration du premier étage rejoint notre réseau, et plus personne ne veut régler son adresse à la main. Le câblage du bâtiment arrive sur les panneaux de brassage de chaque baie : à toi de brasser, de séparer enseignants, étudiants et administration, et de distribuer les adresses par DHCP. C'est le travail d'un vrai technicien : prends l'escalier, et garde ton plan à portée de main.",
+    "en": "The first-floor administration joins our network, and nobody wants to set addresses by hand any more. The building's cabling ends on each rack's patch panels: patch it, separate staff, students and administration, and hand out addresses by DHCP. It is a real technician's job: take the stairs, and keep your plan at hand."
+  },
+  "brief": {
+    "fr": "Rez-de-chaussée, salle technique : R1, S1, ADMIN, panneau PP-TECH. Salle de TP : S2, ADMIN2, PC2, PC3, panneau PP-TP. Étage, administration : S3, ADMIN3, PC4, PC5, panneau PP-ADM.\n1. Brassage (câbles droits, ports à auto-MDIX) : Gi0/2 de S1 sur le port 1 de PP-TECH et Gi0/2 de S2 sur le port 1 de PP-TP ; Fa0/24 de S1 sur le port 2 de PP-TECH et Gi0/2 de S3 sur le port 1 de PP-ADM. Relie aussi Gi0/1 de S1 à Gi0/0 de R1.\n2. PC : PC2 sur Fa0/1 de S2, PC3 sur Fa0/2 de S2, PC4 sur Fa0/1 de S3, PC5 sur Fa0/2 de S3.\n3. VLAN sur les trois switches : 10 (enseignants : PC2 et PC4), 20 (étudiants : PC3), 30 (administration : PC5). Passe en trunk toutes les liaisons entre switches et vers R1.\n4. R1 : sous-interfaces Gi0/0.10 en 192.168.10.1/24, Gi0/0.20 en 192.168.20.1/24, Gi0/0.30 en 192.168.30.1/24. Un pool DHCP par VLAN, avec sa passerelle, et les dix premières adresses de chaque réseau exclues.\n5. Sur chaque PC : ipconfig /renew. Vérifie que PC2 joint PC4, que PC3 joint PC5, puis sauvegarde R1, S1, S2 et S3.",
+    "en": "Ground floor, technical room: R1, S1, ADMIN, panel PP-TECH. Lab room: S2, ADMIN2, PC2, PC3, panel PP-TP. First floor, administration: S3, ADMIN3, PC4, PC5, panel PP-ADM.\n1. Patching (straight cables, auto-MDIX ports): S1 Gi0/2 to PP-TECH port 1 and S2 Gi0/2 to PP-TP port 1; S1 Fa0/24 to PP-TECH port 2 and S3 Gi0/2 to PP-ADM port 1. Also cable S1 Gi0/1 to R1 Gi0/0.\n2. PCs: PC2 to S2 Fa0/1, PC3 to S2 Fa0/2, PC4 to S3 Fa0/1, PC5 to S3 Fa0/2.\n3. VLANs on the three switches: 10 (staff: PC2 and PC4), 20 (students: PC3), 30 (administration: PC5). Make every link between switches and to R1 a trunk.\n4. R1: subinterfaces Gi0/0.10 192.168.10.1/24, Gi0/0.20 192.168.20.1/24, Gi0/0.30 192.168.30.1/24. One DHCP pool per VLAN with its gateway, and the first ten addresses of each network excluded.\n5. On each PC: ipconfig /renew. Check that PC2 reaches PC4 and PC3 reaches PC5, then save R1, S1, S2 and S3."
+  },
+  "difficulty": 4,
+  "timeLimit": 2700,
+  "settings": { "strictMdix": false },
+  "devices": [
+    { "id": "ADMIN", "model": "pc", "label": { "fr": "Portable de la salle technique", "en": "Technical room laptop" }, "position": [-0.8, 0.76, 0.25] },
+    { "id": "S1", "model": "catalyst-2960", "label": { "fr": "Switch de cœur", "en": "Core switch" }, "position": [0, 1.2, -0.4] },
+    { "id": "R1", "model": "cisco-2911", "label": { "fr": "Routeur", "en": "Router" }, "position": [0, 0.9, -0.4] },
+    { "id": "S2", "model": "catalyst-2960", "label": { "fr": "Switch de la salle de TP", "en": "Lab room switch" }, "position": [0, 1.05, -0.4], "room": "annexe" },
+    { "id": "ADMIN2", "model": "pc", "label": { "fr": "Portable de la salle de TP", "en": "Lab room laptop" }, "position": [-0.2, 0.76, 0.35], "room": "annexe" },
+    { "id": "PC2", "model": "pc", "label": { "fr": "PC enseignant", "en": "Staff PC" }, "position": [-1.15, 0.76, 0.25], "room": "annexe" },
+    { "id": "PC3", "model": "pc", "label": { "fr": "PC étudiant", "en": "Student PC" }, "position": [0.95, 0.76, 0.25], "room": "annexe" },
+    { "id": "S3", "model": "catalyst-2960", "label": { "fr": "Switch de l'étage", "en": "First-floor switch" }, "position": [0, 1.05, -0.4], "room": "etage" },
+    { "id": "ADMIN3", "model": "pc", "label": { "fr": "Portable de l'administration", "en": "Administration laptop" }, "position": [-0.2, 0.76, 0.35], "room": "etage" },
+    { "id": "PC4", "model": "pc", "label": { "fr": "PC enseignant de l'étage", "en": "First-floor staff PC" }, "position": [-1.15, 0.76, 0.25], "room": "etage" },
+    { "id": "PC5", "model": "pc", "label": { "fr": "PC de l'administration", "en": "Administration PC" }, "position": [0.95, 0.76, 0.25], "room": "etage" }
+  ],
+  "panels": [
+    { "id": "PP-TECH" },
+    { "id": "PP-TP", "room": "annexe" },
+    { "id": "PP-ADM", "room": "etage" }
+  ],
+  "patchLinks": [
+    { "a": "PP-TECH:P1", "b": "PP-TP:P1", "label": { "fr": "vers la salle de TP", "en": "to the lab room" } },
+    { "a": "PP-TECH:P2", "b": "PP-ADM:P1", "label": { "fr": "vers l'étage", "en": "to the first floor" } }
+  ],
+  "inventory": { "cables": { "straight": 10, "crossover": 2, "console": 3 } },
+  "initial": {
+    "cables": [],
+    "hosts": { "PC2": { "dhcp": true }, "PC3": { "dhcp": true }, "PC4": { "dhcp": true }, "PC5": { "dhcp": true } },
+    "commands": {
+      "R1": ["enable", "configure terminal", "hostname R1", "end"],
+      "S1": ["enable", "configure terminal", "hostname S1", "end"],
+      "S2": ["enable", "configure terminal", "hostname S2", "end"],
+      "S3": ["enable", "configure terminal", "hostname S3", "end"]
+    }
+  },
+  "objectives": [
+    { "id": "link-tp", "type": "link-up", "device": "S2", "port": "GigabitEthernet0/2", "points": 6,
+      "label": { "fr": "S1 et S2 reliés par le brassage", "en": "S1 and S2 linked through the patch panels" },
+      "hint": { "fr": "Un cordon de chaque côté du lien : Gi0/2 de S1 sur le port 1 de PP-TECH, Gi0/2 de S2 sur le port 1 de PP-TP.", "en": "One cord on each side of the link: S1 Gi0/2 to PP-TECH port 1, S2 Gi0/2 to PP-TP port 1." } },
+    { "id": "link-adm", "type": "link-up", "device": "S3", "port": "GigabitEthernet0/2", "points": 6,
+      "label": { "fr": "S1 et S3 reliés par le brassage", "en": "S1 and S3 linked through the patch panels" },
+      "hint": { "fr": "Fa0/24 de S1 sur le port 2 de PP-TECH, puis monte à l'étage : Gi0/2 de S3 sur le port 1 de PP-ADM.", "en": "S1 Fa0/24 to PP-TECH port 2, then go upstairs: S3 Gi0/2 to PP-ADM port 1." } },
+    { "id": "cable-router", "type": "cable", "points": 3, "cable": { "type": "straight", "a": "S1:GigabitEthernet0/1", "b": "R1:GigabitEthernet0/0" },
+      "label": { "fr": "S1 (Gi0/1) relié à R1 (Gi0/0)", "en": "S1 (Gi0/1) cabled to R1 (Gi0/0)" },
+      "hint": { "fr": "Switch et routeur : câble droit.", "en": "Switch to router: straight cable." } },
+    { "id": "cable-pcs", "type": "cable", "points": 3, "cable": { "type": "straight", "a": "PC5:FastEthernet0", "b": "S3:FastEthernet0/2" },
+      "label": { "fr": "PC5 relié à S3 (Fa0/2), à l'étage", "en": "PC5 cabled to S3 (Fa0/2), upstairs" },
+      "hint": { "fr": "L'escalier est au bout du couloir, à droite.", "en": "The stairs are at the end of the corridor, on the right." } },
+    { "id": "vlan-pc2", "type": "config", "device": "S2", "points": 5, "check": { "kind": "access-vlan", "interface": "FastEthernet0/1", "vlan": 10 },
+      "label": { "fr": "S2 : Fa0/1 dans le VLAN 10", "en": "S2: Fa0/1 in VLAN 10" },
+      "hint": { "fr": "switchport mode access, switchport access vlan 10.", "en": "switchport mode access, switchport access vlan 10." } },
+    { "id": "vlan-pc3", "type": "config", "device": "S2", "points": 5, "check": { "kind": "access-vlan", "interface": "FastEthernet0/2", "vlan": 20 },
+      "label": { "fr": "S2 : Fa0/2 dans le VLAN 20", "en": "S2: Fa0/2 in VLAN 20" } },
+    { "id": "vlan-pc4", "type": "config", "device": "S3", "points": 5, "check": { "kind": "access-vlan", "interface": "FastEthernet0/1", "vlan": 10 },
+      "label": { "fr": "S3 : Fa0/1 dans le VLAN 10", "en": "S3: Fa0/1 in VLAN 10" } },
+    { "id": "vlan-pc5", "type": "config", "device": "S3", "points": 5, "check": { "kind": "access-vlan", "interface": "FastEthernet0/2", "vlan": 30 },
+      "label": { "fr": "S3 : Fa0/2 dans le VLAN 30", "en": "S3: Fa0/2 in VLAN 30" } },
+    { "id": "trunks-core", "type": "config", "device": "S1", "points": 6, "check": { "kind": "trunk", "interface": "FastEthernet0/24" },
+      "label": { "fr": "S1 : trunk vers l'étage (Fa0/24)", "en": "S1: trunk to the first floor (Fa0/24)" },
+      "hint": { "fr": "Toutes les liaisons entre switches et vers R1 doivent être en trunk, aux deux bouts.", "en": "Every link between switches and to R1 must be a trunk, at both ends." } },
+    { "id": "sub30", "type": "config", "device": "R1", "points": 6, "check": { "kind": "interface-ip", "interface": "GigabitEthernet0/0.30", "ip": "192.168.30.1", "mask": "255.255.255.0" },
+      "label": { "fr": "R1 : Gi0/0.30 en 192.168.30.1/24", "en": "R1: Gi0/0.30 is 192.168.30.1/24" },
+      "hint": { "fr": "interface g0/0.30, encapsulation dot1q 30, ip address…", "en": "interface g0/0.30, encapsulation dot1q 30, ip address…" } },
+    { "id": "lease-pc2", "type": "dhcp-lease", "device": "PC2", "network": "192.168.10.0", "mask": "255.255.255.0", "points": 6,
+      "label": { "fr": "PC2 a reçu une adresse du VLAN 10 par DHCP", "en": "PC2 got a VLAN 10 address by DHCP" },
+      "hint": { "fr": "ip dhcp pool ENSEIGNANTS, network 192.168.10.0 255.255.255.0, default-router 192.168.10.1. Puis ipconfig /renew sur le PC.", "en": "ip dhcp pool STAFF, network 192.168.10.0 255.255.255.0, default-router 192.168.10.1. Then ipconfig /renew on the PC." } },
+    { "id": "lease-pc3", "type": "dhcp-lease", "device": "PC3", "network": "192.168.20.0", "mask": "255.255.255.0", "points": 6,
+      "label": { "fr": "PC3 a reçu une adresse du VLAN 20 par DHCP", "en": "PC3 got a VLAN 20 address by DHCP" },
+      "hint": { "fr": "Un pool par VLAN. Si le PC n'obtient rien : le trunk, ou la sous-interface.", "en": "One pool per VLAN. If the PC gets nothing: the trunk, or the subinterface." } },
+    { "id": "lease-pc4", "type": "dhcp-lease", "device": "PC4", "network": "192.168.10.0", "mask": "255.255.255.0", "points": 6,
+      "label": { "fr": "PC4 a reçu une adresse du VLAN 10 par DHCP", "en": "PC4 got a VLAN 10 address by DHCP" } },
+    { "id": "lease-pc5", "type": "dhcp-lease", "device": "PC5", "network": "192.168.30.0", "mask": "255.255.255.0", "points": 6,
+      "label": { "fr": "PC5 a reçu une adresse du VLAN 30 par DHCP", "en": "PC5 got a VLAN 30 address by DHCP" } },
+    { "id": "ping-same", "type": "ping", "from": "PC2", "to": "192.168.10.11", "toHost": "PC4", "expect": "success", "points": 9,
+      "label": { "fr": "PC2 joint PC4 entre les étages (même VLAN)", "en": "PC2 reaches PC4 between floors (same VLAN)" },
+      "hint": { "fr": "ipconfig sur PC4 donne l'adresse à joindre ; show ip dhcp binding sur R1 montre qui a reçu quoi.", "en": "ipconfig on PC4 gives the address to reach; show ip dhcp binding on R1 shows who got what." } },
+    { "id": "ping-inter", "type": "ping", "from": "PC3", "to": "192.168.30.11", "toHost": "PC5", "expect": "success", "points": 9,
+      "label": { "fr": "PC3 joint PC5 par le routeur", "en": "PC3 reaches PC5 through the router" },
+      "hint": { "fr": "Vérifie les passerelles reçues avec ipconfig.", "en": "Check the gateways received with ipconfig." } },
+    { "id": "saved-r1", "type": "saved", "device": "R1", "points": 3, "label": { "fr": "R1 sauvegardé", "en": "R1 saved" } },
+    { "id": "saved-s1", "type": "saved", "device": "S1", "points": 2, "label": { "fr": "S1 sauvegardé", "en": "S1 saved" } },
+    { "id": "saved-s2", "type": "saved", "device": "S2", "points": 2, "label": { "fr": "S2 sauvegardé", "en": "S2 saved" } },
+    { "id": "saved-s3", "type": "saved", "device": "S3", "points": 1, "label": { "fr": "S3 sauvegardé", "en": "S3 saved" } }
+  ],
+  "hints": [
+    { "afterSeconds": 180, "text": { "fr": "Commence par le câblage de chaque salle et le brassage, puis les switches, enfin le routeur et le DHCP.", "en": "Start with each room's cabling and the patching, then the switches, finally the router and DHCP." } },
+    { "afterSeconds": 900, "text": { "fr": "show ip dhcp binding sur R1 montre qui a reçu quoi.", "en": "show ip dhcp binding on R1 shows who got what." } }
+  ],
+  "solution": {
+    "cables": [
+      { "type": "straight", "a": "S1:GigabitEthernet0/2", "b": "S2:GigabitEthernet0/2" },
+      { "type": "straight", "a": "S1:FastEthernet0/24", "b": "S3:GigabitEthernet0/2" },
+      { "type": "straight", "a": "S1:GigabitEthernet0/1", "b": "R1:GigabitEthernet0/0" },
+      { "type": "straight", "a": "PC2:FastEthernet0", "b": "S2:FastEthernet0/1" },
+      { "type": "straight", "a": "PC3:FastEthernet0", "b": "S2:FastEthernet0/2" },
+      { "type": "straight", "a": "PC4:FastEthernet0", "b": "S3:FastEthernet0/1" },
+      { "type": "straight", "a": "PC5:FastEthernet0", "b": "S3:FastEthernet0/2" }
+    ],
+    "commands": {
+      "S1": [
+        "configure terminal", "vlan 10", "vlan 20", "vlan 30", "exit",
+        "interface g0/1", "switchport mode trunk", "interface g0/2", "switchport mode trunk", "interface fa0/24", "switchport mode trunk",
+        "end", "copy running-config startup-config", ""
+      ],
+      "S2": [
+        "configure terminal", "vlan 10", "vlan 20", "vlan 30", "exit",
+        "interface fa0/1", "switchport mode access", "switchport access vlan 10",
+        "interface fa0/2", "switchport mode access", "switchport access vlan 20",
+        "interface g0/2", "switchport mode trunk",
+        "end", "copy running-config startup-config", ""
+      ],
+      "S3": [
+        "configure terminal", "vlan 10", "vlan 20", "vlan 30", "exit",
+        "interface fa0/1", "switchport mode access", "switchport access vlan 10",
+        "interface fa0/2", "switchport mode access", "switchport access vlan 30",
+        "interface g0/2", "switchport mode trunk",
+        "end", "copy running-config startup-config", ""
+      ],
+      "R1": [
+        "configure terminal", "interface g0/0", "no shutdown",
+        "interface g0/0.10", "encapsulation dot1q 10", "ip address 192.168.10.1 255.255.255.0",
+        "interface g0/0.20", "encapsulation dot1q 20", "ip address 192.168.20.1 255.255.255.0",
+        "interface g0/0.30", "encapsulation dot1q 30", "ip address 192.168.30.1 255.255.255.0",
+        "exit",
+        "ip dhcp excluded-address 192.168.10.1 192.168.10.10", "ip dhcp excluded-address 192.168.20.1 192.168.20.10", "ip dhcp excluded-address 192.168.30.1 192.168.30.10",
+        "ip dhcp pool ENSEIGNANTS", "network 192.168.10.0 255.255.255.0", "default-router 192.168.10.1", "exit",
+        "ip dhcp pool ETUDIANTS", "network 192.168.20.0 255.255.255.0", "default-router 192.168.20.1", "exit",
+        "ip dhcp pool ADMINISTRATION", "network 192.168.30.0 255.255.255.0", "default-router 192.168.30.1",
+        "end", "copy running-config startup-config", ""
+      ]
+    },
+    "renew": ["PC4", "PC2", "PC3", "PC5"]
+  }
+}

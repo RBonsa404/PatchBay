@@ -22,6 +22,9 @@ export interface PortView {
   mouth: THREE.Object3D;
 }
 
+/** Height of a patch panel's bottom in the rack. */
+const PANEL_Y = 1.285;
+
 export type DeviceShape = 'router' | 'switch' | 'pc' | 'laptop' | 'server';
 
 export interface DeviceView {
@@ -39,6 +42,7 @@ export interface DeviceView {
   inRack: boolean;
   /** Where its room is along z (0 for the technical room). */
   roomZ: number;
+  roomY: number;
 }
 
 const SOCKET: Record<string, [w: number, h: number]> = {
@@ -334,11 +338,11 @@ function buildLaptop(id: string, model: DeviceModel, m: Materials, view: DeviceV
 }
 
 /** Build the 3D model of a device from its catalog entry. `caption` is shown on screens (PCs, laptops). */
-export function buildDevice(id: string, model: DeviceModel, position: [number, number, number] | undefined, caption: string, roomZ = 0): DeviceView {
+export function buildDevice(id: string, model: DeviceModel, position: [number, number, number] | undefined, caption: string, roomZ = 0, roomY = 0): DeviceView {
   const m = materials();
   const shape: DeviceShape =
     model.kind === 'router' ? 'router' : model.kind === 'switch' ? 'switch' : model.kind === 'server' ? 'server' : id.toUpperCase().startsWith('ADMIN') ? 'laptop' : 'pc';
-  const view: DeviceView = { id, shape, root: new THREE.Group(), ports: new Map(), body: [], height: 0.1, width: 0.4, depth: 0.3, inRack: false, roomZ: 0 };
+  const view: DeviceView = { id, shape, root: new THREE.Group(), ports: new Map(), body: [], height: 0.1, width: 0.4, depth: 0.3, inRack: false, roomZ: 0, roomY: 0 };
   view.root.name = id;
 
   if (shape === 'router') buildRouter(id, model, m, view);
@@ -361,8 +365,9 @@ export function buildDevice(id: string, model: DeviceModel, position: [number, n
     shadow.position.y = 0.0012 - lift;
     view.root.add(shadow);
   }
-  view.root.position.set(x, inRack ? y : BENCH_TOP + lift, (inRack ? RACK.frontZ - view.depth / 2 : z) + roomZ);
+  view.root.position.set(x, (inRack ? y : BENCH_TOP + lift) + roomY, (inRack ? RACK.frontZ - view.depth / 2 : z) + roomZ);
   view.roomZ = roomZ;
+  view.roomY = roomY;
   for (const b of view.body) b.userData.device = id;
   // What stays still on a device is merged; what is clicked or lights up stays separate. Pick boxes are never drawn.
   for (const b of view.body) b.userData.dynamic = true;
@@ -377,8 +382,42 @@ export function buildDevice(id: string, model: DeviceModel, position: [number, n
 }
 
 /** Bottom and top of each device mounted in the rack, for the fillers to close the units around them. */
-export function rackOccupied(views: DeviceView[], roomZ = 0): [number, number][] {
-  return views.filter((v) => v.inRack && v.roomZ === roomZ).map((v) => [v.root.position.y, v.root.position.y + v.height]);
+export function rackOccupied(views: DeviceView[], roomZ = 0, roomY = 0): [number, number][] {
+  return views.filter((v) => v.inRack && v.roomZ === roomZ && v.roomY === roomY).map((v) => [v.root.position.y - roomY, v.root.position.y - roomY + v.height]);
+}
+
+/** A 1U patch panel just under the rack's own: numbered sockets, where the building's fixed cabling arrives. */
+export function buildPatchPanel(id: string, ports: { name: string; label: string }[], roomZ = 0, roomY = 0): DeviceView {
+  const m = materials();
+  const [w, h, d] = [0.445, 0.044, 0.05];
+  const view: DeviceView = { id, shape: 'switch', root: new THREE.Group(), ports: new Map(), body: [], height: h, width: w, depth: d, inRack: true, roomZ, roomY };
+  view.root.name = id;
+  const chassis = mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color: '#0f141c', metalness: 0.6, roughness: 0.45 }));
+  chassis.position.y = h / 2;
+  view.root.add(chassis);
+  view.body.push(chassis);
+  addRackEars(view.root, w, h, d);
+  const face = d / 2 + 0.001;
+  label(view.root, id, -w / 2 + 0.04, h / 2, face, 0.06, 0.012, '#fbbf24');
+  ports.forEach((p, i) => {
+    const x = -w / 2 + 0.1 + i * 0.05;
+    const spec: PortSpec = { name: p.name, kind: 'ethernet' };
+    view.ports.set(p.name, addSocket(view.root, m, id, spec, x, h / 2 + 0.005, face, 'none'));
+    label(view.root, String(i + 1), x, h / 2 - 0.012, face, 0.012, 0.007, '#e2e8f0');
+    if (p.label) label(view.root, p.label, x + 0.02, h / 2 + 0.019, face, 0.05, 0.005, '#94a3b8');
+  });
+  view.root.position.set(0, PANEL_Y + roomY, RACK.frontZ - d / 2 + roomZ);
+  for (const b of view.body) {
+    b.userData.device = id;
+    b.userData.dynamic = true;
+  }
+  for (const port of view.ports.values()) {
+    port.hit.visible = false;
+    port.hit.userData.dynamic = true;
+    port.socket.userData.dynamic = true;
+  }
+  bake(view.root);
+  return view;
 }
 
 const LED_COLOURS: Record<LedState, [string, number]> = { off: ['#1f2937', 0], green: ['#10b981', 4], amber: ['#fbbf24', 3.5] };

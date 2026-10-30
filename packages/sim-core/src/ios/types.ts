@@ -12,6 +12,7 @@ export type CliMode =
   | 'config-line'
   | 'config-vlan'
   | 'config-router'
+  | 'dhcp-config'
   | 'config-std-nacl'
   | 'config-ext-nacl';
 
@@ -23,6 +24,7 @@ export const SUB_CONFIG_MODES: readonly CliMode[] = [
   'config-line',
   'config-vlan',
   'config-router',
+  'dhcp-config',
   'config-std-nacl',
   'config-ext-nacl',
 ];
@@ -38,6 +40,8 @@ export interface Selection {
   acl?: string;
   /** Line ids (see LineConfig.id) in config-line. */
   lines?: string[];
+  /** The DHCP pool being configured in dhcp-config. */
+  dhcpPool?: string;
 }
 
 /** An input request: the next line the user types goes to `handler` instead of the command parser. */

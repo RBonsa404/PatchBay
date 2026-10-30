@@ -24,7 +24,19 @@ const RACK_FREE = { from: 0.07 + RACK_UNIT * 3, to: 1.335 } as const;
 const ROOM = { width: 7, back: -1.6, front: 3.6, height: 3 } as const;
 
 /** The building around the technical room: a corridor behind its back wall, and the lab room across it. */
-export const BUILDING = { annexZ: -7, corridor: { back: -3.4, front: -1.6 }, door: { x: -2.95, width: 0.92, height: 2.05 } } as const;
+export const BUILDING = {
+  annexZ: -7,
+  floorY: 3.3,
+  corridor: { back: -3.4, front: -1.6 },
+  door: { x: -2.95, width: 0.92, height: 2.05 },
+  /** Two flights side by side, from x = 4.5 to the landing, split along z. */
+  stairs: { flightEnd: 7, landingEnd: 8, split: -2.5, back: -3.4, front: -1.6, rise: 3.3 },
+} as const;
+
+/** Where the room containing a world position starts: everything in a room is laid out as in the technical room. */
+export function roomOrigin(y: number, z: number): { y: number; z: number } {
+  return { y: y > BUILDING.floorY - 0.1 ? BUILDING.floorY : 0, z: z < BUILDING.corridor.back ? BUILDING.annexZ : 0 };
+}
 
 let paintMaterial: THREE.Material | null = null;
 
@@ -68,24 +80,6 @@ export function doorWall(g: THREE.Object3D, width: number, z: number, ry: number
   const head = box(doorW + 0.08, 0.04, 0.06, frame);
   head.position.set(doorX, doorH + 0.02, z);
   g.add(head);
-}
-
-/** A ladder cable tray running along z, carrying the link between the racks. */
-export function zTray(x: number, z0: number, z1: number): THREE.Group {
-  const g = new THREE.Group();
-  const yellow = steel('#eab308', 0.45, 0.5);
-  const y = 2.5;
-  for (const side of [-1, 1]) {
-    const rail = box(0.008, 0.04, z1 - z0, yellow, false);
-    rail.position.set(x + side * 0.09, y, (z0 + z1) / 2);
-    g.add(rail);
-  }
-  for (let z = z0 + 0.1; z < z1; z += 0.3) {
-    const rung = box(0.18, 0.01, 0.02, yellow, false);
-    rung.position.set(x, y - 0.018, z);
-    g.add(rung);
-  }
-  return g;
 }
 
 let mainDoor: THREE.Group | null = null;
@@ -307,9 +301,9 @@ function rack(): THREE.Group {
  * Closes the rack's free units around the gear of a level (`occupied`: bottom and top of each device, in metres), as
  * in a real rack: blanking panels, vented panels, horizontal cable managers and a fibre drawer. Nothing stays empty.
  */
-export function rackFillers(occupied: [number, number][], z = 0): THREE.Group {
+export function rackFillers(occupied: [number, number][], z = 0, y = 0): THREE.Group {
   const g = new THREE.Group();
-  g.position.z = z;
+  g.position.set(0, y, z);
   const { x, frontZ } = RACK;
   const blank = steel('#1b2028', 0.55, 0.5);
   const dark = new THREE.MeshBasicMaterial({ color: '#05070a' });

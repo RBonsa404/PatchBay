@@ -87,7 +87,7 @@ export function powerButton(parent: THREE.Object3D, x: number, y: number, z: num
  * The mission plan, drawn on a whiteboard like a trainer's sketch: the devices and the links to make (no cable
  * types: choosing them is part of the exercise).
  */
-export function buildWhiteboard(level: Level, roomZ = 0): THREE.Group {
+export function buildWhiteboard(level: Level, roomZ = 0, roomY = 0): THREE.Group {
   const group = new THREE.Group();
   const W = 1280;
   const H = 860;
@@ -110,7 +110,9 @@ export function buildWhiteboard(level: Level, roomZ = 0): THREE.Group {
   // Lay the devices out like the room: rack gear on the top row, desk gear below, ordered left to right. A mission
   // across rooms gets one half of the board per room.
   const place = new Map<string, [number, number]>();
-  const split = level.devices.some((d) => d.room);
+  const rooms = [undefined, 'annexe', 'etage'].filter((r) => level.devices.some((d) => d.room === r));
+  const split = rooms.length > 1;
+  const NAMES: Record<string, string> = { '': 'Salle technique', annexe: 'Salle de TP', etage: 'Étage · Administration' };
   const lay = (list: typeof level.devices, x0: number, x1: number): void => {
     const row = (items: typeof level.devices, y: number): void => {
       const sorted = [...items].sort((a, b) => (a.position?.[0] ?? 0) - (b.position?.[0] ?? 0));
@@ -119,24 +121,23 @@ export function buildWhiteboard(level: Level, roomZ = 0): THREE.Group {
     row(list.filter((d) => d.model !== 'pc' && d.model !== 'server'), 330);
     row(list.filter((d) => d.model === 'pc' || d.model === 'server'), 650);
   };
-  if (split) {
-    lay(level.devices.filter((d) => !d.room), 0, W / 2);
-    lay(level.devices.filter((d) => d.room), W / 2, W);
+  rooms.forEach((room, i) => {
+    const [x0, x1] = [(i * W) / rooms.length, ((i + 1) * W) / rooms.length];
+    lay(level.devices.filter((d) => d.room === room), x0, x1);
+    if (!split) return;
+    g.fillStyle = '#475569';
+    g.font = '600 24px Inter, sans-serif';
+    g.fillText(NAMES[room ?? ''] as string, x0 + 26, 190);
+    if (i === 0) return;
     g.strokeStyle = '#94a3b8';
     g.lineWidth = 3;
     g.setLineDash([12, 12]);
     g.beginPath();
-    g.moveTo(W / 2, 150);
-    g.lineTo(W / 2, H - 40);
+    g.moveTo(x0, 150);
+    g.lineTo(x0, H - 40);
     g.stroke();
     g.setLineDash([]);
-    g.fillStyle = '#475569';
-    g.font = '600 26px Inter, sans-serif';
-    g.fillText('Salle technique', 50, 190);
-    g.fillText('Salle de TP', W / 2 + 30, 190);
-  } else {
-    lay(level.devices, 0, W);
-  }
+  });
 
   g.lineWidth = 6;
   g.lineCap = 'round';
@@ -161,7 +162,7 @@ export function buildWhiteboard(level: Level, roomZ = 0): THREE.Group {
     g.fillText(short(bp), a[0] + (b[0] - a[0]) * 0.7 - 40, a[1] + (b[1] - a[1]) * 0.7 - 12);
   }
 
-  const boxHalf = split ? 66 : 90;
+  const boxHalf = rooms.length > 2 ? 54 : split ? 66 : 90;
   for (const d of level.devices) {
     const p = place.get(d.id);
     if (!p) continue;
@@ -176,7 +177,7 @@ export function buildWhiteboard(level: Level, roomZ = 0): THREE.Group {
     g.fill();
     g.stroke();
     g.fillStyle = '#0f172a';
-    g.font = split ? '700 26px Poppins, sans-serif' : '700 34px Poppins, sans-serif';
+    g.font = rooms.length > 2 ? '700 21px Poppins, sans-serif' : split ? '700 26px Poppins, sans-serif' : '700 34px Poppins, sans-serif';
     g.textAlign = 'center';
     g.fillText(d.id, p[0], p[1] + 12);
     g.textAlign = 'left';
@@ -193,6 +194,6 @@ export function buildWhiteboard(level: Level, roomZ = 0): THREE.Group {
   board.userData.whiteboard = true;
   frame.userData.whiteboard = true;
   group.add(frame, board, tray);
-  group.position.set(-1.75, 1.62, -1.57 + roomZ);
+  group.position.set(-1.75, 1.62 + roomY, -1.57 + roomZ);
   return group;
 }

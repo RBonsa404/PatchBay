@@ -6,7 +6,7 @@ const resultOf = (net: Network, level: Level, id: string) => evaluate(net, level
 
 describe('MVP campaign', () => {
   it('has its levels in order', () => {
-    expect(campaign.map((l) => l.id)).toEqual(['l01-cablage-console', 'l02-relier-deux-reseaux', 'l03-deux-salles-vlan']);
+    expect(campaign.map((l) => l.id)).toEqual(['l01-cablage-console', 'l02-relier-deux-reseaux', 'l03-deux-salles-vlan', 'l04-reseau-du-batiment']);
   });
 
   for (const level of campaign) {
@@ -132,5 +132,30 @@ describe('level 3: two rooms, two VLANs', () => {
     applySolution(net, { ...level, solution: { ...level.solution, commands: { ...level.solution.commands, S2: s2 } } });
     expect(resultOf(net, level, 'trunk-s2').passed).toBe(false);
     expect(resultOf(net, level, 'ping-same').passed).toBe(false);
+  });
+});
+
+describe('level 4: the building', () => {
+  const level = campaign[3]!;
+
+  it('needs the DHCP pools for the PCs to get an address', () => {
+    const net = buildLevel(level);
+    const r1 = level.solution.commands.R1!.filter((c) => !/dhcp|^network|default-router/.test(c));
+    applySolution(net, { ...level, solution: { ...level.solution, commands: { ...level.solution.commands, R1: r1 } } });
+    expect(resultOf(net, level, 'lease-pc2').passed).toBe(false);
+    expect(resultOf(net, level, 'ping-same').passed).toBe(false);
+  });
+
+  it('gives a PC in the wrong VLAN an address from the wrong pool', () => {
+    const net = buildLevel(level);
+    const s3 = level.solution.commands.S3!.map((c) => c.replace('access vlan 30', 'access vlan 10'));
+    applySolution(net, { ...level, solution: { ...level.solution, commands: { ...level.solution.commands, S3: s3 } } });
+    expect(resultOf(net, level, 'lease-pc5').passed).toBe(false);
+    expect(net.device('PC5').host?.ip?.startsWith('192.168.10.')).toBe(true);
+  });
+
+  it('has patch links between panels that exist', () => {
+    const ids = level.panels!.map((p) => p.id);
+    for (const link of level.patchLinks!) for (const end of [link.a, link.b]) expect(ids).toContain(end.split(':')[0]);
   });
 });
