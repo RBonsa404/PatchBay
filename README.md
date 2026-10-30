@@ -148,7 +148,7 @@ PatchBay/
 ├── packages/
 │   ├── sim-core/       le moteur de simulation et ses tests
 │   └── content/        les missions et leur schéma
-├── functions/        l'API d'Aïcha (Cloudflare Pages Functions), facultative
+├── functions/        l'API d'Aïcha (Cloudflare Workers ou Pages), facultative
 ├── docs/               vision, spécifications, décisions, captures
 └── .github/workflows/  intégration continue
 ```

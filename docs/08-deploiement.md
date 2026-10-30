@@ -9,6 +9,8 @@ Durée : une dizaine de minutes.
 - Le dépôt https://github.com/RBonsa404/PatchBay à jour.
 - Un compte Cloudflare gratuit : https://dash.cloudflare.com/sign-up.
 
+> **Si Cloudflare a créé un Worker** (ton journal de construction montre `npx wrangler deploy`), tout est prévu : le dépôt contient `wrangler.jsonc`. Garde la commande de construction `npm run build -w @patchbay/web` et la commande de déploiement `npx wrangler deploy`. Le nom du Worker doit être `patchbay`, comme dans `wrangler.jsonc` ; sinon, change ce nom dans le fichier pour qu'il corresponde. L'adresse sera du type `https://patchbay.<ton-compte>.workers.dev`. Pour Aïcha, la clé se met dans **Settings**, **Variables and Secrets** du Worker, en type **Secret**, et non dans les variables de construction. Les étapes ci-dessous concernent un projet Pages.
+
 ## Étape 1 : créer le projet
 
 1. Connecte-toi sur https://dash.cloudflare.com.
