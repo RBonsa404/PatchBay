@@ -22,6 +22,8 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const request = event.request;
   if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) return;
+  // Music streams by ranges, which the cache refuses; offline, the game falls back on its generated piece.
+  if (request.headers.has('range') || new URL(request.url).pathname.includes('/music/')) return;
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)

@@ -30,6 +30,8 @@ const ZOOM_MAX = 4.5;
 /** Where the eyes go to read the whiteboard (see `buildWhiteboard`). */
 const BOARD_CENTRE = new THREE.Vector3(-1.75, 1.62, -1.56);
 const BOARD_VIEW = new THREE.Vector3(-1.75, 1.62, -0.5);
+/** How long it takes to walk in from the door when a mission starts. */
+const ENTRANCE_SECONDS = 3.4;
 const ACCEPTS: Record<CableType, PortSpec['kind'][]> = {
   straight: ['ethernet'],
   crossover: ['ethernet'],
@@ -116,7 +118,7 @@ export class Mission {
     stage.level.add(this.cables.group, whiteboard, rackFillers(rackOccupied([...this.devices.values()])));
     stage.controls.enabled = false;
     stage.manualCamera = true;
-    this.overview(1.4);
+    this.enter();
     this.cleanup.push(stage.onFrame((dt) => this.walk(dt)));
 
     this.consoles = new Consoles(this.net, () => this.afterChange(), (action) => this.recordTraffic(action));
@@ -289,6 +291,7 @@ export class Mission {
         if (this.anchor) this.overview(0.7);
       }
       if (e.code === 'KeyT' && !typing) this.toggleBoard();
+      if (e.code === 'KeyN' && !typing) sound.nextTrack();
       if (e.code === 'KeyM' && !typing) this.hud.toast(t(sound.toggleMusic() ? 'music.on' : 'music.off'));
       // 1-4 pick a cable from the inventory (not while typing in a console).
       const slot = /^[1-4]$/.test(e.key) && !(e.target instanceof HTMLInputElement) ? CABLE_ORDER.filter((type) => this.level.inventory.cables[type] !== undefined)[Number(e.key) - 1] : undefined;
@@ -469,6 +472,44 @@ export class Mission {
       this.flying = false;
       this.following = true;
     });
+  }
+
+  /** The player comes in through the door and walks round the bench to their place. Walking cuts it short. */
+  private enter(): void {
+    const id = ++this.flight;
+    const eye = this.player.eye;
+    const path = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-2.95, 1.62, -1.35),
+      new THREE.Vector3(-2.35, 1.62, -0.45),
+      new THREE.Vector3(-1.95, 1.62, 0.6),
+      new THREE.Vector3(-1.1, 1.62, 1.2),
+      eye,
+    ]);
+    const ahead = new THREE.Vector3();
+    const end = eye.clone().add(this.player.look);
+    this.following = false;
+    this.flying = true;
+    this.stage.stopFlight();
+    this.stage.camera.position.copy(path.getPoint(0));
+    this.stage.controls.target.copy(path.getPoint(0.12));
+    let steps = 0;
+    void this.stage
+      .animate(ENTRANCE_SECONDS, (t) => {
+        if (id !== this.flight) return;
+        const p = path.getPoint(t);
+        this.stage.camera.position.copy(p);
+        path.getPoint(Math.min(1, t + 0.15), ahead);
+        this.stage.controls.target.lerpVectors(ahead, end, THREE.MathUtils.smoothstep(t, 0.55, 1));
+        if (Math.floor(t * 9) > steps) {
+          steps = Math.floor(t * 9);
+          sound.play('step');
+        }
+      })
+      .then(() => {
+        if (id !== this.flight) return;
+        this.flying = false;
+        this.following = true;
+      });
   }
 
   /** Walk up to the whiteboard's schema, from anywhere in the room; again to come back. */

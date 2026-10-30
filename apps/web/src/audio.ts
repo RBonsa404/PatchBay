@@ -3,7 +3,8 @@
  * track. The context starts on the first user gesture (browsers require it).
  *
  * Three levels, mixed through a limiter: effects (the player's actions), the room (mains hum and occasional
- * machine noises) and the music (an original generative loop, quieter during a mission).
+ * machine noises) and the music: a shuffled playlist of free tracks (`public/music`, see ASSETS.md) with an original
+ * generative piece among them, quieter during a mission.
  */
 export type SoundName = 'plug' | 'unplug' | 'error' | 'objective' | 'success' | 'click' | 'packet' | 'step';
 export type Mood = 'menu' | 'mission';
@@ -13,6 +14,15 @@ const MUSIC_KEY = 'patchbay.music';
 const MASTER = 0.9;
 const MUSIC_LEVEL: Record<Mood, number> = { menu: 1.2, mission: 1.0 };
 const ROOM_LEVEL: Record<Mood, number> = { menu: 0.6, mission: 1.2 };
+
+/** The MP3s in `public/music`, all normalised to the same loudness. */
+const TRACKS = ['calm-ambient-1', 'calm-ambient-2', 'calm-ambient-3', 'calm-relax-1', 'emotional-5', 'claimed-by-the-void', 'contemplation'];
+const SYNTH = 'synth';
+/** Level of the MP3s, so that they match the generative piece. */
+const TRACK_LEVEL = 0.85;
+const FADE = 2.5;
+/** Bars of the generative piece before moving on. */
+const SYNTH_BARS = 40;
 
 const BEAT = 60 / 84;
 const midi = (n: number): number => 440 * 2 ** ((n - 69) / 12);
@@ -57,6 +67,11 @@ class Sound {
   private nextBar = 0;
   private bar = 0;
   private nextNoise = 0;
+  private queue: string[] = [];
+  private playing = SYNTH;
+  private player: HTMLAudioElement | null = null;
+  private playerGain: GainNode | null = null;
+  private synthEnds = 0;
 
   constructor() {
     const unlock = (): void => {
@@ -68,8 +83,13 @@ class Sound {
     window.addEventListener('keydown', unlock);
     // Silence in a background tab.
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden) void this.ctx?.suspend();
-      else void this.ctx?.resume();
+      if (document.hidden) {
+        void this.ctx?.suspend();
+        this.player?.pause();
+      } else {
+        void this.ctx?.resume();
+        if (this.musicOn) void this.player?.play().catch(() => undefined);
+      }
     });
   }
 
@@ -89,7 +109,75 @@ class Sound {
     this.musicOn = !this.musicOn;
     write(MUSIC_KEY, this.musicOn ? '1' : '0');
     this.applyMood();
+    if (this.musicOn) void this.player?.play().catch(() => undefined);
+    else this.player?.pause();
     return this.musicOn;
+  }
+
+  /** Skip to the next piece of the playlist. */
+  nextTrack(): void {
+    if (this.ctx && this.musicOn) this.startNext();
+  }
+
+  /** The track playing now (for automated checks). */
+  get track(): string {
+    return this.playing;
+  }
+
+  /** Stop the current piece with a fade, and start the next one in the shuffled order. */
+  private startNext(): void {
+    const ctx = this.ctx as AudioContext;
+    this.fadeOutPlayer();
+    if (this.queue.length === 0) {
+      const all = [...TRACKS, SYNTH];
+      for (let i = all.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [all[i], all[j]] = [all[j] as string, all[i] as string];
+      }
+      // Never the same piece twice in a row.
+      if (all[0] === this.playing) all.push(all.shift() as string);
+      this.queue = all;
+    }
+    const next = this.queue.shift() as string;
+    this.playing = next;
+    if (next === SYNTH) {
+      this.nextBar = ctx.currentTime + 0.2;
+      this.bar = 0;
+      this.synthEnds = SYNTH_BARS;
+      return;
+    }
+    this.synthEnds = 0;
+    const audio = new Audio(`${import.meta.env.BASE_URL}music/${next}.mp3`);
+    audio.preload = 'auto';
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(TRACK_LEVEL, ctx.currentTime + FADE);
+    ctx.createMediaElementSource(audio).connect(gain).connect(this.music as GainNode);
+    const skip = (): void => {
+      if (this.player === audio) this.startNext();
+    };
+    audio.addEventListener('ended', skip);
+    // A track that cannot load (offline, say) is skipped; the generative piece needs no file.
+    audio.addEventListener('error', () => {
+      if (this.player !== audio) return;
+      this.queue = this.queue.filter((t) => t === SYNTH);
+      this.startNext();
+    });
+    this.player = audio;
+    this.playerGain = gain;
+    if (this.musicOn) void audio.play().catch(() => undefined);
+  }
+
+  private fadeOutPlayer(): void {
+    const ctx = this.ctx as AudioContext;
+    const audio = this.player;
+    const gain = this.playerGain;
+    this.player = null;
+    this.playerGain = null;
+    if (!audio || !gain) return;
+    gain.gain.cancelScheduledValues(ctx.currentTime);
+    gain.gain.setTargetAtTime(0, ctx.currentTime, FADE / 4);
+    setTimeout(() => audio.pause(), FADE * 1000);
   }
 
   /** The menus let the music forward; a mission brings the room forward. */
@@ -150,8 +238,8 @@ class Sound {
     this.buildEffects();
     this.startRoom();
     this.applyMood();
-    this.nextBar = ctx.currentTime + 0.2;
     this.nextNoise = ctx.currentTime + 4;
+    this.startNext();
     // Notes are scheduled ahead of time: timers are slowed down in the background and when the game is busy.
     setInterval(() => this.schedule(), 250);
     this.schedule();
@@ -204,7 +292,11 @@ class Sound {
   /** Queue the music's next bars and the room's next noise. */
   private schedule(): void {
     const ctx = this.ctx as AudioContext;
-    while (this.nextBar < ctx.currentTime + 1.5) {
+    while (this.playing === SYNTH && this.nextBar < ctx.currentTime + 1.5) {
+      if (this.bar >= this.synthEnds) {
+        this.startNext();
+        break;
+      }
       if (this.musicOn) this.playBar(this.bar, this.nextBar);
       this.nextBar += BEAT * 4;
       this.bar++;

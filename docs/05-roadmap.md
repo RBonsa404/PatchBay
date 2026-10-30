@@ -120,7 +120,9 @@ Retours du porteur de projet après la première version jouable (à traiter qua
 - ✔ **Son** (2026-10-30, `audio.ts`) : musique générative originale, ronronnement discret et bruits de machines, pas sur le plancher ; M coupe la musique.
 - ✔ **Lumière** (2026-10-30, `scene/stage.ts`) : ambiance réduite, projecteurs par dalle, deux lumières à ombres, occlusion ambiante (qualité haute), vignette, lueurs des machines.
 - ✔ **Décor** (2026-10-30, `scene/decor.ts`) : rayonnages, rangée de baies, bureau, fenêtre, tableau électrique, panneau d'outils, affichages, cartons, desserte, goulottes, gaine de ventilation.
-- Animation d'entrée dans la salle.
+- ✔ **Entrée dans la salle** (2026-10-30) : le joueur entre par la porte et contourne l'établi ; marcher coupe l'animation.
+- ✔ **Musique** (2026-10-30) : 7 morceaux CC0 (`public/music`, `ASSETS.md`) et le morceau généré, en liste aléatoire avec fondus ; N : morceau suivant, M : couper. Hors ligne, seul le morceau généré joue.
+- Aïcha en 3D : essai fait avec le mannequin féminin CC0 de Quaternius, rejeté (combinaison sans visage, peu flatteur). Il faut un personnage habillé avec un visage (piste : Universal Base Characters de Quaternius, à télécharger sur itch.io).
 - Vérifier sur un vrai Chrome : installation PWA et hors ligne, manette réelle.
 
 Autres points :
