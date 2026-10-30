@@ -5,8 +5,8 @@ import { campaign, parseLevel } from '../src/index.js';
 const resultOf = (net: Network, level: Level, id: string) => evaluate(net, level.objectives).results.find((r) => r.id === id)!;
 
 describe('MVP campaign', () => {
-  it('has the two levels decided for the MVP, in order', () => {
-    expect(campaign.map((l) => l.id)).toEqual(['l01-cablage-console', 'l02-relier-deux-reseaux']);
+  it('has its levels in order', () => {
+    expect(campaign.map((l) => l.id)).toEqual(['l01-cablage-console', 'l02-relier-deux-reseaux', 'l03-deux-salles-vlan']);
   });
 
   for (const level of campaign) {
@@ -113,5 +113,24 @@ describe('parseLevel', () => {
     (broken.initial as { hosts: Record<string, { ip: string }> }).hosts.PC1!.ip = '192.168.1.300';
     broken.secret = true;
     expect(() => parseLevel(broken)).toThrow(/adresse IPv4 attendue[\s\S]*secret|secret[\s\S]*adresse IPv4 attendue/);
+  });
+});
+
+describe('level 3: two rooms, two VLANs', () => {
+  const level = campaign[2]!;
+
+  it('needs the router for the two VLANs to talk', () => {
+    const net = buildLevel(level);
+    applySolution(net, { ...level, solution: { ...level.solution, commands: { S1: level.solution.commands.S1!, S2: level.solution.commands.S2! } } });
+    expect(resultOf(net, level, 'ping-same').passed).toBe(true);
+    expect(resultOf(net, level, 'ping-inter').passed).toBe(false);
+  });
+
+  it('needs the trunk at both ends between the rooms', () => {
+    const net = buildLevel(level);
+    const s2 = level.solution.commands.S2!.filter((c) => !/^interface g0\/2|mode trunk/.test(c));
+    applySolution(net, { ...level, solution: { ...level.solution, commands: { ...level.solution.commands, S2: s2 } } });
+    expect(resultOf(net, level, 'trunk-s2').passed).toBe(false);
+    expect(resultOf(net, level, 'ping-same').passed).toBe(false);
   });
 });

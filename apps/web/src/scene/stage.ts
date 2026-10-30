@@ -44,6 +44,7 @@ export class Stage {
   private readonly frameHandlers = new Set<(dt: number, time: number) => void>();
   private quality: Quality;
   private flightId = 0;
+  private rigZ = 0;
   private zoomFactor = 1;
   /** Lights that cost too much on modest machines. */
   private readonly extraLights: THREE.Light[] = [];
@@ -196,6 +197,18 @@ export class Stage {
     if (Math.abs(factor - this.zoomFactor) < 0.0005) return;
     this.zoomFactor = factor;
     this.applyFov();
+  }
+
+  /** Move the ceiling lights over the room at `z`: only the occupied room is really lit. */
+  setRigZ(z: number): void {
+    if (z === this.rigZ) return;
+    const delta = z - this.rigZ;
+    this.rigZ = z;
+    // The coloured glows belong to the technical room's machines: they stay there.
+    for (const light of [this.key, this.frontKey, ...this.extraLights]) {
+      light.position.z += delta;
+      (light as THREE.SpotLight).target?.position.setZ((light as THREE.SpotLight).target.position.z + delta);
+    }
   }
 
   /** Cancel the camera flight in progress: it stays where it is. */

@@ -298,8 +298,10 @@ function walls(): THREE.Group {
   const esd = sign(0.26, 0.17, '#1d4ed8', '#ffffff', ['ZONE ESD', 'BRACELET OBLIGATOIRE']);
   esd.position.set(0.72, 1.62, back + 0.002);
   const reserved = sign(0.3, 0.12, '#0b1e3f', '#fbbf24', ['ACCÈS RÉSERVÉ']);
-  reserved.position.set(-2.95, 1.62, back + 0.048);
-  g.add(esd, reserved);
+  reserved.position.set(0.46, 1.62, 0.022);
+  g.add(esd);
+  // The sign rides on the door's leaf: added once the room is assembled.
+  g.userData.doorSign = reserved;
 
   // Ceiling: an air duct with its grilles, a smoke detector.
   g.add(box(4.8, 0.26, 0.42, M.paintedGrey, -0.4, 2.86, 3.15));

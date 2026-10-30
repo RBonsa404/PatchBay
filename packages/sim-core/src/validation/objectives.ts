@@ -12,7 +12,9 @@ export type ConfigCheck =
   | { kind: 'console-login' }
   | { kind: 'vty-login' }
   | { kind: 'interface-ip'; interface: string; ip: string; mask: string }
-  | { kind: 'clock-rate'; interface: string };
+  | { kind: 'clock-rate'; interface: string }
+  | { kind: 'access-vlan'; interface: string; vlan: number }
+  | { kind: 'trunk'; interface: string };
 
 interface Base {
   id: string;
@@ -109,6 +111,10 @@ function check(net: Network, o: Objective): Omit<ObjectiveResult, 'id' | 'points
           }
           case 'clock-rate':
             return config.interfaces.find((i) => i.name === c.interface)?.clockRate !== undefined;
+          case 'access-vlan':
+            return config.interfaces.find((i) => i.name === c.interface)?.switchport?.accessVlan === c.vlan;
+          case 'trunk':
+            return config.interfaces.find((i) => i.name === c.interface)?.switchport?.mode === 'trunk';
         }
       })();
       return has ? ok : fail('missing-config');

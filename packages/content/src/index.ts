@@ -1,6 +1,7 @@
 import type { Level } from '../../sim-core/src/index.js';
 import level01 from '../levels/l01-cablage-console.json';
 import level02 from '../levels/l02-relier-deux-reseaux.json';
+import level03 from '../levels/l03-deux-salles-vlan.json';
 import { levelSchema } from './schema.js';
 
 export { levelSchema } from './schema.js';
@@ -16,4 +17,4 @@ export function parseLevel(data: unknown): Level {
 }
 
 /** The MVP campaign, in play order. */
-export const campaign: Level[] = [level01, level02].map(parseLevel);
+export const campaign: Level[] = [level01, level02, level03].map(parseLevel);

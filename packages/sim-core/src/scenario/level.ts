@@ -22,6 +22,8 @@ export interface LevelDevice {
   label?: Text;
   /** Where the 3D scene places it (metres). Optional: the engine does not care. */
   position?: [number, number, number];
+  /** The other room of the building; the position is then relative to it. */
+  room?: 'annexe';
 }
 
 /**

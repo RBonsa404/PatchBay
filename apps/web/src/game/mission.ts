@@ -8,7 +8,8 @@ import { setGameTarget, type GameTarget } from './gamepad.js';
 import { CableLayer, portFrame } from '../scene/cables.js';
 import { buildDevice, highlightSocket, rackOccupied, setLed, type DeviceView, type PortView } from '../scene/devices.js';
 import { buildWhiteboard } from '../scene/details.js';
-import { rackFillers } from '../scene/room.js';
+import { buildAnnex } from '../scene/annex.js';
+import { BUILDING, rackFillers, setMainDoorOpen } from '../scene/room.js';
 import type { Quality, Stage } from '../scene/stage.js';
 import { AskAicha } from '../ui/askAicha.js';
 import { CABLE_ORDER, Hud } from '../ui/hud.js';
@@ -29,9 +30,11 @@ const LOOK_SPEED = 0.0032;
 /** Zoom of the eyes: slightly wide at rest (a person's view), up to a close look at the ports. */
 const ZOOM_REST = 0.82;
 const ZOOM_MAX = 4.5;
-/** Where the eyes go to read the whiteboard (see `buildWhiteboard`). */
+/** Where the eyes go to read the whiteboard (see `buildWhiteboard`), in a room's own coordinates. */
 const BOARD_CENTRE = new THREE.Vector3(-1.75, 1.62, -1.56);
 const BOARD_VIEW = new THREE.Vector3(-1.75, 1.62, -0.5);
+/** Which part of the building a position along z is in. */
+const zoneOf = (z: number): 'room' | 'corridor' | 'lab' => (z > BUILDING.corridor.front ? 'room' : z < BUILDING.corridor.back ? 'lab' : 'corridor');
 /** How long it takes to walk in from the door when a mission starts. */
 const ENTRANCE_SECONDS = 3.4;
 /** Time allowed when a level does not say, and the share of it left in an exam. */
@@ -101,6 +104,9 @@ export class Mission {
   /** After a zoom on a device: where the head stays until the player walks away. */
   private anchor: THREE.Vector3 | null = null;
   private zoom = ZOOM_REST;
+  private building = false;
+  private lastZone: string | null = null;
+  private boardView: THREE.Vector3 | null = null;
   private readonly limit: number;
   private remaining: number;
   /** The clock starts once the player has walked in. */
@@ -124,7 +130,7 @@ export class Mission {
     for (const d of level.devices) {
       const host = this.net.device(d.id).host;
       const caption = host?.ip ? `${d.id} · ${host.ip}` : d.id;
-      const view = buildDevice(d.id, catalog[d.model]!, d.position, caption);
+      const view = buildDevice(d.id, catalog[d.model]!, d.position, caption, d.room ? BUILDING.annexZ : 0);
       this.devices.set(d.id, view);
       stage.level.add(view.root);
       this.picks.push(...view.body, ...[...view.ports.values()].map((p) => p.hit));
@@ -139,6 +145,16 @@ export class Mission {
     const whiteboard = buildWhiteboard(level);
     this.picks.push(...whiteboard.children.filter((o) => o.userData.whiteboard));
     stage.level.add(this.cables.group, whiteboard, rackFillers(rackOccupied([...this.devices.values()])));
+    // A mission across rooms opens the door at the back of the technical room.
+    this.building = level.devices.some((d) => d.room);
+    setMainDoorOpen(this.building);
+    stage.setRigZ(0);
+    if (this.building) {
+      this.player.enterBuilding();
+      const labBoard = buildWhiteboard(level, BUILDING.annexZ);
+      this.picks.push(...labBoard.children.filter((o) => o.userData.whiteboard));
+      stage.level.add(buildAnnex(), labBoard, rackFillers(rackOccupied([...this.devices.values()], BUILDING.annexZ), BUILDING.annexZ));
+    }
     stage.controls.enabled = false;
     stage.manualCamera = true;
     this.enter();
@@ -205,6 +221,8 @@ export class Mission {
     closePanel();
     this.stage.manualCamera = false;
     this.stage.zoom = 1;
+    this.stage.setRigZ(0);
+    setMainDoorOpen(false);
     this.stage.clearLevel();
   }
 
@@ -354,6 +372,8 @@ export class Mission {
   private pick(): { port?: PortView; device?: string; board?: boolean } {
     this.raycaster.setFromCamera(this.pointer, this.stage.camera);
     for (const hit of this.raycaster.intersectObjects(this.picks, false)) {
+      // There is no seeing, or reaching, through the walls.
+      if (zoneOf(hit.point.z) !== zoneOf(this.player.z)) continue;
       const port = hit.object.userData.port as PortView | undefined;
       if (port) return { port };
       const device = hit.object.userData.device as string | undefined;
@@ -574,11 +594,15 @@ export class Mission {
 
   /** Walk up to the whiteboard's schema, from anywhere in the room; again to come back. */
   private toggleBoard(): void {
-    if (this.anchor === BOARD_VIEW) return this.overview(0.7);
+    if (this.anchor && this.anchor === this.boardView) return this.overview(0.7);
     if (this.flying) return;
-    this.fly(BOARD_VIEW, BOARD_CENTRE, 0.9, () => {
-      this.anchor = BOARD_VIEW;
-      this.player.lookAlong(BOARD_CENTRE.clone().sub(BOARD_VIEW));
+    const roomZ = zoneOf(this.player.z) === 'lab' ? BUILDING.annexZ : 0;
+    const view = BOARD_VIEW.clone().setZ(BOARD_VIEW.z + roomZ);
+    const centre = BOARD_CENTRE.clone().setZ(BOARD_CENTRE.z + roomZ);
+    this.boardView = view;
+    this.fly(view, centre, 0.9, () => {
+      this.anchor = view;
+      this.player.lookAlong(centre.clone().sub(view));
     });
     this.setZoom(1);
     this.hud.toast(t('board.back'));
@@ -635,6 +659,16 @@ export class Mission {
     if (this.remaining <= 0) this.finish(evaluate(this.net, this.level.objectives), true);
   }
 
+  /** Going through a door: the lights follow, and the player is told where they are. */
+  private followZone(): void {
+    if (!this.building) return;
+    const zone = zoneOf(this.player.z);
+    if (zone === this.lastZone) return;
+    if (this.lastZone !== null) this.hud.toast(t(`zone.${zone}`));
+    this.lastZone = zone;
+    if (zone !== 'corridor') this.stage.setRigZ(zone === 'lab' ? BUILDING.annexZ : 0);
+  }
+
   /** Every frame: walk, turn the head, and put the camera where the eyes are. */
   private walk(dt: number): void {
     this.tickClock(dt);
@@ -664,11 +698,14 @@ export class Mission {
       this.stage.controls.target.copy(camera.position).add(this.player.look);
     }
     // Never let the camera leave the room (it would see through the walls).
-    camera.position.set(
-      THREE.MathUtils.clamp(camera.position.x, -3.35, 3.35),
-      THREE.MathUtils.clamp(camera.position.y, 0.3, 2.85),
-      THREE.MathUtils.clamp(camera.position.z, -1.45, 3.45),
-    );
+    if (!this.building) {
+      camera.position.set(
+        THREE.MathUtils.clamp(camera.position.x, -3.35, 3.35),
+        THREE.MathUtils.clamp(camera.position.y, 0.3, 2.85),
+        THREE.MathUtils.clamp(camera.position.z, -1.45, 3.45),
+      );
+    }
+    this.followZone();
     camera.lookAt(this.stage.controls.target);
   }
 
@@ -810,7 +847,8 @@ export class Mission {
     this.following = false;
     this.flying = true;
     this.flight++;
-    const finale = this.stage.flyTo(new THREE.Vector3(0, 1.9, 2.8), HOME.target, 1.6);
+    const finaleZ = zoneOf(this.player.z) === 'lab' ? BUILDING.annexZ : 0;
+    const finale = this.stage.flyTo(new THREE.Vector3(0, 1.9, 2.8 + finaleZ), HOME.target.clone().setZ(HOME.target.z + finaleZ), 1.6);
     const result = grade(evaluation, this.remaining, this.limit, timedOut, this.exam);
     void Promise.race([finale, new Promise((resolve) => setTimeout(resolve, 1800))]).then(() => this.events.complete(result));
   }

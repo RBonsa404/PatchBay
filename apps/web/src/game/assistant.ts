@@ -43,6 +43,10 @@ const SHEET: Entry[] = [
   { keys: ['aide', 'commande', 'commandes', '?'], answer: 'Dans la console, ? liste les commandes possibles à cet endroit, et Tab complète un mot. Les flèches haut et bas rappellent les commandes précédentes.' },
   { keys: ['note', 'score', 'etoile', 'etoiles', 'bareme', 'point'], answer: 'Les objectifs valent 80 points. Les 20 autres récompensent la rapidité et ne comptent que si tout est fait : ils sont tous acquis si tu finis dans la moitié du temps. Il faut 90 pour trois étoiles.' },
   { keys: ['clavier', 'deplacer', 'marcher', 'zoom', 'controle', 'touches'], answer: 'ZQSD : marcher. Maj : courir. Glisser : regarder. Molette : zoomer. Double-clic : s’approcher d’un appareil. T : tableau. P : liste des ports, pour tout faire au clavier. M : musique. N : morceau suivant.' },
+  { keys: ['vlan'], answer: 'Un VLAN sépare un switch en plusieurs réseaux. vlan 10 crée le VLAN ; sur le port : switchport mode access, puis switchport access vlan 10. show vlan brief vérifie. Il faut le créer sur chaque switch.' },
+  { keys: ['trunk', 'dot1q', '802.1q'], answer: 'Un trunk transporte plusieurs VLAN sur un seul câble, en étiquetant les trames (802.1Q). switchport mode trunk, aux deux bouts. show interface trunk vérifie.' },
+  { keys: ['sous-interface', 'sous interface', 'router-on-a-stick', 'inter-vlan', 'intervlan', 'encapsulation'], answer: 'Pour relier des VLAN : une sous-interface par VLAN sur le routeur. interface g0/0.10, encapsulation dot1q 10, ip address de la passerelle du VLAN. L’interface g0/0 elle-même doit être allumée avec no shutdown.' },
+  { keys: ['salle', 'couloir', 'porte', 'etage'], answer: 'Passe par la porte au fond de la salle technique, à gauche, traverse le couloir et entre en face : tu arrives en salle de TP. Il faut être à moins de 2 mètres d’un appareil pour le toucher.' },
   { keys: ['schema', 'tableau', 'plan'], answer: 'Clique sur le tableau blanc, ou appuie sur T, pour voir le plan de la mission : appareils, liaisons et ports.' },
 ];
 

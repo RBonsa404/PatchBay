@@ -22,6 +22,18 @@ const OBSTACLES: [number, number, number, number][] = [
   [0.1, 0.4, 3.15, 3.45], // bin
 ];
 const ROOM = { x0: -3.5, x1: 3.5, z0: -1.6, z1: 3.6 };
+/** The rest of the building: the corridor, the doorways leading to it (already narrowed for the body), and the lab room. */
+const CORRIDOR = { x0: -4.5, x1: 4.5, z0: -3.4, z1: -1.6 };
+const LAB = { x0: -3.5, x1: 3.5, z0: -8.6, z1: -3.4 };
+const DOORWAYS = [
+  { x0: -3.19, x1: -2.71, z0: -1.95, z1: -1.25 },
+  { x0: -3.19, x1: -2.71, z0: -3.75, z1: -3.05 },
+];
+const LAB_OBSTACLES: [number, number, number, number][] = [
+  [-1.6, 1.6, -7.3, -6.2], // bench
+  [-0.36, 0.36, -7.96, -7.33], // rack
+  [2.05, 3.5, -7.65, -4.3], // students' tables and stools
+];
 const RADIUS = 0.24;
 const WALK = 1.35;
 const RUN = 2.6;
@@ -45,6 +57,12 @@ export class Player {
   pitch = HOME_PITCH;
   private speed = 0;
   private phase = 0;
+  private building = false;
+
+  /** Open the whole building to the player (otherwise, the technical room only). */
+  enterBuilding(): void {
+    this.building = true;
+  }
 
   /** Where the eyes are, with the slight bob of walking. */
   get eye(): THREE.Vector3 {
@@ -93,9 +111,16 @@ export class Player {
 
   /** Move by (dx, dz), sliding along walls and furniture instead of passing through them. */
   private move(dx: number, dz: number): boolean {
-    const free = (x: number, z: number): boolean =>
-      x > ROOM.x0 + RADIUS && x < ROOM.x1 - RADIUS && z > ROOM.z0 + RADIUS && z < ROOM.z1 - RADIUS &&
-      !OBSTACLES.some(([x0, x1, z0, z1]) => x > x0 - RADIUS && x < x1 + RADIUS && z > z0 - RADIUS && z < z1 + RADIUS);
+    const inArea = (x: number, z: number, area: typeof ROOM): boolean => x > area.x0 + RADIUS && x < area.x1 - RADIUS && z > area.z0 + RADIUS && z < area.z1 - RADIUS;
+    const inDoorway = (x: number, z: number): boolean => DOORWAYS.some((d) => x > d.x0 && x < d.x1 && z > d.z0 && z < d.z1);
+    const blocked = (x: number, z: number, list: typeof OBSTACLES): boolean => list.some(([x0, x1, z0, z1]) => x > x0 - RADIUS && x < x1 + RADIUS && z > z0 - RADIUS && z < z1 + RADIUS);
+    const free = (x: number, z: number): boolean => {
+      if (blocked(x, z, OBSTACLES)) return false;
+      if (inArea(x, z, ROOM)) return true;
+      if (!this.building) return false;
+      if (blocked(x, z, LAB_OBSTACLES)) return false;
+      return inArea(x, z, CORRIDOR) || inArea(x, z, LAB) || inDoorway(x, z);
+    };
     const [x, z] = [this.x, this.z];
     if (free(x + dx, z + dz)) [this.x, this.z] = [x + dx, z + dz];
     else if (free(x + dx, z)) this.x = x + dx;

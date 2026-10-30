@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { DeviceModel, PortSpec } from '@patchbay/sim-core';
+import { bake } from './bake.js';
 import { contactShadow } from './materials.js';
 import { BENCH_TOP, RACK } from './room.js';
 import { addFeet, addRackEars, addVents, powerButton, roundedChassis } from './details.js';
@@ -36,6 +37,8 @@ export interface DeviceView {
   depth: number;
   /** Mounted in the rack, rather than standing on the bench. */
   inRack: boolean;
+  /** Where its room is along z (0 for the technical room). */
+  roomZ: number;
 }
 
 const SOCKET: Record<string, [w: number, h: number]> = {
@@ -331,11 +334,11 @@ function buildLaptop(id: string, model: DeviceModel, m: Materials, view: DeviceV
 }
 
 /** Build the 3D model of a device from its catalog entry. `caption` is shown on screens (PCs, laptops). */
-export function buildDevice(id: string, model: DeviceModel, position: [number, number, number] | undefined, caption: string): DeviceView {
+export function buildDevice(id: string, model: DeviceModel, position: [number, number, number] | undefined, caption: string, roomZ = 0): DeviceView {
   const m = materials();
   const shape: DeviceShape =
     model.kind === 'router' ? 'router' : model.kind === 'switch' ? 'switch' : model.kind === 'server' ? 'server' : id.toUpperCase().startsWith('ADMIN') ? 'laptop' : 'pc';
-  const view: DeviceView = { id, shape, root: new THREE.Group(), ports: new Map(), body: [], height: 0.1, width: 0.4, depth: 0.3, inRack: false };
+  const view: DeviceView = { id, shape, root: new THREE.Group(), ports: new Map(), body: [], height: 0.1, width: 0.4, depth: 0.3, inRack: false, roomZ: 0 };
   view.root.name = id;
 
   if (shape === 'router') buildRouter(id, model, m, view);
@@ -358,14 +361,24 @@ export function buildDevice(id: string, model: DeviceModel, position: [number, n
     shadow.position.y = 0.0012 - lift;
     view.root.add(shadow);
   }
-  view.root.position.set(x, inRack ? y : BENCH_TOP + lift, inRack ? RACK.frontZ - view.depth / 2 : z);
+  view.root.position.set(x, inRack ? y : BENCH_TOP + lift, (inRack ? RACK.frontZ - view.depth / 2 : z) + roomZ);
+  view.roomZ = roomZ;
   for (const b of view.body) b.userData.device = id;
+  // What stays still on a device is merged; what is clicked or lights up stays separate. Pick boxes are never drawn.
+  for (const b of view.body) b.userData.dynamic = true;
+  for (const port of view.ports.values()) {
+    port.hit.visible = false;
+    port.hit.userData.dynamic = true;
+    port.socket.userData.dynamic = true;
+    if (port.led) port.led.userData.dynamic = true;
+  }
+  bake(view.root);
   return view;
 }
 
 /** Bottom and top of each device mounted in the rack, for the fillers to close the units around them. */
-export function rackOccupied(views: DeviceView[]): [number, number][] {
-  return views.filter((v) => v.inRack).map((v) => [v.root.position.y, v.root.position.y + v.height]);
+export function rackOccupied(views: DeviceView[], roomZ = 0): [number, number][] {
+  return views.filter((v) => v.inRack && v.roomZ === roomZ).map((v) => [v.root.position.y, v.root.position.y + v.height]);
 }
 
 const LED_COLOURS: Record<LedState, [string, number]> = { off: ['#1f2937', 0], green: ['#10b981', 4], amber: ['#fbbf24', 3.5] };

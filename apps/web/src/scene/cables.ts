@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { Cable, CableEnd, CableType } from '@patchbay/sim-core';
 import type { PortView } from './devices.js';
-import { BENCH_TOP, MANAGER, RACK } from './room.js';
+import { BENCH_TOP, BUILDING, MANAGER, RACK } from './room.js';
 import type { Stage } from './stage.js';
 
 /** Cable colours: the usual workshop habits (blue straight, amber crossover, light-blue console, dark serial). */
@@ -39,6 +39,21 @@ function curveBetween(a: THREE.Vector3, na: THREE.Vector3, b: THREE.Vector3, nb:
   return new THREE.CatmullRomCurve3([a, a1, mid, b1, b], false, 'centripetal', 0.5);
 }
 
+/** Two ends further apart than this are in different rooms: the cable goes up and runs through the cable trays. */
+const ROOMS_APART = 3.5;
+/** Height of the trays. */
+const TRAY_Y = 2.49;
+
+const rackRoomZ = (p: THREE.Vector3): number => (p.z < BUILDING.corridor.back ? BUILDING.annexZ : 0);
+
+/** From a port up to the tray above the rack: along the gear, up the cable manager, along the tray. */
+function toTray(p: THREE.Vector3, lane: number): THREE.Vector3[] {
+  const x = RACK.x + MANAGER.x;
+  const z = RACK.frontZ + rackRoomZ(p) + 0.03;
+  const drift = (lane % 4) * 0.006;
+  return [new THREE.Vector3(x - 0.04, p.y - 0.012, z), new THREE.Vector3(x + drift, p.y + 0.05, z), new THREE.Vector3(x + drift, TRAY_Y - 0.15, z), new THREE.Vector3(x + drift, TRAY_Y, z + (p.z < BUILDING.corridor.back ? 0.2 : -0.2))];
+}
+
 /** Space between two cables lying side by side on the bench. */
 const LANE = 0.016;
 
@@ -51,6 +66,10 @@ function routeBetween(a: THREE.Vector3, na: THREE.Vector3, b: THREE.Vector3, nb:
   const lead = 0.05;
   const a1 = a.clone().addScaledVector(na, lead);
   const b1 = b.clone().addScaledVector(nb, lead);
+  if (Math.abs(a.z - b.z) > ROOMS_APART) {
+    return new THREE.CatmullRomCurve3([a, a1, ...toTray(a1, lane), ...toTray(b1, lane).reverse(), b1, b], false, 'centripetal', 0.5);
+  }
+  const frontZ = RACK.frontZ + rackRoomZ(a);
   const rest = BENCH_TOP + radius + 0.001;
   const highA = a.y - BENCH_TOP > 0.1;
   const highB = b.y - BENCH_TOP > 0.1;
@@ -60,7 +79,7 @@ function routeBetween(a: THREE.Vector3, na: THREE.Vector3, b: THREE.Vector3, nb:
     // Patch cord: along the gear to the nearest cable manager, along the manager, and back along the other device.
     const side = (a1.x + b1.x) / 2 < RACK.x ? -1 : 1;
     const x = RACK.x + side * (MANAGER.x - 0.012 + (lane % 4) * 0.006);
-    const z = RACK.frontZ + 0.03;
+    const z = frontZ + 0.03;
     const drop = 0.018 + (lane % 4) * 0.004;
     const [topY, bottomY] = [a1.y - drop, b1.y - drop];
     return new THREE.CatmullRomCurve3([a, a1, new THREE.Vector3(x - side * 0.05, topY, z), new THREE.Vector3(x, topY - 0.02, z), new THREE.Vector3(x, bottomY + 0.02, z), new THREE.Vector3(x - side * 0.05, bottomY, z), b1, b], false, 'centripetal', 0.5);
@@ -78,10 +97,10 @@ function routeBetween(a: THREE.Vector3, na: THREE.Vector3, b: THREE.Vector3, nb:
     // bench's back edge. Cables never hang in front of the ports below.
     const side = other.x < RACK.x ? -1 : 1;
     const x = RACK.x + side * (MANAGER.x - 0.012 + (lane % 4) * 0.006);
-    const z = RACK.frontZ + 0.03;
+    const z = frontZ + 0.03;
     const across = new THREE.Vector3(x, p.y - 0.018 - (lane % 4) * 0.004, z);
     const low = new THREE.Vector3(x, rest + 0.1, z);
-    const t = new THREE.Vector3(x, rest, RACK.frontZ + 0.13 + offset);
+    const t = new THREE.Vector3(x, rest, frontZ + 0.13 + offset);
     return [across, low, t];
   };
   const da = down(a1, na, highA, b1);
@@ -256,7 +275,7 @@ export class CableLayer {
   private build(type: CableType, a: { point: THREE.Vector3; normal: THREE.Vector3 }, b: { point: THREE.Vector3; normal: THREE.Vector3 }, curve: THREE.CatmullRomCurve3): THREE.Group {
     const style = CABLE_STYLE[type];
     const group = new THREE.Group();
-    const geometry = new THREE.TubeGeometry(curve, 160, style.radius, 10, false);
+    const geometry = new THREE.TubeGeometry(curve, curve.getLength() > 4 ? 520 : 160, style.radius, 10, false);
     const tube = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: style.colour, roughness: 0.45, metalness: 0.05 }));
     tube.castShadow = true;
     const pa = plug(type);

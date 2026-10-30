@@ -1,0 +1,175 @@
+{
+  "id": "l03-deux-salles-vlan",
+  "version": 1,
+  "title": { "fr": "Deux salles, deux VLAN", "en": "Two rooms, two VLANs" },
+  "story": {
+    "fr": "Bon travail sur les premières missions. Le club s'agrandit : on nous confie la salle de TP, de l'autre côté du couloir, et le câble de liaison entre les deux baies est déjà tiré dans les chemins de câbles. Les enseignants et les étudiants ne doivent pas se retrouver sur le même réseau, mais doivent pouvoir se joindre en passant par le routeur. À toi de tout mettre en place, en allant d'une salle à l'autre.",
+    "en": "Good work on the first missions. The club is growing: we are given the lab room across the corridor, and the link cable between the two racks already runs through the cable trays. Staff and students must not share a network, yet must reach each other through the router. Set it all up, walking from room to room."
+  },
+  "brief": {
+    "fr": "Salle technique : R1, S1, le portable ADMIN et PC1 (enseignants). Salle de TP, par la porte du fond : S2, le portable ADMIN2, PC2 (enseignants) et PC3 (étudiants).\n1. Branche PC1 sur Fa0/1 de S1, Gi0/1 de S1 sur Gi0/0 de R1, PC2 sur Fa0/1 de S2, PC3 sur Fa0/2 de S2.\n2. Sur S1 et S2 : crée le VLAN 10 (enseignants) et le VLAN 20 (étudiants), place chaque port de PC dans son VLAN, et passe les liaisons Gi0/2 (entre switches) et Gi0/1 de S1 (vers le routeur) en trunk.\n3. Sur R1 : allume Gi0/0 et crée les sous-interfaces Gi0/0.10 (192.168.10.1/24) et Gi0/0.20 (192.168.20.1/24), en 802.1Q.\n4. Vérifie que PC1 joint PC2 et que PC1 joint PC3, puis sauvegarde S1, S2 et R1.\nChaque portable a son câble console : il faut aller dans la bonne salle. ADMIN n'a qu'un port console : pour passer de R1 à S1, débranche et rebranche.",
+    "en": "Technical room: R1, S1, the ADMIN laptop and PC1 (staff). Lab room, through the back door: S2, the ADMIN2 laptop, PC2 (staff) and PC3 (students).\n1. Cable PC1 to S1 Fa0/1, S1 Gi0/1 to R1 Gi0/0, PC2 to S2 Fa0/1, PC3 to S2 Fa0/2.\n2. On S1 and S2: create VLAN 10 (staff) and VLAN 20 (students), put each PC port in its VLAN, and make Gi0/2 (between switches) and S1 Gi0/1 (to the router) trunks.\n3. On R1: bring Gi0/0 up and create subinterfaces Gi0/0.10 (192.168.10.1/24) and Gi0/0.20 (192.168.20.1/24), with 802.1Q.\n4. Check that PC1 reaches PC2 and PC3, then save S1, S2 and R1.\nEach laptop has its console cable: you must go to the right room. ADMIN has a single console port: to move from R1 to S1, unplug and replug."
+  },
+  "difficulty": 3,
+  "timeLimit": 1500,
+  "settings": { "strictMdix": true },
+  "devices": [
+    { "id": "ADMIN", "model": "pc", "label": { "fr": "Portable de la salle technique", "en": "Technical room laptop" }, "position": [-0.8, 0.76, 0.25] },
+    { "id": "PC1", "model": "pc", "label": { "fr": "PC enseignant", "en": "Staff PC" }, "position": [0.7, 0.76, 0.25] },
+    { "id": "S1", "model": "catalyst-2960", "label": { "fr": "Switch de la salle technique", "en": "Technical room switch" }, "position": [0, 1.2, -0.4] },
+    { "id": "R1", "model": "cisco-2911", "label": { "fr": "Routeur", "en": "Router" }, "position": [0, 0.9, -0.4] },
+    { "id": "S2", "model": "catalyst-2960", "label": { "fr": "Switch de la salle de TP", "en": "Lab room switch" }, "position": [0, 1.05, -0.4], "room": "annexe" },
+    { "id": "ADMIN2", "model": "pc", "label": { "fr": "Portable de la salle de TP", "en": "Lab room laptop" }, "position": [-0.2, 0.76, 0.35], "room": "annexe" },
+    { "id": "PC2", "model": "pc", "label": { "fr": "PC enseignant de la salle de TP", "en": "Lab room staff PC" }, "position": [-1.15, 0.76, 0.25], "room": "annexe" },
+    { "id": "PC3", "model": "pc", "label": { "fr": "PC étudiant", "en": "Student PC" }, "position": [0.95, 0.76, 0.25], "room": "annexe" }
+  ],
+  "inventory": { "cables": { "straight": 5, "crossover": 2, "console": 2 } },
+  "initial": {
+    "cables": [{ "type": "crossover", "a": "S1:GigabitEthernet0/2", "b": "S2:GigabitEthernet0/2" }],
+    "hosts": {
+      "PC1": { "ip": "192.168.10.11", "mask": "255.255.255.0", "gateway": "192.168.10.1" },
+      "PC2": { "ip": "192.168.10.12", "mask": "255.255.255.0", "gateway": "192.168.10.1" },
+      "PC3": { "ip": "192.168.20.13", "mask": "255.255.255.0", "gateway": "192.168.20.1" }
+    },
+    "commands": {
+      "R1": ["enable", "configure terminal", "hostname R1", "end"],
+      "S1": ["enable", "configure terminal", "hostname S1", "end"],
+      "S2": ["enable", "configure terminal", "hostname S2", "end"]
+    }
+  },
+  "objectives": [
+    {
+      "id": "cable-pc1", "type": "cable", "points": 4,
+      "cable": { "type": "straight", "a": "PC1:FastEthernet0", "b": "S1:FastEthernet0/1" },
+      "label": { "fr": "PC1 relié à S1 (Fa0/1)", "en": "PC1 cabled to S1 (Fa0/1)" },
+      "hint": { "fr": "PC et switch : câble droit.", "en": "PC to switch: straight-through cable." }
+    },
+    {
+      "id": "cable-router", "type": "cable", "points": 4,
+      "cable": { "type": "straight", "a": "S1:GigabitEthernet0/1", "b": "R1:GigabitEthernet0/0" },
+      "label": { "fr": "S1 (Gi0/1) relié à R1 (Gi0/0)", "en": "S1 (Gi0/1) cabled to R1 (Gi0/0)" },
+      "hint": { "fr": "Switch et routeur : câble droit.", "en": "Switch to router: straight-through cable." }
+    },
+    {
+      "id": "cable-pc2", "type": "cable", "points": 4,
+      "cable": { "type": "straight", "a": "PC2:FastEthernet0", "b": "S2:FastEthernet0/1" },
+      "label": { "fr": "PC2 relié à S2 (Fa0/1), en salle de TP", "en": "PC2 cabled to S2 (Fa0/1), in the lab room" },
+      "hint": { "fr": "Va dans la salle de TP par la porte au fond de la salle technique, puis le couloir.", "en": "Go to the lab room through the door at the back of the technical room, then the corridor." }
+    },
+    {
+      "id": "cable-pc3", "type": "cable", "points": 4,
+      "cable": { "type": "straight", "a": "PC3:FastEthernet0", "b": "S2:FastEthernet0/2" },
+      "label": { "fr": "PC3 relié à S2 (Fa0/2), en salle de TP", "en": "PC3 cabled to S2 (Fa0/2), in the lab room" },
+      "hint": { "fr": "Câble droit, là aussi.", "en": "Straight-through again." }
+    },
+    {
+      "id": "s1-access", "type": "config", "device": "S1", "points": 8,
+      "check": { "kind": "access-vlan", "interface": "FastEthernet0/1", "vlan": 10 },
+      "label": { "fr": "S1 : Fa0/1 dans le VLAN 10", "en": "S1: Fa0/1 in VLAN 10" },
+      "hint": { "fr": "interface fa0/1, switchport mode access, switchport access vlan 10.", "en": "interface fa0/1, switchport mode access, switchport access vlan 10." }
+    },
+    {
+      "id": "s2-access-10", "type": "config", "device": "S2", "points": 8,
+      "check": { "kind": "access-vlan", "interface": "FastEthernet0/1", "vlan": 10 },
+      "label": { "fr": "S2 : Fa0/1 dans le VLAN 10", "en": "S2: Fa0/1 in VLAN 10" },
+      "hint": { "fr": "Ouvre la console de S2 depuis ADMIN2, dans la salle de TP.", "en": "Open S2's console from ADMIN2, in the lab room." }
+    },
+    {
+      "id": "s2-access-20", "type": "config", "device": "S2", "points": 8,
+      "check": { "kind": "access-vlan", "interface": "FastEthernet0/2", "vlan": 20 },
+      "label": { "fr": "S2 : Fa0/2 dans le VLAN 20", "en": "S2: Fa0/2 in VLAN 20" },
+      "hint": { "fr": "Même méthode, avec le VLAN 20.", "en": "Same method, with VLAN 20." }
+    },
+    {
+      "id": "trunks", "type": "config", "device": "S1", "points": 6,
+      "check": { "kind": "trunk", "interface": "GigabitEthernet0/2" },
+      "label": { "fr": "S1 : Gi0/2 en trunk vers S2", "en": "S1: Gi0/2 trunk to S2" },
+      "hint": { "fr": "interface g0/2, switchport mode trunk.", "en": "interface g0/2, switchport mode trunk." }
+    },
+    {
+      "id": "trunk-s2", "type": "config", "device": "S2", "points": 6,
+      "check": { "kind": "trunk", "interface": "GigabitEthernet0/2" },
+      "label": { "fr": "S2 : Gi0/2 en trunk vers S1", "en": "S2: Gi0/2 trunk to S1" },
+      "hint": { "fr": "Un trunk se configure aux deux bouts.", "en": "A trunk is configured at both ends." }
+    },
+    {
+      "id": "trunk-router", "type": "config", "device": "S1", "points": 6,
+      "check": { "kind": "trunk", "interface": "GigabitEthernet0/1" },
+      "label": { "fr": "S1 : Gi0/1 en trunk vers R1", "en": "S1: Gi0/1 trunk to R1" },
+      "hint": { "fr": "Le routeur doit recevoir les deux VLAN sur le même câble.", "en": "The router must receive both VLANs on the same cable." }
+    },
+    {
+      "id": "sub10", "type": "config", "device": "R1", "points": 6,
+      "check": { "kind": "interface-ip", "interface": "GigabitEthernet0/0.10", "ip": "192.168.10.1", "mask": "255.255.255.0" },
+      "label": { "fr": "R1 : Gi0/0.10 en 192.168.10.1/24", "en": "R1: Gi0/0.10 is 192.168.10.1/24" },
+      "hint": { "fr": "interface g0/0.10, encapsulation dot1q 10, ip address 192.168.10.1 255.255.255.0. N'oublie pas no shutdown sur g0/0.", "en": "interface g0/0.10, encapsulation dot1q 10, ip address 192.168.10.1 255.255.255.0. Don't forget no shutdown on g0/0." }
+    },
+    {
+      "id": "sub20", "type": "config", "device": "R1", "points": 6,
+      "check": { "kind": "interface-ip", "interface": "GigabitEthernet0/0.20", "ip": "192.168.20.1", "mask": "255.255.255.0" },
+      "label": { "fr": "R1 : Gi0/0.20 en 192.168.20.1/24", "en": "R1: Gi0/0.20 is 192.168.20.1/24" },
+      "hint": { "fr": "Même méthode, avec encapsulation dot1q 20.", "en": "Same method, with encapsulation dot1q 20." }
+    },
+    {
+      "id": "ping-same", "type": "ping", "from": "PC1", "to": "192.168.10.12", "expect": "success", "points": 10,
+      "label": { "fr": "PC1 joint PC2 d'une salle à l'autre (même VLAN)", "en": "PC1 reaches PC2 across rooms (same VLAN)" },
+      "hint": { "fr": "Si ça échoue : le VLAN 10 existe-t-il sur les deux switches ? Le trunk est-il actif ?", "en": "If it fails: does VLAN 10 exist on both switches? Is the trunk up?" }
+    },
+    {
+      "id": "ping-inter", "type": "ping", "from": "PC1", "to": "192.168.20.13", "expect": "success", "points": 10,
+      "label": { "fr": "PC1 joint PC3 par le routeur (VLAN différents)", "en": "PC1 reaches PC3 through the router (different VLANs)" },
+      "hint": { "fr": "Les sous-interfaces sont les passerelles : g0/0 doit être allumée, et le trunk vers R1 actif.", "en": "The subinterfaces are the gateways: g0/0 must be up, and the trunk to R1 active." }
+    },
+    {
+      "id": "saved-all", "type": "saved", "device": "S2", "points": 4,
+      "label": { "fr": "Configuration de S2 sauvegardée", "en": "S2 configuration saved" },
+      "hint": { "fr": "copy run start dans la console de S2.", "en": "copy run start in S2's console." }
+    },
+    {
+      "id": "saved-s1", "type": "saved", "device": "S1", "points": 3,
+      "label": { "fr": "Configuration de S1 sauvegardée", "en": "S1 configuration saved" },
+      "hint": { "fr": "copy run start dans la console de S1.", "en": "copy run start in S1's console." }
+    },
+    {
+      "id": "saved-r1", "type": "saved", "device": "R1", "points": 3,
+      "label": { "fr": "Configuration de R1 sauvegardée", "en": "R1 configuration saved" },
+      "hint": { "fr": "copy run start dans la console de R1.", "en": "copy run start in R1's console." }
+    }
+  ],
+  "hints": [
+    { "afterSeconds": 120, "text": { "fr": "Commence par les câbles dans chaque salle, puis configure les switches avant le routeur.", "en": "Start with the cables in each room, then configure the switches before the router." } },
+    { "afterSeconds": 400, "text": { "fr": "show vlan brief et show interface trunk disent tout de suite ce qui manque.", "en": "show vlan brief and show interface trunk tell you at once what is missing." } }
+  ],
+  "solution": {
+    "cables": [
+      { "type": "straight", "a": "PC1:FastEthernet0", "b": "S1:FastEthernet0/1" },
+      { "type": "straight", "a": "S1:GigabitEthernet0/1", "b": "R1:GigabitEthernet0/0" },
+      { "type": "straight", "a": "PC2:FastEthernet0", "b": "S2:FastEthernet0/1" },
+      { "type": "straight", "a": "PC3:FastEthernet0", "b": "S2:FastEthernet0/2" },
+      { "type": "console", "a": "ADMIN:RS232", "b": "R1:Console" },
+      { "type": "console", "a": "ADMIN2:RS232", "b": "S2:Console" }
+    ],
+    "commands": {
+      "S1": [
+        "configure terminal", "vlan 10", "name ENSEIGNANTS", "vlan 20", "name ETUDIANTS", "exit",
+        "interface fa0/1", "switchport mode access", "switchport access vlan 10",
+        "interface g0/2", "switchport mode trunk",
+        "interface g0/1", "switchport mode trunk",
+        "end", "copy running-config startup-config", ""
+      ],
+      "S2": [
+        "configure terminal", "vlan 10", "name ENSEIGNANTS", "vlan 20", "name ETUDIANTS", "exit",
+        "interface fa0/1", "switchport mode access", "switchport access vlan 10",
+        "interface fa0/2", "switchport mode access", "switchport access vlan 20",
+        "interface g0/2", "switchport mode trunk",
+        "end", "copy running-config startup-config", ""
+      ],
+      "R1": [
+        "configure terminal", "interface g0/0", "no shutdown",
+        "interface g0/0.10", "encapsulation dot1q 10", "ip address 192.168.10.1 255.255.255.0",
+        "interface g0/0.20", "encapsulation dot1q 20", "ip address 192.168.20.1 255.255.255.0",
+        "end", "copy running-config startup-config", ""
+      ]
+    }
+  }
+}

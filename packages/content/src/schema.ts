@@ -24,6 +24,8 @@ const configCheck = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('vty-login') }).strict(),
   z.object({ kind: z.literal('interface-ip'), interface: z.string(), ip: ipv4, mask: ipv4 }).strict(),
   z.object({ kind: z.literal('clock-rate'), interface: z.string() }).strict(),
+  z.object({ kind: z.literal('access-vlan'), interface: z.string(), vlan: z.number().int().min(1).max(4094) }).strict(),
+  z.object({ kind: z.literal('trunk'), interface: z.string() }).strict(),
 ]);
 
 const base = { id: z.string().min(1), label: text, hint: text.optional(), points: z.number().int().min(0) };
@@ -57,6 +59,7 @@ export const levelSchema = z
             model: z.string().min(1),
             label: text.optional(),
             position: z.tuple([z.number(), z.number(), z.number()]).optional(),
+            room: z.literal('annexe').optional(),
           })
           .strict(),
       )
