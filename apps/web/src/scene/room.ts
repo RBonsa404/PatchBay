@@ -503,7 +503,7 @@ function wallItems(): THREE.Group {
   g.add(ac, vent, acLed);
 
   // Fire extinguisher on the left wall with its sign.
-  placeProp(g, 'korean_fire_extinguisher_01', { x: -3.27, y: 0, z: -0.6, turn: -Math.PI / 2 });
+  placeProp(g, 'korean_fire_extinguisher_01', { x: -3.27, y: 0, z: -0.6, turn: Math.PI / 2 });
   const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.2), new THREE.MeshStandardMaterial({ color: '#dc2626', roughness: 0.6 }));
   sign.rotation.y = Math.PI / 2;
   sign.position.set(-ROOM.width / 2 + 0.003, 1.3, -0.6);

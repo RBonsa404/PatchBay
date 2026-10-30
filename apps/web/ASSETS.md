@@ -42,7 +42,7 @@ Convertis en GLB, textures réduites à 512 px en WebP.
 
 | Fichier | Source |
 |---|---|
-| korean_fire_extinguisher_01 | https://polyhaven.com/a/korean_fire_extinguisher_01 |
+| korean_fire_extinguisher_01 (inscription du socle remplacée par « EXTINCTEUR ») | https://polyhaven.com/a/korean_fire_extinguisher_01 |
 | wall_clock | https://polyhaven.com/a/wall_clock |
 | metal_toolbox | https://polyhaven.com/a/metal_toolbox |
 | retro_multimeter | https://polyhaven.com/a/retro_multimeter |

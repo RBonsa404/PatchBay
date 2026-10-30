@@ -202,22 +202,12 @@ function desk(): THREE.Group {
   placeProp(g, 'clipboard', { x: x + 0.34, y: top + 0.018, z: z - 0.1, turn: 0.2 });
   placeProp(g, 'desk_lamp_arm_01', { x: x - 0.55, y: top + 0.1, z: z + 0.16, turn: 0.6, scale: 0.75 });
 
-  // Chair: five spokes on the floor, a column, a seat and a back.
-  const chair = new THREE.Group();
-  for (let i = 0; i < 5; i++) {
-    const spoke = box(0.3, 0.02, 0.04, M.black, 0, 0.07, 0);
-    spoke.rotation.y = (i * Math.PI * 2) / 5;
-    spoke.translateX(0.14);
-    chair.add(spoke, cylinder(0.024, 0.04, M.black, Math.cos((i * Math.PI * 2) / 5) * 0.28, 0.024, -Math.sin((i * Math.PI * 2) / 5) * 0.28));
-  }
-  chair.add(cylinder(0.024, 0.34, M.steel, 0, 0.26, 0), soft(0.46, 0.08, 0.44, M.plastic, 0, 0.47, 0, 0.035), soft(0.42, 0.48, 0.06, M.plastic, 0, 0.82, -0.22, 0.028), soft(0.05, 0.3, 0.02, M.steel, 0, 0.62, -0.25, 0.008));
-  chair.position.set(x - 0.05, 0, z - 0.72);
-  chair.rotation.y = 0.5;
+  placeProp(g, 'SchoolChair_01', { x: x - 0.05, y: 0, z: z - 0.72, turn: 0.25 });
   const chairShadow = contactShadow(0.8, 0.8, 0.5);
   chairShadow.position.set(x - 0.05, 0.003, z - 0.72);
   const deskShadow = contactShadow(1.8, 1, 0.5);
   deskShadow.position.set(x, 0.003, z);
-  g.add(chair, chairShadow, deskShadow);
+  g.add(chairShadow, deskShadow);
 
   // The window: the campus outside, the blind half down, and the daylight it lets in.
   const wz = 3.59;

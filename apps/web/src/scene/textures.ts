@@ -124,3 +124,52 @@ export function screenTexture(lines: string[], accent = '#38bdf8'): THREE.Canvas
   tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
   return tex;
 }
+
+/** The slide on the lab's projection screen: the two VLANs of the course, drawn the way a teacher would. */
+export function diagramTexture(): THREE.CanvasTexture {
+  const [c, g] = canvas(1024, 632);
+  g.fillStyle = '#f8fafc';
+  g.fillRect(0, 0, 1024, 632);
+  g.fillStyle = '#0b1e3f';
+  g.fillRect(0, 0, 1024, 84);
+  g.fillStyle = '#ffffff';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.font = '700 40px Poppins, sans-serif';
+  g.fillText('VLAN et trunk 802.1Q', 512, 44);
+  const link = (points: [number, number][], colour: string, width = 5): void => {
+    g.strokeStyle = colour;
+    g.lineWidth = width;
+    g.beginPath();
+    points.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+    g.stroke();
+  };
+  const node = (x: number, y: number, w: number, colour: string, text: string): void => {
+    g.fillStyle = colour;
+    g.fillRect(x - w / 2, y - 30, w, 60);
+    g.fillStyle = '#ffffff';
+    g.font = '600 28px Poppins, sans-serif';
+    g.fillText(text, x, y + 1);
+  };
+  const [v10, v20] = ['#1d4ed8', '#b45309'];
+  link([[512, 180], [512, 310]], '#0b1e3f', 9);
+  for (const [sw, a, b] of [[300, 130, 400], [724, 624, 894]] as const) {
+    link([[512, 310], [sw, 310]], '#0b1e3f', 9);
+    link([[sw, 310], [a, 480]], v10);
+    link([[sw, 310], [b, 480]], v20);
+    node(sw, 310, 130, '#334155', sw < 512 ? 'S1' : 'S2');
+    node(a, 510, 120, v10, 'PC');
+    node(b, 510, 120, v20, 'PC');
+  }
+  node(512, 170, 130, '#0b1e3f', 'R1');
+  g.font = '600 26px Poppins, sans-serif';
+  g.fillStyle = v10;
+  g.fillText('VLAN 10', 330, 590);
+  g.fillStyle = v20;
+  g.fillText('VLAN 20', 694, 590);
+  g.fillStyle = '#0b1e3f';
+  g.fillText('trunk', 610, 285);
+  const tex = toTexture(c);
+  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  return tex;
+}

@@ -2,7 +2,7 @@
 
 > **Les PDF ne sont pas dans le dépôt** (contenu Cisco protégé). Ils restent en local : placez-les dans ce dossier, et leurs textes extraits dans `docs/references/text/` (par exemple avec PyMuPDF). Les dossiers `docs/references/*` (sauf ce fichier) et `course/` sont ignorés par git. Les tests du projet n'en dépendent pas.
 
-PDF du TP Guide CCNA 3 fournis par l'utilisateur. À lire (Claude Code sait lire les PDF) pour copier la syntaxe, les enchaînements de commandes et les sorties exactes avant d'écrire un test golden.
+PDF du TP Guide CCNA 3 fournis par l'utilisateur. À lire pour copier la syntaxe, les enchaînements de commandes et les sorties exactes avant d'écrire un test golden.
 
 | Fichier | Sujet | Milestone |
 |---|---|---|

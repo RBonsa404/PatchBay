@@ -93,13 +93,13 @@ Réalisé (première version) : `apps/web` avec Vite + Three.js (ADR 0001 : inte
 - **Contraintes de performance** (révisé le 2026-10-30 : le standard est un PC de 8 Go) : à l'origine PC de 4 Go, WebGL2, modèles légers (budget de triangles par scène), éclairage simple (pas de ray-tracing ni de post-traitement lourd), qualité réglable, repli en rendu simplifié.
 - **Direction artistique (exigence du porteur de projet : « un vrai jeu, waouh »)** : rendu PBR (matériaux métal/plastique crédibles), éclairage soigné (lumière d'ambiance + spots, ombres douces, environnement HDRI), post-traitement léger (bloom sur les voyants, anti-crénelage, occlusion ambiante si le matériel suit), animations fluides (câbles, caméra, UI). Charte du **Club Informatique de l'IST** (`docs/06-charte-club-ist.md`). Préréglages de qualité (bas/moyen/haut) détectés automatiquement pour rester jouable sur un PC de 4 Go.
 - **Modèles 3D** : créés procéduralement ou récupérés en ligne **uniquement sous licence compatible** (CC0 en priorité : Poly Haven, Kenney, Quaternius, ambientCG ; CC-BY accepté avec attribution). Chaque ressource externe est consignée dans `apps/web/ASSETS.md` (source, auteur, licence, URL). Jamais de modèle extrait d'un logiciel propriétaire ni de logo Cisco.
-- **Design de l'interface** : maquettes et système visuel (menus, HUD, écrans de mission) faits avec les outils de design disponibles (Claude Design / artefacts de type Design) avant intégration.
+- **Design de l'interface** : maquettes et système visuel (menus, HUD, écrans de mission) faits avec les outils de design disponibles avant intégration.
 - **Ce que le moteur fournit déjà** : `catalog` (ports par modèle, polarité), `canPlug`/`connect`/`disconnect`, `linkState` (voyants), `drainSyslog`, `consoleTarget`, `snapshot`/`restore`, `sendFrame`/`ping` (trafic). Aucune logique réseau ne doit être réimplémentée côté 3D.
 
 ## M8 — Finition MVP et refonte visuelle
 
 Retours du porteur de projet après la première version jouable (à traiter quand M7 est fini ; les 2 niveaux doivent être « incroyables » avant d'en ajouter d'autres) :
-- **Interface** : jugée « pas jolie, fait trop IA ». Refaire un système visuel professionnel (menus, HUD, panneaux, consoles) avec une vraie identité de jeu plutôt que des cartes en verre génériques : typographie et hiérarchie soignées, moins d'effets lumineux décoratifs, iconographie cohérente. Passer par des maquettes (Claude Design) avant d'intégrer.
+- **Interface** : jugée « pas jolie, fait trop IA ». Refaire un système visuel professionnel (menus, HUD, panneaux, consoles) avec une vraie identité de jeu plutôt que des cartes en verre génériques : typographie et hiérarchie soignées, moins d'effets lumineux décoratifs, iconographie cohérente. Passer par des maquettes avant d'intégrer.
 - **Logos** : créer un logo PatchBay ; intégrer le logo du Club Informatique de l'IST et la charte (`docs/06-charte-club-ist.md`) dans l'écran titre, les crédits et la salle.
 - **Salle** : plus réaliste et immersive (les plantes en pot font « jouet ») : vrais matériaux (béton, faux plancher technique, chemins de câbles au plafond, éclairage néon, baie avec panneau de brassage, poussière/variations), éventuellement modèles CC0 (`apps/web/ASSETS.md`).
 - **Équipements posés** : le routeur semble flotter. Contact au sol : ombres de contact (AO), pieds visibles, aucune lame d'air, objets ancrés sur l'établi ou dans la baie.
@@ -107,7 +107,7 @@ Retours du porteur de projet après la première version jouable (à traiter qua
 - **Tutoriel incarné** : un personnage (mentor du club) qui présente la mission et guide le tutoriel, avec bulles ou voix ; éventuellement un assistant intégré qui répond aux questions de l'élève.
 - **Icônes** : celles d'aujourd'hui (emoji, pastilles de couleur, icône d'application provisoire) sont jugées moches. Passer à un jeu d'icônes professionnel et cohérent sous licence libre (par exemple Lucide ou Phosphor, MIT, consigné dans `apps/web/ASSETS.md`), et refaire l'icône d'application avec le futur logo.
 - Garder et développer le **tableau blanc** (apprécié).
-- Notes de Claude : animation d'entrée dans la salle, son d'ambiance (ventilateurs), retour visuel au survol des ports, écran de résultats plus spectaculaire, captures pour la présentation.
+- Notes : animation d'entrée dans la salle, son d'ambiance (ventilateurs), retour visuel au survol des ports, écran de résultats plus spectaculaire, captures pour la présentation.
 
 État après la première passe (2026-10-29) — fait : interface, icônes Lucide, logo PatchBay et logo du club, salle réaliste, équipements ancrés, câbles rangés, personnage d'Aïcha (portrait + texte qui s'écrit). Reste à faire :
 - Interface validée par le porteur de projet (2026-10-29) : « beaucoup plus pro ». Garder cette direction, l'affiner sans tout casser.

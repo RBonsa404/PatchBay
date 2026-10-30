@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { bake } from './bake.js';
-import { ceilingTexture, contactShadow, outsideTexture, photo, photoRelief } from './materials.js';
+import { ceilingTexture, contactShadow, keyboardTexture, outsideTexture, photo, photoRelief } from './materials.js';
 import { placeProp } from './props.js';
 import { BUILDING, buildRoomParts, doorWall, paintedWall } from './room.js';
-import { textTexture } from './textures.js';
+import { diagramTexture, screenTexture, textTexture } from './textures.js';
 
 /**
  * The rest of the building: the corridor behind the technical room, the lab room across it, and for the missions that
@@ -21,6 +21,8 @@ const STEEL = lit('#475569', 0.45, 0.75);
 const BLACK = lit('#1b2028', 0.55, 0.25);
 const WOOD = new THREE.MeshStandardMaterial({ ...photo('plywood', 0.7, 0.5), roughness: 0.8 });
 const GREY = lit('#94a3b8', 0.65, 0.2);
+const KEYS = new THREE.MeshStandardMaterial({ map: keyboardTexture(), roughness: 0.55 });
+const LED = new THREE.MeshStandardMaterial({ color: '#38bdf8', emissive: '#38bdf8', emissiveIntensity: 1.6 });
 
 function box(w: number, h: number, d: number, material: THREE.Material, x: number, y: number, z: number, shadow = true): THREE.Mesh {
   const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
@@ -220,18 +222,17 @@ function workstation(x: number, z: number, wallX: number, label: string): THREE.
   g.add(box(0.8, 0.03, 1.0, WOOD, x, 0.74, z));
   for (const dz of [-0.45, 0.45]) g.add(box(0.72, 0.03, 0.03, STEEL, x, 0.12, z + dz), box(0.03, 0.74, 0.03, STEEL, x + 0.36, 0.37, z + dz), box(0.03, 0.74, 0.03, STEEL, x - 0.36, 0.37, z + dz));
   g.add(soft(0.024, 0.33, 0.5, BLACK, x + side * 0.2, 1.02, z, 0.008), soft(0.04, 0.16, 0.05, STEEL, x + side * 0.22, 0.83, z, 0.012), soft(0.17, 0.012, 0.22, STEEL, x + side * 0.22, 0.76, z, 0.005));
-  const screen = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.47, 0.3),
-    new THREE.MeshBasicMaterial({ map: textTexture(label, { width: 470, height: 300, color: '#7dd3fc', font: '600 30px "JetBrains Mono", monospace' }), color: '#d8e9ff', toneMapped: false, transparent: true }),
-  );
+  const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.47, 0.3), new THREE.MeshBasicMaterial({ map: screenTexture([label, '', 'login: _']), color: '#d8e9ff', toneMapped: false }));
   screen.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2;
-  screen.position.set(x + side * 0.183, 1.02, z);
-  const back = new THREE.Mesh(new THREE.PlaneGeometry(0.47, 0.3), new THREE.MeshBasicMaterial({ color: '#0d1c33' }));
-  back.rotation.y = screen.rotation.y;
-  back.position.set(x + side * 0.1835, 1.02, z);
-  g.add(back, screen);
-  g.add(soft(0.14, 0.014, 0.36, BLACK, x - side * 0.12, 0.762, z, 0.005), soft(0.095, 0.022, 0.058, BLACK, x - side * 0.12, 0.766, z + 0.27, 0.01));
+  screen.position.set(x + side * 0.187, 1.02, z);
+  g.add(screen);
+  // Keyboard with its keys, mouse, and a tower whose front faces the room.
+  const caps = new THREE.Mesh(new THREE.PlaneGeometry(0.35, 0.13), KEYS);
+  caps.rotation.set(-Math.PI / 2, 0, -side * Math.PI / 2);
+  caps.position.set(x - side * 0.12, 0.7695, z);
+  g.add(soft(0.14, 0.014, 0.36, BLACK, x - side * 0.12, 0.762, z, 0.005), caps, soft(0.095, 0.022, 0.058, BLACK, x - side * 0.12, 0.766, z + 0.27, 0.01));
   g.add(soft(0.36, 0.38, 0.17, BLACK, x + side * 0.12, 0.2, z - 0.28, 0.012));
+  g.add(box(0.002, 0.28, 0.004, LED, x - side * 0.062, 0.2, z - 0.34, false), box(0.002, 0.004, 0.11, STEEL, x - side * 0.062, 0.3, z - 0.27, false), box(0.002, 0.02, 0.02, STEEL, x - side * 0.062, 0.25, z - 0.27, false));
   // The socket under the table, on the trunking.
   g.add(box(0.012, 0.075, 0.075, lit('#e8ebef', 0.7), wallX - side * 0.04, 0.42, z, false), box(0.003, 0.02, 0.022, BLACK, wallX - side * 0.048, 0.42, z, false));
   const shadow = contactShadow(1.1, 1.25, 0.45);
@@ -243,16 +244,18 @@ function workstation(x: number, z: number, wallX: number, label: string): THREE.
 function labFurniture(): THREE.Group {
   const g = new THREE.Group();
   const wallX = 3.48;
-  [-1.2, -0.05, 1.1, 2.25].forEach((z, i) => g.add(workstation(2.95, z, wallX, `TP-${String(i + 1).padStart(2, '0')}  login:`)));
+  [-1.2, -0.05, 1.1, 2.25].forEach((z, i) => g.add(workstation(2.95, z, wallX, `TP-${String(i + 1).padStart(2, '0')}`)));
   g.add(box(0.03, 0.06, 5.0, lit('#d6dae0', 0.6), wallX - 0.01, 0.42, 0.9, false));
 
   // Projection screen and projector above the room.
-  g.add(box(1.75, 0.05, 0.08, GREY, 1.6, 2.5, -1.56));
-  const under = new THREE.Mesh(new THREE.PlaneGeometry(1.72, 1.07), new THREE.MeshStandardMaterial({ color: '#f1f5fb', roughness: 0.8 }));
-  under.position.set(1.6, 1.96, -1.578);
-  const projected = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 1.05), new THREE.MeshBasicMaterial({ map: textTexture('VLAN 10 · VLAN 20 · TRUNK', { width: 1024, height: 632, color: '#1d4ed8', font: '700 62px Poppins, sans-serif' }), transparent: true }));
+  const map = diagramTexture();
+  const projected = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 1.05), new THREE.MeshStandardMaterial({ map, emissive: '#ffffff', emissiveMap: map, emissiveIntensity: 0.28, roughness: 0.85 }));
   projected.position.set(1.6, 1.96, -1.572);
-  g.add(under, projected, box(0.34, 0.12, 0.28, lit('#e8ebef', 0.5), 1.6, 2.72, 0.9), box(0.04, 0.2, 0.04, STEEL, 1.6, 2.89, 0.9), box(0.06, 0.06, 0.02, BLACK, 1.6, 2.72, 0.75, false));
+  g.add(soft(1.82, 0.07, 0.09, BLACK, 1.6, 2.53, -1.55, 0.02), soft(1.74, 0.018, 0.02, BLACK, 1.6, 1.425, -1.565, 0.006), projected);
+  const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, 0.03, 20), BLACK);
+  lens.rotation.x = Math.PI / 2;
+  lens.position.set(1.6, 2.72, 0.75);
+  g.add(soft(0.34, 0.12, 0.28, lit('#e8ebef', 0.5), 1.6, 2.72, 0.9, 0.025), lens, box(0.04, 0.2, 0.04, STEEL, 1.6, 2.89, 0.9));
 
   // Two closed lockers against the left wall, and what is pinned up in any lab.
   for (const z of [-1.28, -0.66]) {
@@ -275,7 +278,7 @@ function labFurniture(): THREE.Group {
 function officeFurniture(): THREE.Group {
   const g = new THREE.Group();
   const wallX = 3.48;
-  [-0.7, 0.45, 1.6].forEach((z, i) => g.add(workstation(2.95, z, wallX, `ADM-${String(i + 1).padStart(2, '0')}  login:`)));
+  [-0.7, 0.45, 1.6].forEach((z, i) => g.add(workstation(2.95, z, wallX, `ADM-${String(i + 1).padStart(2, '0')}`)));
   g.add(box(0.03, 0.06, 4.0, lit('#d6dae0', 0.6), wallX - 0.01, 0.42, 0.45, false));
   // Windows onto the outside, on the front wall, and binders on a long low cabinet.
   for (const x of [-1.7, 1.2]) {

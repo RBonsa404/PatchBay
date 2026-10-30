@@ -10,3 +10,5 @@ course/
 docs/references/*
 !docs/references/INDEX.md
 .wrangler/
+
+CLAUDE.md
