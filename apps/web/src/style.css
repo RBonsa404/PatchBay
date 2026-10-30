@@ -369,3 +369,24 @@ body.time-low::after { content: ''; position: fixed; inset: 0; pointer-events: n
   .breakdown { grid-template-columns: 1fr; }
 }
 .chat-privacy { margin: 0 0 8px; font-size: 12px; color: var(--text-3); }
+
+/* Long sheets keep their buttons in view. */
+.dossier footer, .results footer { position: sticky; bottom: -28px; margin: 0 -32px -28px; padding: 14px 32px; background: var(--panel); border-top: 1px solid var(--line); z-index: 1; }
+.results footer { bottom: -30px; margin-bottom: -30px; }
+.brief-panel { flex: 1; min-height: 0; overflow: auto; font-size: 15px; line-height: 1.55; }
+.brief-panel p { margin: 0 0 10px; }
+.controls { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 10px 14px; align-items: center; overflow: auto; }
+.controls dd { margin: 0; font-size: 14px; }
+.controls kbd { font: 12px var(--font-mono); padding: 3px 7px; border: 1px solid var(--line-strong); white-space: nowrap; }
+
+/* On a laptop screen: Aïcha beside the objectives rather than over them, messages under the clock, clear of the buttons. */
+@media (min-width: 901px) {
+  .coach { left: 346px; right: auto; bottom: 104px; transform: none; width: min(520px, calc(100vw - 720px)); min-width: 340px; }
+  body:has(.panel) .coach { left: 346px; right: auto; transform: none; }
+  .toasts { top: 84px; bottom: auto; left: 50%; transform: translateX(-50%); pointer-events: none; align-items: center; }
+}
+.dossier footer, .results footer { background: #0c111a; }
+.time-line { flex-wrap: wrap; white-space: normal; }
+.time-line > span, .time-line { line-height: 1.4; }
+.time-line small { flex: 1 1 260px; }
+.toast { pointer-events: none; }

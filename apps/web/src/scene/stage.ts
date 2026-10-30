@@ -21,6 +21,12 @@ export function detectQuality(): Quality {
   // The reference machine has 8 GB: everything is on by default. Only a really small machine starts lower.
   const cores = navigator.hardwareConcurrency ?? 8;
   const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8;
+  try {
+    const saved = localStorage.getItem('patchbay.quality');
+    if (saved === 'low' || saved === 'medium' || saved === 'high') return saved;
+  } catch {
+    // storage unavailable: detect each time
+  }
   if (cores <= 2 || memory <= 2) return 'low';
   if (cores <= 3 || memory <= 4) return 'medium';
   return 'high';
@@ -54,6 +60,12 @@ export class Stage {
   private readonly frontKey: THREE.SpotLight;
   private readonly ao: GTAOPass;
   private readonly vignette: ShaderPass;
+  private readonly grade: ShaderPass;
+  private shadowTime = 2;
+  /** How far the game has lightened itself to stay fluid: 0 is everything on. */
+  private relief = 0;
+  private sampled = 0;
+  private frames = 0;
   /** A mission drives the camera itself (first-person eyes); otherwise the orbit controls do. */
   manualCamera = false;
 
@@ -63,7 +75,9 @@ export class Stage {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 0.95;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.VSMShadowMap;
+    // The room stands still: shadows are drawn again only when something in it changes (see `refreshShadows`).
+    this.renderer.shadowMap.autoUpdate = false;
     container.appendChild(this.renderer.domElement);
 
     this.camera = new THREE.PerspectiveCamera(BASE_FOV, 1, 0.02, 60);
@@ -93,14 +107,18 @@ export class Stage {
     this.key.position.set(0.4, 2.95, 0.6);
     this.key.target.position.set(0, 0.8, -0.1);
     this.key.shadow.mapSize.set(4096, 4096);
-    this.key.shadow.bias = -0.0004;
+    this.key.shadow.bias = -0.0002;
     this.key.shadow.normalBias = 0.02;
+    this.key.shadow.radius = 5;
+    this.key.shadow.blurSamples = 16;
     this.frontKey = new THREE.SpotLight('#f1f5ff', 9, 0, 0.95, 1, 1.6);
     this.frontKey.position.set(0.4, 2.95, 2.4);
     this.frontKey.target.position.set(0.1, 0, 1.3);
     this.frontKey.shadow.mapSize.set(2048, 2048);
-    this.frontKey.shadow.bias = -0.0005;
+    this.frontKey.shadow.bias = -0.0003;
     this.frontKey.shadow.normalBias = 0.03;
+    this.frontKey.shadow.radius = 7;
+    this.frontKey.shadow.blurSamples = 16;
     this.scene.add(this.key, this.key.target, this.frontKey, this.frontKey.target);
     for (const [x, z] of [[-1.5, 0.3], [2.2, 0.3], [-1.5, 2.2], [2.2, 2.2]] as const) {
       const panel = new THREE.SpotLight('#dfe9ff', 7, 0, 1.05, 1, 1.6);
@@ -138,6 +156,20 @@ export class Stage {
     this.vignette.uniforms.offset!.value = 0.95;
     this.vignette.uniforms.darkness!.value = 1.15;
     this.composer.addPass(this.vignette);
+    // A light grade: a little more contrast and colour than the raw render.
+    this.grade = new ShaderPass({
+      uniforms: { tDiffuse: { value: null } },
+      vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: `uniform sampler2D tDiffuse; varying vec2 vUv;
+        void main() {
+          vec4 c = texture2D(tDiffuse, vUv);
+          float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
+          vec3 v = mix(vec3(l), c.rgb, 1.1);
+          v = mix(v, v * v * (3.0 - 2.0 * v), 0.22);
+          gl_FragColor = vec4(v, c.a);
+        }`,
+    });
+    this.composer.addPass(this.grade);
 
     this.setQuality(quality);
     window.addEventListener('resize', () => this.resize());
@@ -161,6 +193,9 @@ export class Stage {
     this.bloom.enabled = q !== 'low';
     this.ao.enabled = q !== 'low';
     this.vignette.enabled = q !== 'low';
+    this.grade.enabled = q !== 'low';
+    this.relief = 0;
+    this.refreshShadows(1);
     for (const light of this.extraLights) light.visible = q !== 'low';
     for (const light of this.accents) light.visible = q !== 'low';
     this.scene.traverse((o) => {
@@ -168,6 +203,56 @@ export class Stage {
       if (m) m.needsUpdate = true;
     });
     this.resize();
+  }
+
+  /** Draw the shadows again for this long: something in the room has just changed. */
+  refreshShadows(seconds = 1): void {
+    this.shadowTime = Math.max(this.shadowTime, seconds);
+  }
+
+  /**
+   * The room's real image as its reflection: floors, metal and glass mirror the walls and the ceiling lights. Taken
+   * once, from the middle of the room, once the room is built.
+   */
+  captureEnvironment(): void {
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    const previous = this.scene.environment;
+    this.scene.environment = null;
+    this.scene.position.set(0, -1.5, -1);
+    this.scene.updateMatrixWorld(true);
+    const target = pmrem.fromScene(this.scene, 0.02, 0.1, 30);
+    this.scene.position.set(0, 0, 0);
+    this.scene.updateMatrixWorld(true);
+    this.scene.environment = target.texture;
+    this.scene.environmentIntensity = 0.75;
+    (previous as THREE.Texture | null)?.dispose();
+    pmrem.dispose();
+  }
+
+  /** Stay fluid on the machine it is given: when the frame rate stays low, give up what costs most, one step at a time. */
+  private adapt(dt: number): void {
+    if (this.quality === 'low' || dt >= 0.1) return;
+    this.sampled += dt;
+    this.frames++;
+    if (this.sampled < 2.5) return;
+    const fps = this.frames / this.sampled;
+    this.sampled = 0;
+    this.frames = 0;
+    if (fps >= 42 || this.relief >= 3) return;
+    this.relief++;
+    if (this.relief === 1) {
+      this.renderer.setPixelRatio(1);
+      this.resize();
+    } else if (this.relief === 2) {
+      this.ao.enabled = false;
+    } else {
+      this.frontKey.castShadow = false;
+      this.scene.traverse((o) => {
+        const m = (o as THREE.Mesh).material as THREE.Material | undefined;
+        if (m && !Array.isArray(m)) m.needsUpdate = true;
+      });
+      this.refreshShadows(1);
+    }
   }
 
   /** Call `fn` every frame; returns the function that stops it. */
@@ -207,6 +292,7 @@ export class Stage {
   setRig(y: number, z: number): void {
     if (y === this.rigY && z === this.rigZ) return;
     const [dy, dz] = [y - this.rigY, z - this.rigZ];
+    this.refreshShadows(0.3);
     this.rigY = y;
     this.rigZ = z;
     // The coloured glows belong to the technical room's machines: they stay there.
@@ -244,6 +330,7 @@ export class Stage {
       for (const m of mats) m.dispose();
     });
     this.level.clear();
+    this.refreshShadows(2);
   }
 
   private resize(): void {
@@ -271,6 +358,11 @@ export class Stage {
     const time = this.clock.elapsedTime;
     for (const fn of [...this.frameHandlers]) fn(dt, time);
     if (!this.manualCamera) this.controls.update();
+    if (this.shadowTime > 0) {
+      this.renderer.shadowMap.needsUpdate = true;
+      this.shadowTime -= dt;
+    }
+    this.adapt(dt);
     if (this.quality === 'low') this.renderer.render(this.scene, this.camera);
     else this.composer.render(dt);
   }

@@ -52,7 +52,7 @@ const EYE = 1.62;
 const MAX_PITCH = 1.35;
 /** Looking at the bench and the rack from a standing position. */
 const HOME_YAW = Math.PI;
-const HOME_PITCH = -0.26;
+const HOME_PITCH = -0.34;
 
 export interface MoveInput {
   /** -1 … 1: right is +x, forward is +y (relative to where the player looks). */
@@ -63,7 +63,7 @@ export interface MoveInput {
 
 export class Player {
   x = 0;
-  z = 1.15;
+  z = 1.75;
   yaw = HOME_YAW;
   pitch = HOME_PITCH;
   private speed = 0;

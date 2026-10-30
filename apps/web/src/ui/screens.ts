@@ -63,6 +63,7 @@ export function showTitle(onPlay: () => void, onMissions: () => void): void {
       { class: 'side-column' },
       logo('large'),
       h('p', { class: 'tagline' }, t('title.tagline')),
+      window.innerWidth < 1000 || matchMedia('(pointer: coarse)').matches ? h('p', { class: 'muted' }, t('title.desktop')) : null,
       h(
         'nav',
         { class: 'menu', 'aria-label': 'Menu principal' },
@@ -130,7 +131,7 @@ export function showBriefing(level: Level, index: number, onStart: () => void, o
         ? h('div', { class: 'mentor-line' }, mentorPortrait(), h('div', {}, h('strong', {}, `${MENTOR.name} · ${MENTOR.role}`), h('p', {}, tx(level.story))))
         : null,
       h('section', {}, h('h3', {}, t('briefing.order')), h('div', { class: 'brief' }, tx(level.brief))),
-      h('p', { class: 'time-line' }, icon(Timer, 16), `${t('briefing.time')} : ${clock(level.timeLimit ?? 600)}`, h('small', {}, ` · ${onExam ? t('exam.note') : ''}`)),
+      h('p', { class: 'time-line' }, icon(Timer, 16), h('span', { style: { whiteSpace: 'nowrap' } }, `${t('briefing.time')} : ${clock(level.timeLimit ?? 600)}`), h('small', {}, onExam ? t('exam.note') : '')),
       h(
         'section',
         {},

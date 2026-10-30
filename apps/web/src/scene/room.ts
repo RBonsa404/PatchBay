@@ -86,8 +86,8 @@ let mainDoor: THREE.Group | null = null;
 
 /** The door of the technical room stays shut in the missions that take place in that room alone. */
 export function setMainDoorOpen(open: boolean): void {
-  if (mainDoor) // Wide open, flat against the corridor's wall.
-  mainDoor.rotation.y = open ? Math.PI * 0.96 : 0;
+  // Wide open, flat against the corridor's wall.
+  if (mainDoor) mainDoor.rotation.y = open ? Math.PI * 0.96 : 0;
 }
 
 /** A room's shell, bench, rack and cable tray; `door` says which wall has the doorway. */
@@ -129,7 +129,7 @@ function shell(door: 'back' | 'front'): THREE.Group {
 
   const floorTex = raisedFloorTexture();
   floorTex.repeat.set(ROOM.width / 1.2, depth / 1.2);
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.width, depth), new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.55, metalness: 0.1 }));
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.width, depth), new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.32, metalness: 0.12 }));
   floor.rotation.x = -Math.PI / 2;
   floor.position.z = (ROOM.front + ROOM.back) / 2;
   floor.receiveShadow = true;
@@ -168,7 +168,7 @@ function shell(door: 'back' | 'front'): THREE.Group {
 function bench(): THREE.Group {
   const g = new THREE.Group();
   const [w, d, z] = [3.2, 1.1, 0.25];
-  const laminate = new THREE.MeshStandardMaterial({ map: laminateTexture(), roughness: 0.6 });
+  const laminate = new THREE.MeshStandardMaterial({ map: laminateTexture(), roughness: 0.38 });
   const top = box(w, 0.04, d, laminate);
   top.position.set(0, BENCH_TOP - 0.022, z);
   const mat = new THREE.Mesh(new THREE.BoxGeometry(w - 0.12, 0.003, d - 0.1), new THREE.MeshStandardMaterial({ map: esdMatTexture(), roughness: 0.85 }));

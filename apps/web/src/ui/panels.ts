@@ -279,3 +279,33 @@ export function showPortList(devices: { id: string; open(): void; ports: PortEnt
   ], 'ports');
   (document.querySelector('.port-list button') as HTMLElement | null)?.focus();
 }
+
+export function showBriefPanel(title: string, brief: string): void {
+  panel(`${t('brief.title')} · ${title}`, [h('div', { class: 'brief-panel' }, ...brief.split('\n').map((line) => h('p', {}, line)))], 'brief');
+}
+
+const CONTROLS: [string, string][] = [
+  ['Z Q S D ou flèches ↑ ↓', 'marcher (Maj : courir)'],
+  ['Glisser, flèches ← →', 'regarder autour de soi'],
+  ['Molette', 'zoomer sur les ports'],
+  ['Double-clic', 's’approcher d’un appareil'],
+  ['1 à 4', 'prendre un câble'],
+  ['Clic / clic droit', 'brancher / débrancher, ouvrir un appareil'],
+  ['B', 'ordre de travail'],
+  ['T', 'schéma au tableau'],
+  ['H', 'demander à Aïcha'],
+  ['P', 'liste des ports, pour tout faire au clavier'],
+  ['M / N', 'couper la musique / morceau suivant'],
+  ['Échap', 'fermer, reposer le câble, revenir'],
+];
+
+export function showHelp(): void {
+  panel(t('help.title'), [h('dl', { class: 'controls' }, ...CONTROLS.flatMap(([key, what]) => [h('dt', {}, h('kbd', {}, key)), h('dd', {}, what)]))], 'help');
+}
+
+export function showConfirm(title: string, text: string, label: string, confirm: () => void): void {
+  panel(title, [
+    h('p', { class: 'notice' }, text),
+    h('div', { class: 'actions' }, h('button', { class: 'btn primary small', onclick: () => { closePanel(); confirm(); } }, label), h('button', { class: 'btn ghost small', onclick: () => closePanel() }, t('panel.close'))),
+  ], 'confirm');
+}

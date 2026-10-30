@@ -18,6 +18,17 @@ const ROOM_LEVEL: Record<Mood, number> = { menu: 0.6, mission: 1.2 };
 /** The MP3s in `public/music`, all normalised to the same loudness. */
 const TRACKS = ['calm-ambient-1', 'calm-ambient-2', 'calm-ambient-3', 'calm-relax-1', 'contemplation', 'first-light-particles', 'starfield-romance', 'exploration-theme'];
 const SYNTH = 'synth';
+const TITLES: Record<string, string> = {
+  'calm-ambient-1': 'Calm Ambient 1',
+  'calm-ambient-2': 'Calm Ambient 2',
+  'calm-ambient-3': 'Calm Ambient 3',
+  'calm-relax-1': 'Calm Relax 1',
+  contemplation: 'Contemplation',
+  'first-light-particles': 'First Light Particles',
+  'starfield-romance': 'Starfield Romance',
+  'exploration-theme': 'Exploration Theme',
+  [SYNTH]: 'morceau du jeu',
+};
 /** Level of the MP3s, so that they match the generative piece. */
 const TRACK_LEVEL = 0.85;
 const FADE = 2.5;
@@ -117,6 +128,11 @@ class Sound {
   /** Skip to the next piece of the playlist. */
   nextTrack(): void {
     if (this.ctx && this.musicOn) this.startNext();
+  }
+
+  /** The name of the piece playing now, to tell which one you like or not. */
+  get trackTitle(): string {
+    return TITLES[this.playing] ?? this.playing;
   }
 
   /** The track playing now (for automated checks). */

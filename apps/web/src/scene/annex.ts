@@ -132,12 +132,6 @@ function corridor(upper: boolean, stairs: boolean): THREE.Group {
     notice.position.set(1.42 + i * 0.48, 1.5, back + 0.03);
     g.add(notice);
   }
-  // Two lamps per corridor.
-  for (const x of [-2.2, 2.2]) {
-    const lamp = new THREE.PointLight('#eaf1ff', 5.5, 8, 1.6);
-    lamp.position.set(x, 2.8, mid);
-    g.add(lamp);
-  }
   return g;
 }
 
@@ -303,5 +297,14 @@ export function buildAnnex(floors: boolean): THREE.Group {
     g.add(stairwell(), office, upper);
   }
   bake(g);
+  // Two lamps only, moved to whichever corridor the player is in: every light costs on every pixel.
+  const lamps = new THREE.Group();
+  lamps.name = 'corridor-lamps';
+  for (const x of [-2.2, 2.2]) {
+    const lamp = new THREE.PointLight('#eaf1ff', 5.5, 8, 1.6);
+    lamp.position.set(x, 2.8, (BUILDING.corridor.back + BUILDING.corridor.front) / 2);
+    lamps.add(lamp);
+  }
+  g.add(lamps);
   return g;
 }

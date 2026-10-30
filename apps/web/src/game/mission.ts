@@ -13,12 +13,12 @@ import { BUILDING, rackFillers, setMainDoorOpen } from '../scene/room.js';
 import type { Quality, Stage } from '../scene/stage.js';
 import { AskAicha } from '../ui/askAicha.js';
 import { CABLE_ORDER, Hud } from '../ui/hud.js';
-import { closePanel, Consoles, openPanelKey, resetHostShells, showHostPanel, showNotice, showPortList } from '../ui/panels.js';
+import { closePanel, Consoles, openPanelKey, resetHostShells, showHostPanel, showBriefPanel, showConfirm, showHelp, showNotice, showPortList } from '../ui/panels.js';
 import { clock, grade, type Grade } from './scoring.js';
 
 const HOME = { position: new THREE.Vector3(0, 1.78, 2.45), target: new THREE.Vector3(0, 0.86, 0.02) };
 /** How far the player can reach a device from, in metres (seen from above). */
-const REACH = 2.0;
+const REACH = 2.6;
 /** Movement keys, by physical position (ZQSD on a French keyboard, WASD on an English one), and the arrows. */
 const KEYS: Record<string, [number, number]> = {
   KeyW: [0, 1], ArrowUp: [0, 1], KeyS: [0, -1], ArrowDown: [0, -1], KeyA: [-1, 0], KeyD: [1, 0],
@@ -126,12 +126,19 @@ export class Mission {
   /** The clock starts once the player has walked in. */
   private entrance = reducedMotion() ? 0 : ENTRANCE_SECONDS;
   private warned = false;
+  private clockAt = 0;
+  /** The direction shown, catching up with where the player looks: turning the head stays smooth. */
+  private viewYaw = 0;
+  private viewPitch = 0;
+  private ledsIn = 0;
+  private lamps: THREE.Object3D | null = null;
   private lastTick = 0;
   private readonly aicha: AskAicha;
   /** Sitting at the laptop: getting up when the console closes. */
   private seated = false;
 
   constructor(private readonly stage: Stage, readonly level: Level, private readonly events: MissionEvents, index = 0, private readonly exam = false) {
+    this.clockAt = performance.now();
     this.limit = Math.round((level.timeLimit ?? DEFAULT_LIMIT) * (exam ? EXAM_TIME : 1));
     this.remaining = this.limit;
     this.aicha = new AskAicha(() => {
@@ -182,7 +189,9 @@ export class Mission {
     stage.setRig(0, 0);
     if (this.building) {
       this.player.enterBuilding(floors);
-      stage.level.add(buildAnnex(floors));
+      const annex = buildAnnex(floors);
+      this.lamps = annex.getObjectByName('corridor-lamps') ?? null;
+      stage.level.add(annex);
     }
     stage.controls.enabled = false;
     stage.manualCamera = true;
@@ -198,14 +207,16 @@ export class Mission {
     this.hud = new Hud(level, {
       check: () => this.check(),
       hint: () => this.hint(),
-      menu: () => events.menu(),
+      menu: () => this.leave(),
       overview: () => this.overview(),
       ask: () => this.aicha.open(),
       ports: () => this.showPorts(),
+      brief: () => this.showBrief(),
+      help: () => showHelp(),
       cycleQuality: () => this.cycleQuality(),
       selectCable: (type) => this.select(type),
     }, stage.currentQuality, index, exam);
-    setTimeout(() => this.hud.banner(`${t('briefing.mission')} ${String(index + 1).padStart(2, '0')}`, exam ? t('exam.start') : t('timer.start')), this.entrance * 1000);
+    setTimeout(() => this.hud.banner(`${t('briefing.mission')} ${String(index + 1).padStart(2, '0')}`, exam ? t('exam.start') : this.coach?.active ? t('timer.tutorial') : t('timer.start')), this.entrance * 1000);
     this.listen();
     this.afterChange();
     this.coach = exam ? null : Coach.for(level.id, stage, () => this.coachView());
@@ -314,6 +325,12 @@ export class Mission {
     });
     const release = (e: PointerEvent): void => {
       fingers.delete(e.pointerId);
+      // Released outside the canvas (over the HUD, say): the gesture is over all the same.
+      if (down?.id === e.pointerId) {
+        cancelPress();
+        down = null;
+        last = null;
+      }
     };
     on(window, 'pointerup', release);
     on(window, 'pointercancel', release);
@@ -362,6 +379,12 @@ export class Mission {
       if (e.code.startsWith('Shift')) this.held.delete('Shift');
     });
     on(window, 'blur', () => this.held.clear());
+    // Closing the page in the middle of a mission loses it: the browser asks first.
+    const guard = (e: BeforeUnloadEvent): void => {
+      if (!this.finished) e.preventDefault();
+    };
+    window.addEventListener('beforeunload', guard);
+    this.cleanup.push(() => window.removeEventListener('beforeunload', guard));
     on(window, 'keydown', (e) => {
       const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
       if ((KEYS[e.code] || TURN_KEYS[e.code]) && !typing) {
@@ -377,7 +400,15 @@ export class Mission {
       if (e.code === 'KeyT' && !typing) this.toggleBoard();
       if (e.code === 'KeyH' && !typing && !this.exam) this.aicha.open();
       if (e.code === 'KeyP' && !typing) this.showPorts();
-      if (e.code === 'KeyN' && !typing) sound.nextTrack();
+      if (e.code === 'KeyB' && !typing) this.showBrief();
+      if (e.key === 'F1') {
+        e.preventDefault();
+        showHelp();
+      }
+      if (e.code === 'KeyN' && !typing) {
+        sound.nextTrack();
+        this.hud.toast(t('music.now', { title: sound.trackTitle }));
+      }
       if (e.code === 'KeyM' && !typing) this.hud.toast(t(sound.toggleMusic() ? 'music.on' : 'music.off'));
       // 1-4 pick a cable from the inventory (not while typing in a console).
       const slot = /^[1-4]$/.test(e.key) && !(e.target instanceof HTMLInputElement) ? CABLE_ORDER.filter((type) => this.level.inventory.cables[type] !== undefined)[Number(e.key) - 1] : undefined;
@@ -467,6 +498,8 @@ export class Mission {
     if (!this.firstEnd) return ACCEPTS[this.selected].includes(port.spec.kind) ? null : t('error.incompatible');
     if (port === this.firstEnd) return t('error.samePort');
     if (port.device === this.firstEnd.device) return t('error.sameDevice');
+    const [va, vb] = [this.viewOf(this.firstEnd.device), this.viewOf(port.device)];
+    if (va && vb && (va.roomY !== vb.roomY || va.roomZ !== vb.roomZ)) return t('error.otherRoom');
     if (this.panels.has(port.device) || this.panels.has(this.firstEnd.device)) {
       // A cord goes between a panel and a device: panels are only joined by the building's own cabling.
       return this.panels.has(port.device) && this.panels.has(this.firstEnd.device) ? t('error.panelToPanel') : this.selected === 'straight' || this.selected === 'crossover' ? null : t('error.incompatible');
@@ -532,6 +565,10 @@ export class Mission {
     sound.play('plug');
     if (this.left(type) === 0) this.selected = null;
     this.afterChange();
+  }
+
+  private viewOf(id: string): DeviceView | undefined {
+    return this.devices.get(id) ?? this.panels.get(id);
   }
 
   private isBusy(port: PortView): boolean {
@@ -618,6 +655,17 @@ export class Mission {
       this.flying = false;
       this.following = true;
     });
+  }
+
+  /** The work order stays at hand during the mission. */
+  private showBrief(): void {
+    showBriefPanel(tx(this.level.title), tx(this.level.brief));
+  }
+
+  /** Leaving loses the work in progress: ask first. */
+  private leave(): void {
+    if (this.finished) return this.events.menu();
+    showConfirm(t('leave.title'), t('leave.text'), t('leave.confirm'), () => this.events.menu());
   }
 
   /** The keyboard's way to play: every port as a button, doing what a click on it would do. */
@@ -739,11 +787,16 @@ export class Mission {
 
   /** The clock runs from the end of the entrance, except during the guided tutorial of a first mission. */
   private tickClock(dt: number): void {
+    // Real seconds, not frames: a slow machine or a hidden tab must not stop the clock.
+    const now = performance.now();
+    const real = (now - this.clockAt) / 1000;
+    this.clockAt = now;
     if (this.finished) return;
+    this.twinkle(dt);
     if (this.entrance > 0) {
-      this.entrance -= dt;
+      this.entrance -= real;
     } else if (!this.coach?.active) {
-      this.remaining -= dt;
+      this.remaining -= real;
     }
     this.hud?.setTimer(this.remaining, this.limit, this.coach?.active ?? false);
     if (this.remaining <= 60 && !this.warned) {
@@ -758,6 +811,19 @@ export class Mission {
     if (this.remaining <= 0) this.finish(evaluate(this.net, this.level.objectives), true);
   }
 
+  /** Link LEDs flicker with the traffic, as they do on real gear. */
+  private twinkle(dt: number): void {
+    this.ledsIn -= dt;
+    if (this.ledsIn > 0 || reducedMotion()) return;
+    this.ledsIn = 0.09;
+    for (const view of this.devices.values()) {
+      for (const port of view.ports.values()) {
+        const material = port.led?.material as THREE.MeshStandardMaterial | undefined;
+        if (material && material.emissiveIntensity >= 1 && material.emissive.g > material.emissive.r) material.emissiveIntensity = 1.4 + Math.random() * 3.6;
+      }
+    }
+  }
+
   /** Going through a door: the lights follow, and the player is told where they are. */
   private followZone(): void {
     if (!this.building) return;
@@ -765,6 +831,7 @@ export class Mission {
     if (zone === this.lastZone) return;
     if (this.lastZone !== null) this.hud.toast(t(`zone.${zone}`));
     this.lastZone = zone;
+    if (this.lamps) this.lamps.position.y = zone === 'corridor1' || zone === 'office' ? BUILDING.floorY : 0;
     if (zone === 'room') this.stage.setRig(0, 0);
     if (zone === 'lab') this.stage.setRig(0, BUILDING.annexZ);
     if (zone === 'office') this.stage.setRig(BUILDING.floorY, 0);
@@ -794,9 +861,17 @@ export class Mission {
       this.following = true;
     }
     this.stage.zoom += (this.zoom - this.stage.zoom) * (1 - Math.exp(-dt * 10));
+    if (!this.following) {
+      this.viewYaw = this.player.yaw;
+      this.viewPitch = this.player.pitch;
+    }
     if (this.following) {
       camera.position.copy(this.anchor ?? this.player.eye);
-      this.stage.controls.target.copy(camera.position).add(this.player.look);
+      const ease = 1 - Math.exp(-dt * 20);
+      this.viewYaw += (this.player.yaw - this.viewYaw) * ease;
+      this.viewPitch += (this.player.pitch - this.viewPitch) * ease;
+      const c = Math.cos(this.viewPitch);
+      this.stage.controls.target.copy(camera.position).add(new THREE.Vector3(Math.sin(this.viewYaw) * c, Math.sin(this.viewPitch), Math.cos(this.viewYaw) * c));
     }
     // Never let the camera leave the room (it would see through the walls).
     if (!this.building) {
@@ -905,6 +980,7 @@ export class Mission {
       ...this.net.cables.filter((c) => !this.cordOf(c.a)),
       ...this.cords.map((c) => ({ type: c.type, a: { device: c.end.device, port: c.end.port }, b: { device: c.panel.device, port: c.panel.port } })),
     ] as typeof this.net.cables;
+    this.stage.refreshShadows(0.8);
     this.cables.sync(drawn, (device, port) => (this.devices.get(device) ?? this.panels.get(device))?.ports.get(port));
     this.updateLeds();
     this.consoles.collectSyslog();
@@ -979,6 +1055,11 @@ export class Mission {
     const order: Quality[] = ['low', 'medium', 'high'];
     const next = order[(order.indexOf(this.stage.currentQuality) + 1) % order.length] as Quality;
     this.stage.setQuality(next);
+    try {
+      localStorage.setItem('patchbay.quality', next);
+    } catch {
+      // storage unavailable: the choice lasts until the page closes
+    }
     return next;
   }
 }

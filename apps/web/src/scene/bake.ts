@@ -16,7 +16,7 @@ export function bake(group: THREE.Group): void {
     const mesh = o as THREE.Mesh;
     if (mesh.isMesh && !Array.isArray(mesh.material)) {
       const m = mesh.material as THREE.MeshStandardMaterial;
-      const key = [m.type, m.color?.getHexString(), m.roughness, m.metalness, m.map?.uuid, m.transparent, m.opacity, m.toneMapped, m.depthWrite, m.side, mesh.renderOrder, mesh.castShadow, mesh.receiveShadow].join('|');
+      const key = [m.type, m.color?.getHexString(), m.roughness, m.metalness, m.map?.uuid, m.transparent, m.opacity, m.toneMapped, m.depthWrite, m.side, m.emissive?.getHexString(), m.emissiveIntensity, m.envMapIntensity, mesh.renderOrder, mesh.castShadow, mesh.receiveShadow].join('|');
       const source = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry.clone();
       for (const name of Object.keys(source.attributes)) {
         if (name !== 'position' && name !== 'normal' && name !== 'uv') source.deleteAttribute(name);

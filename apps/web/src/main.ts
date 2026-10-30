@@ -21,8 +21,17 @@ document.addEventListener('click', (e) => {
   if ((e.target as HTMLElement).closest('.btn, .tool, .cable-slot, .mission-row, .menu-item')) sound.play('click');
 });
 
+// Without WebGL there is no room to walk in: say so, rather than leaving a black page.
+if (!document.createElement('canvas').getContext('webgl2')) {
+  const boot = document.getElementById('boot');
+  if (boot) boot.textContent = 'PatchBay a besoin de WebGL 2. Active l’accélération matérielle du navigateur, ou essaie Chrome ou Edge à jour.';
+  throw new Error('WebGL 2 is not available');
+}
+
 const stage = new Stage(document.getElementById('stage') as HTMLElement, detectQuality());
 stage.scene.add(buildRoom());
+stage.captureEnvironment();
+document.getElementById('boot')?.remove();
 
 /** A message on top of whatever screen is shown (outside missions, which have their own toasts). */
 function notify(text: string): void {
@@ -32,6 +41,10 @@ function notify(text: string): void {
   setTimeout(() => el.remove(), 4200);
 }
 startGamepad(stage, notify);
+stage.renderer.domElement.addEventListener('webglcontextlost', (e) => {
+  e.preventDefault();
+  notify('La carte graphique a décroché : recharge la page pour reprendre.');
+});
 
 // Installable and playable offline once loaded (production builds only: the dev server reloads modules itself).
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {

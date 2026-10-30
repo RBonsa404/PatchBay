@@ -1,4 +1,4 @@
-import { Check, CircleCheckBig, Gauge, Keyboard, Lightbulb, Menu, MessageCircleQuestion, Scan, Timer, Volume2, VolumeX, type IconNode } from 'lucide';
+import { BookOpen, Check, CircleCheckBig, CircleHelp, Gauge, Keyboard, Lightbulb, Menu, MessageCircleQuestion, Scan, Timer, Volume2, VolumeX, type IconNode } from 'lucide';
 import type { CableType, Level, ObjectiveResult } from '@patchbay/sim-core';
 import { t, tx, type Key } from '../i18n.js';
 import { CABLE_STYLE } from '../scene/cables.js';
@@ -14,6 +14,8 @@ export interface HudActions {
   menu(): void;
   overview(): void;
   ask(): void;
+  brief(): void;
+  help(): void;
   ports(): void;
   cycleQuality(): Quality;
   selectCable(type: CableType | null): void;
@@ -86,10 +88,12 @@ export class Hud {
         h(
           'div',
           { class: 'toolbar panel-solid' },
+          toolButton(t('brief.tool'), BookOpen, () => actions.brief()),
           toolButton(t('hud.view'), Scan, () => actions.overview()),
           exam ? null : toolButton(t('hud.hint'), Lightbulb, () => actions.hint()),
           exam ? null : toolButton(t('assistant.tool'), MessageCircleQuestion, () => actions.ask()),
           toolButton(t('ports.tool'), Keyboard, () => actions.ports()),
+          toolButton(t('help.tool'), CircleHelp, () => actions.help()),
           qualityButton,
           soundButton,
           toolButton(t('hud.menu'), Menu, () => actions.menu()),
