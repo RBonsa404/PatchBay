@@ -32,6 +32,8 @@ const BOARD_CENTRE = new THREE.Vector3(-1.75, 1.62, -1.56);
 const BOARD_VIEW = new THREE.Vector3(-1.75, 1.62, -0.5);
 /** How long it takes to walk in from the door when a mission starts. */
 const ENTRANCE_SECONDS = 3.4;
+/** Height of the eyes when sitting at the bench. */
+const SEATED_EYE = 1.2;
 const ACCEPTS: Record<CableType, PortSpec['kind'][]> = {
   straight: ['ethernet'],
   crossover: ['ethernet'],
@@ -93,6 +95,8 @@ export class Mission {
   /** After a zoom on a device: where the head stays until the player walks away. */
   private anchor: THREE.Vector3 | null = null;
   private zoom = ZOOM_REST;
+  /** Sitting at the laptop: getting up when the console closes. */
+  private seated = false;
 
   constructor(private readonly stage: Stage, readonly level: Level, private readonly events: MissionEvents, index = 0) {
     stage.clearLevel();
@@ -527,6 +531,7 @@ export class Mission {
   /** Back to standing eyes, facing the bench and the rack. */
   private overview(seconds = 1.1): void {
     this.anchor = null;
+    this.seated = false;
     this.player.faceHome();
     this.setZoom(ZOOM_REST);
     const eye = this.player.eye;
@@ -561,6 +566,11 @@ export class Mission {
       if (turn) this.player.turn((turn * dt) / this.zoom, 0);
     }
     const { moved, step } = this.player.update(dt, this.moveInput());
+    if (this.seated && moved) this.seated = false;
+    if (this.seated && !this.flying && !openPanelKey()) {
+      this.seated = false;
+      this.overview(0.7);
+    }
     if (step) sound.play('step');
     if (moved && (this.anchor || this.flying) && !this.finished) {
       // Walking takes over at once from a zoom on a device or a flight in progress.
@@ -607,19 +617,36 @@ export class Mission {
     return undefined;
   }
 
+  /** Sit down at the laptop: eyes lower, facing the bench and the rack, for as long as the console stays open. */
+  private openConsole(device: string, laptop: string): void {
+    this.consoles.open(device, laptop);
+    const view = this.devices.get(laptop);
+    if (!view) return;
+    const p = view.root.getWorldPosition(new THREE.Vector3());
+    const seat = new THREE.Vector3(p.x, SEATED_EYE, Math.max(p.z + 0.62, 1.08));
+    // Turned towards the rack, so that it stays visible beside the console panel.
+    const target = new THREE.Vector3(0.25 + p.x * 0.4, 0.98, -0.4);
+    this.setZoom(1);
+    this.seated = true;
+    this.fly(seat, target, 0.8, () => {
+      this.anchor = seat;
+      this.player.lookAlong(target.clone().sub(seat));
+    });
+  }
+
   private openDevice(id: string): void {
     const view = this.devices.get(id);
     if (!view) return;
     if (view.shape === 'router' || view.shape === 'switch') {
       const laptop = this.consoleLaptop(id);
-      if (laptop) this.consoles.open(id, laptop);
+      if (laptop) this.openConsole(id, laptop);
       else showNotice(id, t('panel.routerInfo'));
       this.coach?.update();
       return;
     }
     const target = this.net.consoleTarget(id);
     if (view.shape === 'laptop') {
-      if (target) this.consoles.open(target.id, id);
+      if (target) this.openConsole(target.id, id);
       else showNotice(`${t('panel.console')} · ${id}`, t('panel.noConsole'));
       this.coach?.update();
       return;
@@ -688,7 +715,6 @@ export class Mission {
       sound.play('success');
       this.coach?.dispose();
       this.coach = null;
-      this.hud.toast(t('check.done'), 'good');
       this.hud.showTooltip(null);
       closePanel();
       // The camera pulls back for the finale; the results never wait on it (animation pauses in background tabs).

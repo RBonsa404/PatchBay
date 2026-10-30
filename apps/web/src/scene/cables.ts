@@ -8,7 +8,7 @@ import type { Stage } from './stage.js';
 export const CABLE_STYLE: Record<CableType, { colour: string; radius: number }> = {
   straight: { colour: '#2563eb', radius: 0.0032 },
   crossover: { colour: '#f59e0b', radius: 0.0032 },
-  console: { colour: '#7dd3fc', radius: 0.0028 },
+  console: { colour: '#2f9fd6', radius: 0.0028 },
   serial: { colour: '#334155', radius: 0.0045 },
 };
 
@@ -57,12 +57,13 @@ function routeBetween(a: THREE.Vector3, na: THREE.Vector3, b: THREE.Vector3, nb:
   const offset = lane * LANE;
 
   if (highA && highB && a1.distanceTo(b1) < 0.6) {
-    // Patch loop in front of the rack: down and out, each cable a little lower and further out than the last.
-    const mid = a1.clone().lerp(b1, 0.5);
-    mid.y = Math.min(a1.y, b1.y) - 0.05 - offset * 0.6;
-    mid.z = Math.max(a1.z, b1.z) + 0.03 + offset;
-    mid.x += a1.x <= b1.x ? 0.12 + offset : -0.12 - offset;
-    return new THREE.CatmullRomCurve3([a, a1, mid, b1, b], false, 'centripetal', 0.5);
+    // Patch cord: along the gear to the nearest cable manager, along the manager, and back along the other device.
+    const side = (a1.x + b1.x) / 2 < RACK.x ? -1 : 1;
+    const x = RACK.x + side * (MANAGER.x - 0.012 + (lane % 4) * 0.006);
+    const z = RACK.frontZ + 0.03;
+    const drop = 0.018 + (lane % 4) * 0.004;
+    const [topY, bottomY] = [a1.y - drop, b1.y - drop];
+    return new THREE.CatmullRomCurve3([a, a1, new THREE.Vector3(x - side * 0.05, topY, z), new THREE.Vector3(x, topY - 0.02, z), new THREE.Vector3(x, bottomY + 0.02, z), new THREE.Vector3(x - side * 0.05, bottomY, z), b1, b], false, 'centripetal', 0.5);
   }
 
   // Touch-down points on the bench, just past each port, shifted into this cable's lane.

@@ -1,3 +1,4 @@
+import { sound } from '../audio.js';
 import { ArrowLeft, ArrowRight, ChevronRight, LayoutList, Play, RotateCcw, Star } from 'lucide';
 import type { Evaluation, Level } from '@patchbay/sim-core';
 import { t, tx } from '../i18n.js';
@@ -129,6 +130,59 @@ export function showBriefing(level: Level, index: number, onStart: () => void, o
   ui().append(screen);
 }
 
+/** A burst of paper in the club's colours from both sides of the screen, gone after a few seconds. */
+function confetti(host: HTMLElement): void {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const canvas = document.createElement('canvas');
+  canvas.className = 'confetti';
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  host.append(canvas);
+  const c = canvas.getContext('2d') as CanvasRenderingContext2D;
+  const colours = ['#fbbf24', '#1d4ed8', '#38bdf8', '#f8fafc'];
+  const pieces = Array.from({ length: 150 }, (_, i) => {
+    const left = i % 2 === 0;
+    const angle = (left ? -1 : -Math.PI + 1) + (Math.random() - 0.5) * 0.9;
+    const speed = 500 + Math.random() * 750;
+    return {
+      x: left ? -10 : canvas.width + 10,
+      y: canvas.height * 0.72,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      turn: Math.random() * 6,
+      spin: 4 + Math.random() * 8,
+      size: 5 + Math.random() * 6,
+      colour: colours[i % colours.length] as string,
+    };
+  });
+  let last = performance.now();
+  const end = last + 4500;
+  const frame = (now: number): void => {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    c.clearRect(0, 0, canvas.width, canvas.height);
+    c.globalAlpha = Math.min(1, (end - now) / 900);
+    for (const p of pieces) {
+      p.vy += 720 * dt;
+      p.vx *= 1 - 0.9 * dt;
+      p.vy *= 1 - 0.9 * dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.turn += p.spin * dt;
+      c.save();
+      c.translate(p.x, p.y);
+      c.rotate(p.turn);
+      c.scale(1, Math.cos(p.turn * 1.4));
+      c.fillStyle = p.colour;
+      c.fillRect(-p.size / 2, -p.size / 3, p.size, p.size * 0.66);
+      c.restore();
+    }
+    if (now < end && canvas.isConnected) requestAnimationFrame(frame);
+    else canvas.remove();
+  };
+  requestAnimationFrame(frame);
+}
+
 export function showResults(
   level: Level,
   evaluation: Evaluation,
@@ -164,6 +218,9 @@ export function showResults(
     ),
   );
   ui().append(screen);
+  confetti(screen);
+  // A note for each star as it lands.
+  [0.25, 0.5, 0.75].slice(0, starCount(evaluation.score)).forEach((delay) => setTimeout(() => sound.play('objective'), delay * 1000));
   // Count the score up, and let the stars land one after the other.
   const start = performance.now();
   const tick = (now: number): void => {

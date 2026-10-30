@@ -126,6 +126,13 @@ function label(parent: THREE.Object3D, text: string, x: number, y: number, face:
   parent.add(p);
 }
 
+function panelScrew(parent: THREE.Object3D, m: Materials, x: number, y: number, face: number): void {
+  const screw = mesh(new THREE.CylinderGeometry(0.002, 0.002, 0.0012, 10), m.frame, false);
+  screw.rotation.x = Math.PI / 2;
+  screw.position.set(x, y, face + 0.0006);
+  parent.add(screw);
+}
+
 function powerLed(parent: THREE.Object3D, x: number, y: number, face: number): void {
   const led = mesh(new THREE.BoxGeometry(0.005, 0.003, 0.002), new THREE.MeshStandardMaterial({ color: '#10b981', emissive: '#10b981', emissiveIntensity: 3 }), false);
   led.position.set(x, y, face + 0.0012);
@@ -186,6 +193,20 @@ function buildRouter(id: string, model: DeviceModel, m: Materials, view: DeviceV
     view.ports.set(aux.name, addSocket(view.root, m, id, aux, x, y, face, 'none'));
     label(view.root, 'AUX', x, y - 0.0125, face, 0.02, 0.006);
   }
+  // Status LEDs with their silkscreen, panel screws, and on the 2U chassis the empty module slots under their plates.
+  label(view.root, 'SYS', -w / 2 + 0.018, h / 2 - 0.016, face, 0.016, 0.005, '#94a3b8');
+  for (const [sx, sy] of [[-w / 2 + 0.007, h - 0.007], [w / 2 - 0.007, h - 0.007], [-w / 2 + 0.007, 0.007], [w / 2 - 0.007, 0.007]] as const) panelScrew(view.root, m, sx, sy, face);
+  if (h > 0.06) {
+    for (const [i, slot] of ['EHWIC 1', 'EHWIC 2'].entries()) {
+      const cx = -0.055 + i * 0.155;
+      const blank = mesh(new THREE.BoxGeometry(0.145, 0.022, 0.0015), m.chassis, false);
+      blank.position.set(cx, h - 0.016, face + 0.0003);
+      view.root.add(blank);
+      label(view.root, slot, cx - 0.045, h - 0.016, face + 0.0008, 0.034, 0.007, '#94a3b8');
+      for (const dx of [-0.067, 0.067]) panelScrew(view.root, m, cx + dx, h - 0.016, face + 0.0006);
+    }
+    label(view.root, 'SERVICE · USB', -w / 2 + 0.05, 0.012, face, 0.05, 0.006, '#64748b');
+  }
   view.height = h;
   view.width = w;
 }
@@ -214,6 +235,16 @@ function buildSwitch(id: string, model: DeviceModel, m: Materials, view: DeviceV
     view.ports.set(p.name, addSocket(view.root, m, id, p, x, y, face, top ? 'above' : 'below'));
   });
   label(view.root, '1 – 24', -0.135 + 5.5 * 0.0172, h / 2 - 0.0185, face, 0.03, 0.005, '#94a3b8');
+  // The mode button and its column of status LEDs, as on the real panel.
+  const mode = mesh(new THREE.BoxGeometry(0.009, 0.005, 0.002), m.frame, false);
+  mode.position.set(-w / 2 + 0.018, h / 2 - 0.016, face + 0.001);
+  view.root.add(mode);
+  ['SYST', 'STAT', 'SPD'].forEach((name, i) => {
+    const led = mesh(new THREE.BoxGeometry(0.003, 0.002, 0.0015), new THREE.MeshStandardMaterial({ color: i === 0 ? '#10b981' : '#1f2937', emissive: i === 0 ? '#10b981' : '#000000', emissiveIntensity: 2 }), false);
+    led.position.set(-w / 2 + 0.032 + i * 0.014, h / 2 - 0.012, face + 0.001);
+    view.root.add(led);
+    label(view.root, name, -w / 2 + 0.032 + i * 0.014, h / 2 - 0.0175, face, 0.013, 0.004, '#94a3b8');
+  });
   model.ports
     .filter((p) => p.name.startsWith('GigabitEthernet'))
     .forEach((p, i) => {
