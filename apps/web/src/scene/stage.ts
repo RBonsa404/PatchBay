@@ -206,6 +206,7 @@ export class Stage {
   /** Fly the camera to look at `target` from `position`. */
   flyTo(position: THREE.Vector3, target: THREE.Vector3, seconds = 1.1): Promise<void> {
     const id = ++this.flightId;
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) seconds = 0.01;
     const p0 = this.camera.position.clone();
     const t0 = this.controls.target.clone();
     return this.animate(seconds, (t) => {

@@ -123,7 +123,14 @@ Retours du porteur de projet après la première version jouable (à traiter qua
 - ✔ **Entrée dans la salle** (2026-10-30) : le joueur entre par la porte et contourne l'établi ; marcher coupe l'animation.
 - ✔ **Musique** (2026-10-30) : 7 morceaux CC0 (`public/music`, `ASSETS.md`) et le morceau généré, en liste aléatoire avec fondus ; N : morceau suivant, M : couper. Hors ligne, seul le morceau généré joue.
 - ✔ **Finitions** (2026-10-30) : on s'assied devant le portable tant que la console est ouverte ; câbles de brassage par le guide-câbles ; sérigraphie, vis, emplacements EHWIC et voyants d'état sur les équipements ; résultats avec confettis aux couleurs du club, note par étoile et lignes qui apparaissent l'une après l'autre.
-- Aïcha en 3D : essai fait avec le mannequin féminin CC0 de Quaternius, rejeté (combinaison sans visage, peu flatteur). Il faut un personnage habillé avec un visage (piste : Universal Base Characters de Quaternius, à télécharger sur itch.io).
+- ✔ **Chrono et note** (2026-10-30, `game/scoring.ts`) : temps limité par niveau (`timeLimit` : 12 et 15 min), réseau noté tel quel à la fin du temps. Objectifs sur 80, rapidité sur 20 (seulement si tout est fait, entière en finissant dans la moitié du temps). 3 étoiles dès 90, rang S à D. Le chrono attend la fin de l'entrée et du tutoriel guidé.
+- ✔ **Mode examen** (2026-10-30) : 30 % de temps en moins, sans indice, tutoriel ni assistant, objectifs non cochés, copie rendue à tout moment, meilleure note à part.
+- ✔ **Aïcha répond** (2026-10-30, `game/assistant.ts`, touche H) : fiche de cours écrite à la main, hors ligne, sans service en ligne. Elle dit ce qu'elle ne sait pas.
+- ✔ **Accessibilité, 1re passe** (2026-10-30) : liste des ports et appareils (touche P) pour jouer au clavier, contours de focus, mouvement réduit, contraste renforcé. Reste : tests avec un vrai lecteur d'écran, taille du texte.
+- ✔ **Interface plus jeu** (2026-10-30) : chrono central, bannière de départ, repères ambre sur les panneaux, rang tamponné, gain de points animé, alerte rouge en fin de temps.
+- Musique : les morceaux agités (Claimed by the Void, emotional 5) et la batterie du morceau généré sont retirés, jugés trop « jeu d'action ». Choisir des morceaux d'ambiance posés.
+- **Grands réseaux** : plusieurs salles et étages, voir `docs/07-grands-reseaux.md`.
+- Aïcha en 3D : reportée par le porteur de projet. Essai fait avec le mannequin féminin CC0 de Quaternius, rejeté (combinaison sans visage, peu flatteur). Il faut un personnage habillé avec un visage (piste : Universal Base Characters de Quaternius, à télécharger sur itch.io).
 - Vérifier sur un vrai Chrome : installation PWA et hors ligne, manette réelle.
 
 Autres points :

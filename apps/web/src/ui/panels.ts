@@ -18,7 +18,7 @@ export function closePanel(): void {
   currentKey = null;
 }
 
-function panel(title: string, body: Node[], key = 'notice'): HTMLElement {
+export function panel(title: string, body: Node[], key = 'notice'): HTMLElement {
   closePanel();
   currentKey = key;
   current = h(
@@ -242,4 +242,39 @@ export function showHostPanel(net: Network, deviceId: string, onChange: () => vo
   ], `host:${deviceId}`);
   paint();
   input.focus();
+}
+
+export interface PortEntry {
+  name: string;
+  busy: boolean;
+  pick(): void;
+}
+
+/**
+ * Every device and port as a plain list: the whole game can be played with the keyboard or a screen reader, without
+ * aiming at anything in the room.
+ */
+export function showPortList(devices: { id: string; open(): void; ports: PortEntry[] }[]): void {
+  panel(t('ports.title'), [
+    h('p', { class: 'notice' }, t('ports.hint')),
+    h(
+      'div',
+      { class: 'port-list' },
+      ...devices.map((d) =>
+        h(
+          'section',
+          {},
+          h('header', {}, h('h4', {}, d.id), h('button', { class: 'btn ghost small', onclick: () => d.open() }, t('ports.open'))),
+          h(
+            'div',
+            { class: 'ports' },
+            ...d.ports.map((port) =>
+              h('button', { class: `port-chip${port.busy ? ' busy' : ''}`, onclick: () => port.pick() }, port.busy ? `${port.name} · ${t('ports.unplug')}` : port.name),
+            ),
+          ),
+        ),
+      ),
+    ),
+  ], 'ports');
+  (document.querySelector('.port-list button') as HTMLElement | null)?.focus();
 }

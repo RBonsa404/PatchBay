@@ -37,6 +37,8 @@ export interface Level {
   /** Narrative shown before the mission (the story thread of the campaign). */
   story?: Text;
   difficulty: number;
+  /** Seconds allowed on the clock (the game's concern: the engine does not use it). */
+  timeLimit?: number;
   settings: { strictMdix: boolean };
   devices: LevelDevice[];
   /** Cables the player can take from the inventory. */

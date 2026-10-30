@@ -20,6 +20,7 @@ Fichiers réencodés en MP3 128 kb/s et normalisés à -18 LUFS. Aucune attribut
 | calm-ambient-2.mp3 | Calm Ambient 2 (Synthwave 15k) | cynicmusic | https://opengameart.org/content/calm-ambient-2-synthwave-15k |
 | calm-ambient-3.mp3 | Calm Ambient 3 (Lifewave 2k) | cynicmusic | https://opengameart.org/content/calm-ambient-3-lifewave-2k |
 | calm-relax-1.mp3 | Calm Relax 1 (Synthwave 421k) | cynicmusic | https://opengameart.org/content/calm-relax-1-synthwave-421k |
-| emotional-5.mp3 | emotional 5 | pro-sensory | https://opengameart.org/node/119853 |
-| claimed-by-the-void.mp3 | Claimed by the Void | vitalezzz | https://opengameart.org/content/claimed-by-the-void |
+| first-light-particles.mp3 | First Light Particles | yoiyami | https://opengameart.org/node/182244 |
+| starfield-romance.mp3 | Starfield Romance | yoiyami | https://opengameart.org/content/starfield-romance-%E2%80%93-cc0-ambient-emotional-space-theme-yoiyami-blue-series-%E2%80%93-no3 |
+| exploration-theme.mp3 | Exploration Theme | cleytonkauffman | https://opengameart.org/content/exploration-theme |
 | contemplation.mp3 | Contemplation | joth | https://opengameart.org/content/contemplation-0 |

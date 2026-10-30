@@ -47,6 +47,7 @@ export const levelSchema = z
     brief: text,
     story: text.optional(),
     difficulty: z.number().int().min(1).max(5),
+    timeLimit: z.number().int().positive().optional(),
     settings: z.object({ strictMdix: z.boolean() }).strict(),
     devices: z
       .array(

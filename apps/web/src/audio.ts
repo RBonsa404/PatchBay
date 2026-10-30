@@ -6,17 +6,17 @@
  * machine noises) and the music: a shuffled playlist of free tracks (`public/music`, see ASSETS.md) with an original
  * generative piece among them, quieter during a mission.
  */
-export type SoundName = 'plug' | 'unplug' | 'error' | 'objective' | 'success' | 'click' | 'packet' | 'step';
+export type SoundName = 'plug' | 'unplug' | 'error' | 'objective' | 'success' | 'click' | 'packet' | 'step' | 'tick' | 'timeout';
 export type Mood = 'menu' | 'mission';
 
 const STORAGE_KEY = 'patchbay.muted';
 const MUSIC_KEY = 'patchbay.music';
 const MASTER = 0.9;
-const MUSIC_LEVEL: Record<Mood, number> = { menu: 1.2, mission: 1.0 };
+const MUSIC_LEVEL: Record<Mood, number> = { menu: 1.0, mission: 0.7 };
 const ROOM_LEVEL: Record<Mood, number> = { menu: 0.6, mission: 1.2 };
 
 /** The MP3s in `public/music`, all normalised to the same loudness. */
-const TRACKS = ['calm-ambient-1', 'calm-ambient-2', 'calm-ambient-3', 'calm-relax-1', 'emotional-5', 'claimed-by-the-void', 'contemplation'];
+const TRACKS = ['calm-ambient-1', 'calm-ambient-2', 'calm-ambient-3', 'calm-relax-1', 'contemplation', 'first-light-particles', 'starfield-romance', 'exploration-theme'];
 const SYNTH = 'synth';
 /** Level of the MP3s, so that they match the generative piece. */
 const TRACK_LEVEL = 0.85;
@@ -308,7 +308,7 @@ class Sound {
   }
 
   /**
-   * One bar of the music. The form is 32 bars: pad and bass alone, then the arpeggio, then the pulse, then a thinner
+   * One bar of the music. The form is 32 bars: pad and bass alone, then the arpeggio, then a thinner
    * passage, so that it never sits still for long.
    */
   private playBar(bar: number, t: number): void {
@@ -326,11 +326,6 @@ class Sound {
         const swing = i % 2 ? BEAT * 0.03 : 0;
         this.note(midi((chord.notes[index] as number) + 12), t + (i * BEAT) / 2 + swing, 0.32, 'triangle', i % 4 === 0 ? 0.11 : 0.075, 2600, true);
       });
-    }
-    if (section === 2) {
-      for (let beat = 0; beat < 4; beat++) {
-        if (beat % 2 === 0) this.kick(t + beat * BEAT);
-      }
     }
     if (section === 3 && bar % 4 === 3) {
       // A single high phrase over the thinner passage.
@@ -381,19 +376,6 @@ class Sound {
     if (wet) gain.connect(this.echo as GainNode);
     osc.start(t);
     osc.stop(t + duration + 0.02);
-  }
-
-  private kick(t: number): void {
-    const ctx = this.ctx as AudioContext;
-    const osc = ctx.createOscillator();
-    osc.frequency.setValueAtTime(120, t);
-    osc.frequency.exponentialRampToValueAtTime(48, t + 0.12);
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.32, t);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
-    osc.connect(gain).connect(this.music as GainNode);
-    osc.start(t);
-    osc.stop(t + 0.3);
   }
 
   /** Now and then, a machine in the room makes itself heard: a relay, a far-off beep. */
@@ -483,6 +465,13 @@ class Sound {
         break;
       case 'packet':
         this.tone(1760, t, 0.04, 'sine', 0.04);
+        break;
+      case 'tick': // the last seconds of the clock
+        this.tone(1320, t, 0.06, 'square', 0.05);
+        break;
+      case 'timeout': // the buzzer
+        this.tone(196, t, 0.5, 'sawtooth', 0.12, 130);
+        this.tone(147, t, 0.6, 'square', 0.05, 98);
         break;
       case 'step': // a soft footfall on the raised floor, hollow underneath
         this.tone(95 + Math.random() * 20, t, 0.09, 'sine', 0.16, 60);

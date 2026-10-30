@@ -1,7 +1,8 @@
-import { Check, CircleCheckBig, Gauge, Lightbulb, Menu, Scan, Volume2, VolumeX, type IconNode } from 'lucide';
+import { Check, CircleCheckBig, Gauge, Keyboard, Lightbulb, Menu, MessageCircleQuestion, Scan, Timer, Volume2, VolumeX, type IconNode } from 'lucide';
 import type { CableType, Level, ObjectiveResult } from '@patchbay/sim-core';
 import { t, tx, type Key } from '../i18n.js';
 import { CABLE_STYLE } from '../scene/cables.js';
+import { clock } from '../game/scoring.js';
 import type { Quality } from '../scene/stage.js';
 import { sound } from '../audio.js';
 import { icon } from './brand.js';
@@ -12,6 +13,8 @@ export interface HudActions {
   hint(): void;
   menu(): void;
   overview(): void;
+  ask(): void;
+  ports(): void;
   cycleQuality(): Quality;
   selectCable(type: CableType | null): void;
 }
@@ -43,14 +46,23 @@ export class Hud {
   private readonly tooltip: HTMLElement;
   private readonly toasts: HTMLElement;
   private readonly hintsShown = new Set<string>();
+  private readonly timerText: HTMLElement;
+  private readonly timerBar: HTMLElement;
+  private readonly timerBox: HTMLElement;
+  private readonly doneBefore = new Set<string>();
+  private firstObjectives = true;
+  private shownSecond = -1;
 
-  constructor(private readonly level: Level, private readonly actions: HudActions, quality: Quality, index = 0) {
+  constructor(private readonly level: Level, private readonly actions: HudActions, quality: Quality, index = 0, private readonly exam = false) {
     this.objectivesList = h('ol', { class: 'objective-list' });
     this.scoreLabel = h('span', { class: 'score' }, '0');
     this.scoreBar = h('span', { class: 'fill' });
     this.inventory = h('div', { class: 'inventory panel-solid', role: 'toolbar', 'aria-label': 'Inventaire de câbles' });
     this.tooltip = h('div', { class: 'tooltip', hidden: true });
     this.toasts = h('div', { class: 'toasts', 'aria-live': 'polite' });
+    this.timerText = h('span', { class: 'time' }, '--:--');
+    this.timerBar = h('i', {});
+    this.timerBox = h('div', { class: 'hud-timer panel-solid', role: 'timer', 'aria-label': t('timer.label') }, icon(Timer, 18), this.timerText, h('span', { class: 'timer-bar' }, this.timerBar));
 
     const qualityButton = toolButton(this.qualityLabel(quality), Gauge, () => {
       const label = this.qualityLabel(actions.cycleQuality());
@@ -75,20 +87,23 @@ export class Hud {
           'div',
           { class: 'toolbar panel-solid' },
           toolButton(t('hud.view'), Scan, () => actions.overview()),
-          toolButton(t('hud.hint'), Lightbulb, () => actions.hint()),
+          exam ? null : toolButton(t('hud.hint'), Lightbulb, () => actions.hint()),
+          exam ? null : toolButton(t('assistant.tool'), MessageCircleQuestion, () => actions.ask()),
+          toolButton(t('ports.tool'), Keyboard, () => actions.ports()),
           qualityButton,
           soundButton,
           toolButton(t('hud.menu'), Menu, () => actions.menu()),
-          h('button', { class: 'btn primary small', onclick: () => actions.check() }, icon(CircleCheckBig, 16), h('span', {}, t('hud.check'))),
+          h('button', { class: 'btn primary small', onclick: () => actions.check() }, icon(CircleCheckBig, 16), h('span', {}, exam ? t('exam.hand') : t('hud.check'))),
         ),
       ),
       h(
         'aside',
         { class: 'objectives panel-solid' },
-        h('header', {}, h('span', { class: 'label' }, t('hud.objectives')), h('span', { class: 'score-line' }, this.scoreLabel, h('small', {}, '/ 100'))),
-        h('div', { class: 'progress' }, this.scoreBar),
+        h('header', {}, h('span', { class: 'label' }, exam ? t('exam.tasks') : t('hud.objectives')), exam ? null : h('span', { class: 'score-line' }, this.scoreLabel, h('small', {}, '/ 100'))),
+        exam ? null : h('div', { class: 'progress' }, this.scoreBar),
         this.objectivesList,
       ),
+      this.timerBox,
       this.inventory,
       this.tooltip,
       this.toasts,
@@ -101,20 +116,50 @@ export class Hud {
   }
 
   destroy(): void {
+    document.body.classList.remove('time-low');
     this.root.remove();
+  }
+
+  /** The clock: amber in the last minute, red and pulsing in the last 15 seconds. */
+  setTimer(remaining: number, limit: number, paused: boolean): void {
+    const second = Math.ceil(remaining);
+    if (second === this.shownSecond) return;
+    this.shownSecond = second;
+    this.timerText.textContent = clock(remaining);
+    this.timerBar.style.width = `${Math.max(0, (remaining / limit) * 100)}%`;
+    this.timerBox.classList.toggle('paused', paused);
+    this.timerBox.title = paused ? t('timer.tutorial') : t('timer.label');
+    this.timerBox.classList.toggle('warn', remaining <= 60);
+    this.timerBox.classList.toggle('danger', remaining <= 15);
+    document.body.classList.toggle('time-low', remaining <= 15);
+  }
+
+  /** A short line across the screen: the start of the mission. */
+  banner(title: string, line: string): void {
+    const el = h('div', { class: 'mission-banner', 'aria-hidden': 'true' }, h('strong', {}, title), h('span', {}, line));
+    this.root.append(el);
+    setTimeout(() => el.remove(), 2600);
   }
 
   setObjectives(results: ObjectiveResult[]): void {
     const passed = new Map(results.map((r) => [r.id, r]));
+    // In an exam the list is the subject: nothing is ticked before the end.
+    if (this.exam) {
+      this.objectivesList.replaceChildren(...this.level.objectives.map((o) => h('li', { class: 'objective' }, h('span', { class: 'tick' }), h('span', { class: 'text' }, tx(o.label)), h('span', { class: 'pts' }, String(o.points)))));
+      return;
+    }
     const score = results.reduce((n, r) => n + r.points, 0);
     this.scoreLabel.textContent = String(score);
     this.scoreBar.style.width = `${score}%`;
     this.objectivesList.replaceChildren(
       ...this.level.objectives.map((o) => {
         const done = passed.get(o.id)?.passed ?? false;
+        const fresh = done && !this.doneBefore.has(o.id) && !this.firstObjectives;
+        if (done) this.doneBefore.add(o.id);
+        else this.doneBefore.delete(o.id);
         return h(
           'li',
-          { class: `objective${done ? ' done' : ''}` },
+          { class: `objective${done ? ' done' : ''}${fresh ? ' fresh' : ''}`, 'data-gain': `+${o.points}` },
           h('span', { class: 'tick', 'aria-label': done ? 'fait' : 'à faire' }, done ? icon(Check, 12) : null),
           h('span', { class: 'text' }, tx(o.label)),
           h('span', { class: 'pts' }, String(o.points)),
@@ -122,6 +167,7 @@ export class Hud {
         );
       }),
     );
+    this.firstObjectives = false;
   }
 
   /** Reveal the hints of these objectives in the checklist. */

@@ -107,6 +107,11 @@ export class Coach {
     this.render();
   }
 
+  /** The guided tutorial is still on screen (the clock waits for it). */
+  get active(): boolean {
+    return !this.finished;
+  }
+
   /** Re-check the current step; call after every player action. */
   update(): void {
     if (this.finished) return;
@@ -121,6 +126,7 @@ export class Coach {
   }
 
   dispose(): void {
+    this.finished = true;
     if (this.typing) clearInterval(this.typing);
     this.stopFrame();
     this.stage.scene.remove(this.marker);

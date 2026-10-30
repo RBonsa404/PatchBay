@@ -35,5 +35,5 @@ export function leave(el: HTMLElement): Promise<void> {
   );
 }
 
-/** Stars earned for a score: 1 from 50, 2 from 75, 3 at 100. */
-export const starCount = (score: number): number => (score >= 100 ? 3 : score >= 75 ? 2 : score >= 50 ? 1 : 0);
+/** Stars earned for a mark: 1 from 40, 2 from 70 (a complete mission gets 80), 3 from 90 (it takes speed). */
+export const starCount = (score: number): number => (score >= 90 ? 3 : score >= 70 ? 2 : score >= 40 ? 1 : 0);

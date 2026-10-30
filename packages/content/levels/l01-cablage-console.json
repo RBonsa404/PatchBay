@@ -14,6 +14,7 @@
     "en": "Cable PC1 to S1 Fa0/1, S1 Gi0/1 to R1 Gi0/0, the ADMIN laptop's console cable to R1, then configure R1 (hostname, enable secret, console password, Gi0/0 = 192.168.10.1/24), test from PC1 and save."
   },
   "difficulty": 1,
+  "timeLimit": 720,
   "settings": {
     "strictMdix": true
   },

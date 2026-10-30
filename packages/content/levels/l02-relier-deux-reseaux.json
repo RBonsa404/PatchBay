@@ -14,6 +14,7 @@
     "en": "Cable PC1-R1 and PC2-R2 directly, the serial link R1 (DCE) - R2, address everything (LANs 192.168.1.0/24 and 192.168.2.0/24, link 10.0.0.0/30), set the clock on the DCE end, add static routes both ways, then ping PC2 from PC1."
   },
   "difficulty": 2,
+  "timeLimit": 900,
   "settings": {
     "strictMdix": true
   },

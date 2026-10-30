@@ -76,29 +76,30 @@ function missions(): void {
 }
 
 function firstUnfinished(): number {
-  const i = campaign.findIndex((l) => (progress.best(l.id) ?? 0) < 100);
+  const i = campaign.findIndex((l) => (progress.best(l.id) ?? 0) < 80);
   return i < 0 ? 0 : i;
 }
 
 function briefing(index: number): void {
   showcase();
   const level = campaign[index] as Level;
-  showBriefing(level, index, () => play(index), missions);
+  showBriefing(level, index, () => play(index), missions, () => play(index, true));
 }
 
-function play(index: number): void {
+function play(index: number, exam = false): void {
   endShowcase();
   sound.setMood('mission');
   mission?.dispose();
   const level = campaign[index] as Level;
   mission = new Mission(stage, level, {
-    complete: (evaluation) => {
-      progress.record(level.id, evaluation.score);
+    complete: (result) => {
+      if (exam) progress.recordExam(level.id, result.total);
+      else progress.record(level.id, result.total);
       const next = index + 1 < campaign.length ? () => briefing(index + 1) : undefined;
-      showResults(level, evaluation, { ...(next ? { next } : {}), retry: () => play(index), menu: missions });
+      showResults(level, result, { ...(next ? { next } : {}), retry: () => play(index, exam), menu: missions });
     },
     menu: missions,
-  }, index);
+  }, index, exam);
 }
 
 // Development only: lets automated checks find where a port is on screen. Stripped from production builds.

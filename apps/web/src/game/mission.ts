@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { buildLevel, canPlug, catalog, evaluate, type CableEnd, type CableType, type EthernetFrame, type Evaluation, type L3Payload, type Level, type Network, type ObjectiveResult, type PortSpec } from '@patchbay/sim-core';
+import { buildLevel, canPlug, catalog, evaluate, type CableEnd, type CableType, type EthernetFrame, type L3Payload, type Level, type Network, type ObjectiveResult, type PortSpec } from '@patchbay/sim-core';
 import { sound } from '../audio.js';
 import { t, tx } from '../i18n.js';
 import { Player, type MoveInput } from './player.js';
@@ -10,8 +10,10 @@ import { buildDevice, highlightSocket, rackOccupied, setLed, type DeviceView, ty
 import { buildWhiteboard } from '../scene/details.js';
 import { rackFillers } from '../scene/room.js';
 import type { Quality, Stage } from '../scene/stage.js';
+import { AskAicha } from '../ui/askAicha.js';
 import { CABLE_ORDER, Hud } from '../ui/hud.js';
-import { closePanel, Consoles, openPanelKey, resetHostShells, showHostPanel, showNotice } from '../ui/panels.js';
+import { closePanel, Consoles, openPanelKey, resetHostShells, showHostPanel, showNotice, showPortList } from '../ui/panels.js';
+import { clock, grade, type Grade } from './scoring.js';
 
 const HOME = { position: new THREE.Vector3(0, 1.78, 2.45), target: new THREE.Vector3(0, 0.86, 0.02) };
 /** How far the player can reach a device from, in metres (seen from above). */
@@ -32,6 +34,10 @@ const BOARD_CENTRE = new THREE.Vector3(-1.75, 1.62, -1.56);
 const BOARD_VIEW = new THREE.Vector3(-1.75, 1.62, -0.5);
 /** How long it takes to walk in from the door when a mission starts. */
 const ENTRANCE_SECONDS = 3.4;
+/** Time allowed when a level does not say, and the share of it left in an exam. */
+const DEFAULT_LIMIT = 600;
+const EXAM_TIME = 0.7;
+const reducedMotion = (): boolean => matchMedia('(prefers-reduced-motion: reduce)').matches;
 /** Height of the eyes when sitting at the bench. */
 const SEATED_EYE = 1.2;
 const ACCEPTS: Record<CableType, PortSpec['kind'][]> = {
@@ -60,7 +66,7 @@ const MAX_HOPS = 90;
 const LONG_PRESS_MS = 550;
 
 export interface MissionEvents {
-  complete(evaluation: Evaluation): void;
+  complete(result: Grade): void;
   menu(): void;
 }
 
@@ -95,10 +101,23 @@ export class Mission {
   /** After a zoom on a device: where the head stays until the player walks away. */
   private anchor: THREE.Vector3 | null = null;
   private zoom = ZOOM_REST;
+  private readonly limit: number;
+  private remaining: number;
+  /** The clock starts once the player has walked in. */
+  private entrance = reducedMotion() ? 0 : ENTRANCE_SECONDS;
+  private warned = false;
+  private lastTick = 0;
+  private readonly aicha: AskAicha;
   /** Sitting at the laptop: getting up when the console closes. */
   private seated = false;
 
-  constructor(private readonly stage: Stage, readonly level: Level, private readonly events: MissionEvents, index = 0) {
+  constructor(private readonly stage: Stage, readonly level: Level, private readonly events: MissionEvents, index = 0, private readonly exam = false) {
+    this.limit = Math.round((level.timeLimit ?? DEFAULT_LIMIT) * (exam ? EXAM_TIME : 1));
+    this.remaining = this.limit;
+    this.aicha = new AskAicha(() => {
+      const failing = this.level.objectives.find((o) => !evaluate(this.net, [o]).complete);
+      return { timeLeft: clock(this.remaining), next: failing ? { label: tx(failing.label), ...(failing.hint ? { hint: tx(failing.hint) } : {}) } : null };
+    });
     stage.clearLevel();
     resetHostShells();
     this.net = buildLevel(level);
@@ -136,12 +155,15 @@ export class Mission {
       hint: () => this.hint(),
       menu: () => events.menu(),
       overview: () => this.overview(),
+      ask: () => this.aicha.open(),
+      ports: () => this.showPorts(),
       cycleQuality: () => this.cycleQuality(),
       selectCable: (type) => this.select(type),
-    }, stage.currentQuality, index);
+    }, stage.currentQuality, index, exam);
+    setTimeout(() => this.hud.banner(`${t('briefing.mission')} ${String(index + 1).padStart(2, '0')}`, exam ? t('exam.start') : t('timer.start')), this.entrance * 1000);
     this.listen();
     this.afterChange();
-    this.coach = Coach.for(level.id, stage, () => this.coachView());
+    this.coach = exam ? null : Coach.for(level.id, stage, () => this.coachView());
   }
 
   private coachView(): CoachView {
@@ -291,10 +313,13 @@ export class Mission {
       }
       if (e.code.startsWith('Shift')) this.held.add('Shift');
       if (e.key === 'Escape') {
+        if (openPanelKey()) closePanel();
         this.select(null);
         if (this.anchor) this.overview(0.7);
       }
       if (e.code === 'KeyT' && !typing) this.toggleBoard();
+      if (e.code === 'KeyH' && !typing && !this.exam) this.aicha.open();
+      if (e.code === 'KeyP' && !typing) this.showPorts();
       if (e.code === 'KeyN' && !typing) sound.nextTrack();
       if (e.code === 'KeyM' && !typing) this.hud.toast(t(sound.toggleMusic() ? 'music.on' : 'music.off'));
       // 1-4 pick a cable from the inventory (not while typing in a console).
@@ -478,8 +503,39 @@ export class Mission {
     });
   }
 
+  /** The keyboard's way to play: every port as a button, doing what a click on it would do. */
+  private showPorts(): void {
+    showPortList(
+      [...this.devices.values()].map((view) => ({
+        id: view.id,
+        open: () => this.openDevice(view.id),
+        ports: [...view.ports.values()].filter((p) => !this.selected || ACCEPTS[this.selected].includes(p.spec.kind) || this.net.cableAt({ device: p.device, port: p.port })).map((p) => {
+          const busy = this.net.cableAt({ device: p.device, port: p.port }) !== undefined;
+          return {
+            name: p.port,
+            busy,
+            pick: () => {
+              if (busy) this.net.disconnect({ device: p.device, port: p.port });
+              else if (this.selected) this.plugEnd(p);
+              else this.hud.toast(t('ports.hint'));
+              if (busy) {
+                sound.play('unplug');
+                this.afterChange();
+              }
+              this.showPorts();
+            },
+          };
+        }),
+      })),
+    );
+  }
+
   /** The player comes in through the door and walks round the bench to their place. Walking cuts it short. */
   private enter(): void {
+    if (reducedMotion()) {
+      this.following = true;
+      return;
+    }
     const id = ++this.flight;
     const eye = this.player.eye;
     const path = new THREE.CatmullRomCurve3([
@@ -558,8 +614,30 @@ export class Mission {
     return n > 1 ? { x: x / n, y: y / n, run } : { x, y, run };
   }
 
+  /** The clock runs from the end of the entrance, except during the guided tutorial of a first mission. */
+  private tickClock(dt: number): void {
+    if (this.finished) return;
+    if (this.entrance > 0) {
+      this.entrance -= dt;
+    } else if (!this.coach?.active) {
+      this.remaining -= dt;
+    }
+    this.hud?.setTimer(this.remaining, this.limit, this.coach?.active ?? false);
+    if (this.remaining <= 60 && !this.warned) {
+      this.warned = true;
+      this.hud.toast(t('timer.lastMinute'), 'bad');
+      sound.play('error');
+    }
+    if (this.remaining <= 10 && Math.ceil(this.remaining) !== this.lastTick) {
+      this.lastTick = Math.ceil(this.remaining);
+      sound.play('tick');
+    }
+    if (this.remaining <= 0) this.finish(evaluate(this.net, this.level.objectives), true);
+  }
+
   /** Every frame: walk, turn the head, and put the camera where the eyes are. */
   private walk(dt: number): void {
+    this.tickClock(dt);
     const camera = this.stage.camera;
     for (const code of this.held) {
       const turn = TURN_KEYS[code];
@@ -699,7 +777,7 @@ export class Mission {
   /** A ding when the number of completed objectives grows (not on the first display). */
   private celebrate(results: ObjectiveResult[]): void {
     const done = results.filter((r) => r.passed).length;
-    if (this.doneCount >= 0 && done > this.doneCount) sound.play('objective');
+    if (this.doneCount >= 0 && done > this.doneCount && !this.exam) sound.play('objective');
     this.doneCount = done;
   }
 
@@ -710,26 +788,31 @@ export class Mission {
     this.consoles.collectSyslog();
     this.updateLeds();
     this.hud.setObjectives(evaluation.results);
-    if (evaluation.complete) {
-      this.finished = true;
-      sound.play('success');
-      this.coach?.dispose();
-      this.coach = null;
-      this.hud.showTooltip(null);
-      closePanel();
-      // The camera pulls back for the finale; the results never wait on it (animation pauses in background tabs).
-      this.following = false;
-      this.flying = true;
-      this.flight++;
-      const finale = this.stage.flyTo(new THREE.Vector3(0, 1.9, 2.8), HOME.target, 1.6);
-      void Promise.race([finale, new Promise((resolve) => setTimeout(resolve, 1800))]).then(() => this.events.complete(evaluation));
-      return;
-    }
+    if (evaluation.complete || this.exam) return this.finish(evaluation, false);
     this.hud.revealHints(evaluation.results.filter((r) => !r.passed).map((r) => r.id));
     this.celebrate(evaluation.results);
     this.hud.setObjectives(evaluation.results);
     this.hud.toast(t('check.missing'), 'bad');
     sound.play('error');
+  }
+
+  /** Stop the clock and hand the network in, as it stands. */
+  private finish(evaluation: ReturnType<typeof evaluate>, timedOut: boolean): void {
+    this.finished = true;
+    sound.play(evaluation.complete ? 'success' : 'timeout');
+    this.coach?.dispose();
+    this.coach = null;
+    this.hud.showTooltip(null);
+    this.hud.setObjectives(evaluation.results);
+    document.body.classList.remove('time-low');
+    closePanel();
+    // The camera pulls back for the finale; the results never wait on it (animation pauses in background tabs).
+    this.following = false;
+    this.flying = true;
+    this.flight++;
+    const finale = this.stage.flyTo(new THREE.Vector3(0, 1.9, 2.8), HOME.target, 1.6);
+    const result = grade(evaluation, this.remaining, this.limit, timedOut, this.exam);
+    void Promise.race([finale, new Promise((resolve) => setTimeout(resolve, 1800))]).then(() => this.events.complete(result));
   }
 
   private hint(): void {
