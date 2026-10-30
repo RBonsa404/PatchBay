@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import clubLogoUrl from '../assets/club-logo-512.webp';
+import { buildDecor } from './decor.js';
 import { contactShadow, esdMatTexture, laminateTexture, paintTexture, perforatedTexture, rackRailTexture, raisedFloorTexture } from './materials.js';
 import { textTexture } from './textures.js';
 
@@ -37,7 +38,7 @@ const steel = (color: string, roughness = 0.4, metalness = 0.75): THREE.MeshStan
  */
 export function buildRoom(): THREE.Group {
   const room = new THREE.Group();
-  room.add(shell(), bench(), rack(), serverCabinet(), cableTray(), wallItems());
+  room.add(shell(), bench(), rack(), serverCabinet(), cableTray(), wallItems(), buildDecor());
   return room;
 }
 

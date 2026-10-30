@@ -168,6 +168,8 @@ export function buildWhiteboard(level: Level): THREE.Group {
   frame.position.z = -0.011;
   const tray = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.02, 0.05), new THREE.MeshStandardMaterial({ color: '#94a3b8', metalness: 0.8, roughness: 0.3 }));
   tray.position.set(0, -0.47, 0.015);
+  board.userData.whiteboard = true;
+  frame.userData.whiteboard = true;
   group.add(frame, board, tray);
   group.position.set(-1.75, 1.62, -1.57);
   return group;

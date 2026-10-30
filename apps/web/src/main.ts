@@ -8,7 +8,6 @@ import * as THREE from 'three';
 import { campaign } from '@patchbay/content';
 import { catalog, type Level } from '@patchbay/sim-core';
 import { sound } from './audio.js';
-import { Avatar } from './game/avatar.js';
 import { startGamepad } from './game/gamepad.js';
 import { Mission } from './game/mission.js';
 import { buildDevice, rackOccupied } from './scene/devices.js';
@@ -44,6 +43,7 @@ let stopShowcase: (() => void) | null = null;
 
 /** Behind the menus: the first level's gear on the bench, and a slow camera sweep across the room. */
 function showcase(): void {
+  sound.setMood('menu');
   if (stopShowcase) return;
   mission?.dispose();
   mission = null;
@@ -51,16 +51,9 @@ function showcase(): void {
   const level = campaign[0]!;
   const views = level.devices.map((d) => buildDevice(d.id, catalog[d.model]!, d.position, d.id));
   stage.level.add(...views.map((v) => v.root), rackFillers(rackOccupied(views)));
-  // The technician stands behind the bench beside the rack, breathing, glancing around.
-  const avatar = new Avatar();
-  avatar.place(0.78, -0.8, -Math.PI * 0.2);
-  stage.level.add(avatar.root);
   stage.controls.enabled = false;
   const target = new THREE.Vector3(0, 1.05, -0.2);
-  const still = { x: 0, y: 0, run: false };
-  const ahead = new THREE.Vector3(0, 0, -1);
-  stopShowcase = stage.onFrame((dt, time) => {
-    avatar.update(dt, still, ahead);
+  stopShowcase = stage.onFrame((_dt, time) => {
     const a = Math.sin(time * 0.11) * 0.55;
     stage.camera.position.set(Math.sin(a) * 2.6, 1.55 + Math.sin(time * 0.17) * 0.12, Math.cos(a) * 2.6);
     stage.controls.target.copy(target);
@@ -95,6 +88,7 @@ function briefing(index: number): void {
 
 function play(index: number): void {
   endShowcase();
+  sound.setMood('mission');
   mission?.dispose();
   const level = campaign[index] as Level;
   mission = new Mission(stage, level, {
@@ -111,6 +105,7 @@ function play(index: number): void {
 if (import.meta.env.DEV) {
   (window as unknown as Record<string, unknown>).__patchbay = {
     stage,
+    sound,
     mission: () => mission,
     portOnScreen(device: string, port: string): [number, number] | null {
       let found: THREE.Object3D | undefined;

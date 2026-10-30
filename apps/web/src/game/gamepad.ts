@@ -3,7 +3,7 @@ import type { Stage } from '../scene/stage.js';
 
 /**
  * Playing with a controller (standard mapping: Xbox, PlayStation, generic USB pads). The left stick moves an
- * on-screen cursor, the right stick turns the camera around what it looks at, the triggers zoom. Over the menus the
+ * on-screen cursor, the right stick turns the view, the triggers zoom. Over the menus the
  * A button clicks what the cursor points at; over the room it acts like the mouse.
  *
  *   A  click / plug        B  unplug         X  zoom on the device   Y  overview
@@ -20,8 +20,10 @@ export interface GameTarget {
   overview(): void;
   cancel(): void;
   cycleCable(step: 1 | -1): void;
-  /** In a mission, the left stick walks the character (the d-pad then moves the cursor). */
+  /** In a mission, the left stick walks (the d-pad then moves the cursor), the right stick turns the head. */
   walk?(x: number, y: number): void;
+  look?(yaw: number, pitch: number): void;
+  zoom?(factor: number): void;
 }
 
 const DEAD_ZONE = 0.18;
@@ -137,7 +139,9 @@ export function startGamepad(stage: Stage, notify: (text: string) => void): void
     }
     cursor.style.transform = `translate(${x}px, ${y}px)`;
 
-    // Camera: orbit around the target, zoom with the triggers.
+    // In a mission: turn the head, zoom with the triggers. Elsewhere: orbit around the target.
+    if (target?.look && (rx || ry)) target.look(-rx * ORBIT_SPEED * dt, -ry * ORBIT_SPEED * dt);
+    if (target?.zoom && Math.abs(zoom) > 0.05) target.zoom(1 + zoom * ZOOM_SPEED * dt);
     if ((rx || ry || Math.abs(zoom) > 0.05) && stage.controls.enabled) {
       const c = stage.controls;
       offset.copy(stage.camera.position).sub(c.target);
