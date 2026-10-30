@@ -96,12 +96,6 @@ export function paintTexture(): THREE.CanvasTexture {
   return texture(c, 2, 1);
 }
 
-/** The fine orange-peel of a painted plaster wall. */
-export function plasterNormal(): THREE.CanvasTexture {
-  const [a, b] = [noise(512, 31, 96), noise(512, 32, 48)];
-  return normalMap(512, 5, 3, 1.6, (x, y) => a(x, y) * 0.6 + b(x, y) * 0.4);
-}
-
 /** Suspended ceiling: 60 cm mineral tiles with fine pits, on a white metal grid. */
 export function ceilingTexture(): THREE.CanvasTexture {
   const [c, g] = canvas(512, 512);
@@ -216,7 +210,22 @@ export function raisedFloorTexture(): THREE.CanvasTexture {
     }
   }
   grain(g, 1024, 1024, 9000, 5, 0.025);
-  return texture(c, 1, 1);
+  const t = texture(c, 1, 1);
+  // Once it has loaded, real concrete gives the tiles their wear and small marks.
+  const wear = new Image();
+  wear.onload = (): void => {
+    // In grey and faint: the wear of a floor that is looked after, not a change of colour.
+    g.filter = 'grayscale(1)';
+    g.globalCompositeOperation = 'overlay';
+    g.globalAlpha = 0.3;
+    g.drawImage(wear, 0, 0, 1024, 1024);
+    g.filter = 'none';
+    g.globalCompositeOperation = 'source-over';
+    g.globalAlpha = 1;
+    t.needsUpdate = true;
+  };
+  wear.src = `${import.meta.env.BASE_URL}textures/smooth_concrete_floor_diff.jpg`;
+  return t;
 }
 
 /** Relief of the raised floor: the tiles' bevelled edges and the holes of the airflow tile. */
@@ -282,24 +291,6 @@ export function perforatedTexture(): THREE.CanvasTexture {
     }
   }
   return texture(c, 6, 14);
-}
-
-/** Wood-look laminate for the bench edge and the shelves. */
-export function laminateTexture(): THREE.CanvasTexture {
-  const [c, g] = canvas(512, 128);
-  g.fillStyle = '#b08a62';
-  g.fillRect(0, 0, 512, 128);
-  const rnd = seeded(21);
-  for (let i = 0; i < 90; i++) {
-    g.strokeStyle = `rgba(${rnd() < 0.5 ? '90,60,35' : '220,190,150'}, ${0.08 + rnd() * 0.12})`;
-    g.lineWidth = 1 + rnd() * 2;
-    const y = rnd() * 128;
-    g.beginPath();
-    g.moveTo(0, y);
-    g.bezierCurveTo(170, y + rnd() * 10 - 5, 340, y + rnd() * 10 - 5, 512, y + rnd() * 6 - 3);
-    g.stroke();
-  }
-  return texture(c, 3, 1);
 }
 
 /** Soft dark blob laid under objects: the contact shadow that keeps them from floating. */
@@ -397,4 +388,27 @@ export function brushedTexture(): THREE.CanvasTexture {
     g.fillRect(rnd() * 512, rnd() * 128, 40 + rnd() * 180, 1);
   }
   return texture(c, 1, 1, false);
+}
+
+const photoLoader = new THREE.TextureLoader();
+
+/**
+ * A surface photographed for real (Poly Haven, CC0: see ASSETS.md): colour, relief and roughness. The files load in
+ * the background, and the material shows its plain colour until then.
+ */
+export function photoRelief(name: string, repeatX = 1, repeatY = repeatX): { normalMap: THREE.Texture; roughnessMap: THREE.Texture } {
+  const { normalMap, roughnessMap } = photo(name, repeatX, repeatY);
+  return { normalMap, roughnessMap };
+}
+
+export function photo(name: string, repeatX = 1, repeatY = repeatX): { map: THREE.Texture; normalMap: THREE.Texture; roughnessMap: THREE.Texture } {
+  const load = (kind: string, colour: boolean): THREE.Texture => {
+    const t = photoLoader.load(`${import.meta.env.BASE_URL}textures/${name}_${kind}.jpg`);
+    if (colour) t.colorSpace = THREE.SRGBColorSpace;
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(repeatX, repeatY);
+    t.anisotropy = 8;
+    return t;
+  };
+  return { map: load('diff', true), normalMap: load('nor', false), roughnessMap: load('rough', false) };
 }

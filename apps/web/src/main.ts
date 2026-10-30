@@ -11,6 +11,7 @@ import { sound } from './audio.js';
 import { startGamepad } from './game/gamepad.js';
 import { Mission } from './game/mission.js';
 import { buildDevice, rackOccupied } from './scene/devices.js';
+import { onPropAppeared } from './scene/props.js';
 import { buildRoom, rackFillers } from './scene/room.js';
 import { detectQuality, Stage } from './scene/stage.js';
 import { h } from './ui/dom.js';
@@ -30,7 +31,10 @@ if (!document.createElement('canvas').getContext('webgl2')) {
 
 const stage = new Stage(document.getElementById('stage') as HTMLElement, detectQuality());
 stage.scene.add(buildRoom());
+onPropAppeared(() => stage.refreshShadows(1));
 stage.captureEnvironment();
+// Once the photo textures are in, the reflections are taken again from the finished room.
+setTimeout(() => stage.captureEnvironment(), 2500);
 document.getElementById('boot')?.remove();
 
 /** A message on top of whatever screen is shown (outside missions, which have their own toasts). */

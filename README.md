@@ -100,7 +100,7 @@ Le moteur ne connaît rien de la 3D, et la 3D ne réimplémente aucune logique r
 
 ## Démarrage rapide
 
-**Prérequis :** Node.js 20 ou plus récent, un navigateur avec WebGL2, 8 Go de mémoire conseillés.
+**Prérequis :** Node.js 20 ou plus récent, un navigateur avec WebGL2, 8 Go de mémoire conseillés. Pour jouer en ligne, une connexion stable est conseillée au premier lancement : le jeu charge ses textures et ses modèles 3D.
 
 ```bash
 git clone https://github.com/RBonsa404/PatchBay.git

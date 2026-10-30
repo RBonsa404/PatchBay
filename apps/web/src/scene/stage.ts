@@ -120,7 +120,7 @@ export class Stage {
     // pool of light; two of them cast shadows (one on the bench and the rack, one behind the player, so everything
     // standing on the floor or the bench is grounded). Cool panels against the warm key, and small coloured glows from
     // the machines themselves.
-    this.scene.add(new THREE.HemisphereLight('#f5f3ee', '#5d5a55', 0.62));
+    this.scene.add(new THREE.HemisphereLight('#f5f3ee', '#6a6761', 0.74));
     this.key = new THREE.SpotLight('#fff1dd', 13, 0, 0.9, 0.9, 1.6);
     this.key.position.set(0.4, 2.95, 0.6);
     this.key.target.position.set(0, 0.8, -0.1);

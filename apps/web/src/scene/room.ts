@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import clubLogoUrl from '../assets/club-logo-512.webp';
 import { bake } from './bake.js';
 import { buildDecor } from './decor.js';
-import { ceilingTexture, contactShadow, esdMatNormal, esdMatTexture, laminateTexture, paintTexture, perforatedTexture, plasterNormal, rackRailTexture, raisedFloorNormal, raisedFloorTexture } from './materials.js';
+import { ceilingTexture, contactShadow, esdMatNormal, esdMatTexture, paintTexture, perforatedTexture, photo, photoRelief, rackRailTexture, raisedFloorNormal, raisedFloorTexture } from './materials.js';
+import { placeProp } from './props.js';
 import { textTexture } from './textures.js';
 
 /** Height of the bench top, in metres: devices in the levels are placed relative to it. */
@@ -39,7 +40,7 @@ export function roomOrigin(y: number, z: number): { y: number; z: number } {
 }
 
 let paintMaterial: THREE.Material | null = null;
-const wallPaint = (): THREE.Material => new THREE.MeshStandardMaterial({ map: paintTexture(), normalMap: plasterNormal(), normalScale: new THREE.Vector2(0.1, 0.1), roughness: 0.82 });
+const wallPaint = (): THREE.Material => new THREE.MeshStandardMaterial({ map: paintTexture(), ...photoRelief('painted_plaster_wall', 3, 1.3), normalScale: new THREE.Vector2(0.22, 0.22), roughness: 0.95 });
 let dadoMaterial: THREE.Material | null = null;
 
 /** A painted wall with its skirting board and the club's colours as a band at hand height. */
@@ -51,7 +52,7 @@ export function paintedWall(g: THREE.Object3D, w: number, x: number, z: number, 
   m.receiveShadow = true;
   g.add(m);
   // The lower part of the wall in a darker, harder-wearing paint, under the club's colours.
-  dadoMaterial ??= new THREE.MeshStandardMaterial({ color: '#aab2bd', map: paintTexture(), normalMap: plasterNormal(), normalScale: new THREE.Vector2(0.08, 0.08), roughness: 0.55 });
+  dadoMaterial ??= new THREE.MeshStandardMaterial({ map: paintTexture(), color: '#aab2bd', ...photoRelief('painted_plaster_wall', 3, 0.5), normalScale: new THREE.Vector2(0.16, 0.16), roughness: 0.7 });
   const dado = new THREE.Mesh(new THREE.PlaneGeometry(w, 1.1), dadoMaterial);
   dado.position.set(x, 0.55, z);
   dado.rotation.y = ry;
@@ -142,7 +143,7 @@ function shell(door: 'back' | 'front'): THREE.Group {
   floorTex.repeat.set(ROOM.width / 1.2, depth / 1.2);
   const floorNormal = raisedFloorNormal();
   floorNormal.repeat.set(ROOM.width / 1.2, depth / 1.2);
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.width, depth), new THREE.MeshStandardMaterial({ map: floorTex, normalMap: floorNormal, normalScale: new THREE.Vector2(0.8, 0.8), roughness: 0.3, metalness: 0.1 }));
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.width, depth), new THREE.MeshStandardMaterial({ map: floorTex, normalMap: floorNormal, normalScale: new THREE.Vector2(0.8, 0.8), roughnessMap: photo('smooth_concrete_floor', ROOM.width / 1.2, depth / 1.2).roughnessMap, roughness: 0.75, metalness: 0.08 }));
   floor.rotation.x = -Math.PI / 2;
   floor.position.z = (ROOM.front + ROOM.back) / 2;
   floor.receiveShadow = true;
@@ -183,7 +184,7 @@ function shell(door: 'back' | 'front'): THREE.Group {
 function bench(): THREE.Group {
   const g = new THREE.Group();
   const [w, d, z] = [3.2, 1.1, 0.25];
-  const laminate = new THREE.MeshStandardMaterial({ map: laminateTexture(), roughness: 0.38 });
+  const laminate = new THREE.MeshStandardMaterial({ ...photo('plywood', 1.6, 0.6), roughness: 0.8 });
   const top = box(w, 0.04, d, laminate);
   top.position.set(0, BENCH_TOP - 0.022, z);
   const mat = new THREE.Mesh(new THREE.BoxGeometry(w - 0.12, 0.003, d - 0.1), new THREE.MeshStandardMaterial({ map: esdMatTexture(), normalMap: esdMatNormal(), normalScale: new THREE.Vector2(0.5, 0.5), roughness: 0.72 }));
@@ -375,7 +376,7 @@ export function rackFillers(occupied: [number, number][], z = 0, y = 0): THREE.G
 function serverCabinet(): THREE.Group {
   const g = new THREE.Group();
   const [w, h, d] = [0.6, 2.0, 0.9];
-  const body = box(w, h, d, steel('#262c35', 0.45, 0.6));
+  const body = box(w, h, d, new THREE.MeshStandardMaterial({ ...photo('metal_plate', 1, 2), color: '#3a4250', metalness: 0.7, roughness: 0.8 }));
   body.position.set(0, h / 2, 0);
   g.add(body);
   const inner = box(w - 0.06, h - 0.12, 0.01, steel('#05070a', 0.8, 0.2), false);
@@ -502,15 +503,10 @@ function wallItems(): THREE.Group {
   g.add(ac, vent, acLed);
 
   // Fire extinguisher on the left wall with its sign.
-  const x = -ROOM.width / 2 + 0.12;
-  const bottle = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.5, 24), new THREE.MeshStandardMaterial({ color: '#dc2626', roughness: 0.35, metalness: 0.2 }));
-  bottle.position.set(x, 0.75, -0.6);
-  bottle.castShadow = true;
-  const head = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 0.08, 16), steel('#111827'));
-  head.position.set(x, 1.04, -0.6);
+  placeProp(g, 'korean_fire_extinguisher_01', { x: -3.27, y: 0, z: -0.6, turn: -Math.PI / 2 });
   const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.2), new THREE.MeshStandardMaterial({ color: '#dc2626', roughness: 0.6 }));
   sign.rotation.y = Math.PI / 2;
   sign.position.set(-ROOM.width / 2 + 0.003, 1.3, -0.6);
-  g.add(bottle, head, sign);
+  g.add(sign);
   return g;
 }

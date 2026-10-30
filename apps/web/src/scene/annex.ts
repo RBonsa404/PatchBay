@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { bake } from './bake.js';
-import { ceilingTexture, contactShadow, outsideTexture } from './materials.js';
+import { ceilingTexture, contactShadow, outsideTexture, photo, photoRelief } from './materials.js';
+import { placeProp } from './props.js';
 import { BUILDING, buildRoomParts, doorWall, paintedWall } from './room.js';
 import { textTexture } from './textures.js';
 
@@ -18,7 +19,7 @@ const CEILING = lit('#e5e7eb', 0.95);
 const FRAME = lit('#475569', 0.5, 0.5);
 const STEEL = lit('#475569', 0.45, 0.75);
 const BLACK = lit('#1b2028', 0.55, 0.25);
-const WOOD = lit('#b08a5e', 0.7);
+const WOOD = new THREE.MeshStandardMaterial({ ...photo('plywood', 0.7, 0.5), roughness: 0.8 });
 const GREY = lit('#94a3b8', 0.65, 0.2);
 
 function box(w: number, h: number, d: number, material: THREE.Material, x: number, y: number, z: number, shadow = true): THREE.Mesh {
@@ -70,7 +71,7 @@ function corridor(upper: boolean, stairs: boolean): THREE.Group {
   const [back, front] = [BUILDING.corridor.back, BUILDING.corridor.front];
   const depth = front - back;
   const mid = (front + back) / 2;
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(9, depth), lit('#8f97a3', 0.42, 0.08));
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(9, depth), new THREE.MeshStandardMaterial({ color: '#8f97a3', ...photoRelief('smooth_concrete_floor', 4, 0.8), roughness: 0.6, metalness: 0.05 }));
   floor.rotation.x = -Math.PI / 2;
   floor.position.set(0, 0.002, mid);
   floor.receiveShadow = true;
@@ -231,9 +232,6 @@ function workstation(x: number, z: number, wallX: number, label: string): THREE.
   g.add(back, screen);
   g.add(soft(0.14, 0.014, 0.36, BLACK, x - side * 0.12, 0.762, z, 0.005), soft(0.095, 0.022, 0.058, BLACK, x - side * 0.12, 0.766, z + 0.27, 0.01));
   g.add(soft(0.36, 0.38, 0.17, BLACK, x + side * 0.12, 0.2, z - 0.28, 0.012));
-  // The chair: a pedestal, a seat and a back, turned to the table.
-  const cx = x - side * 0.72;
-  g.add(soft(0.44, 0.08, 0.42, lit('#2a313c', 0.55), cx, 0.47, z, 0.035), soft(0.06, 0.44, 0.4, lit('#2a313c', 0.55), cx - side * 0.2, 0.8, z, 0.026), box(0.05, 0.4, 0.05, STEEL, cx, 0.24, z), box(0.42, 0.03, 0.05, BLACK, cx, 0.04, z), box(0.05, 0.03, 0.42, BLACK, cx, 0.04, z));
   // The socket under the table, on the trunking.
   g.add(box(0.012, 0.075, 0.075, lit('#e8ebef', 0.7), wallX - side * 0.04, 0.42, z, false), box(0.003, 0.02, 0.022, BLACK, wallX - side * 0.048, 0.42, z, false));
   const shadow = contactShadow(1.1, 1.25, 0.45);
@@ -316,14 +314,20 @@ export function buildAnnex(floors: boolean): THREE.Group {
   sub.position.set(0, 2.08, -1.59);
   lab.add(name, sub);
   lab.position.z = BUILDING.annexZ;
-  g.add(part('part-lab', lab), part('part-lower', corridor(false, floors)));
+  const labPart = part('part-lab', lab);
+  for (const z of [-1.2, -0.05, 1.1, 2.25]) placeProp(labPart, 'SchoolChair_01', { x: 2.2, y: 0, z: z + BUILDING.annexZ, turn: Math.PI / 2 });
+  g.add(labPart, part('part-lower', corridor(false, floors)));
   if (floors) {
     const office = buildRoomParts('back');
     office.add(officeFurniture());
     office.position.y = BUILDING.floorY;
     const upper = corridor(true, true);
     upper.position.y = BUILDING.floorY;
-    g.add(part('part-stairs', stairwell()), part('part-office', office), part('part-upper', upper));
+    const officePart = part('part-office', office);
+    for (const z of [-0.7, 0.45, 1.6]) placeProp(officePart, 'SchoolChair_01', { x: 2.2, y: BUILDING.floorY, z, turn: Math.PI / 2 });
+    placeProp(officePart, 'pachira_aquatica_01', { x: -2.9, y: BUILDING.floorY, z: 3.1, only: ['pachira_aquatica_01_bark_a', 'pachira_aquatica_01_leaves_a'] });
+    placeProp(officePart, 'binder_notebook', { x: -3.24, y: BUILDING.floorY + 0.88, z: 2.35, turn: Math.PI / 2 });
+    g.add(part('part-stairs', stairwell()), officePart, part('part-upper', upper));
   }
   // Two lamps only, moved to whichever corridor the player is in: every light costs on every pixel.
   const lamps = new THREE.Group();

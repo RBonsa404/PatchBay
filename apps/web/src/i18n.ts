@@ -75,6 +75,7 @@ const fr = {
   'leave.confirm': 'Quitter',
   'error.otherRoom': 'Trop loin pour un câble : entre deux salles, on passe par les panneaux de brassage.',
   'music.now': 'Musique : {title}',
+  'title.network': 'Connexion stable conseillée : le jeu charge ses textures et ses modèles 3D.',
   'title.desktop': 'Conseillé sur ordinateur, avec un clavier et une souris.',
   'board.tip': 'Tableau : voir le schéma',
   'board.back': 'Échap ou clic : revenir. T : ouvrir le tableau à tout moment.',

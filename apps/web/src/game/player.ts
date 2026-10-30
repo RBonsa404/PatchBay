@@ -10,7 +10,7 @@ const OBSTACLES: [number, number, number, number][] = [
   [-1.6, 1.6, -0.3, 0.8], // workbench
   [-0.36, 0.36, -0.96, -0.33], // rack and its cable managers
   [2.45, 3.05, -1.55, -0.65], // server cabinet
-  [-3.5, -3.3, -0.75, -0.45], // fire extinguisher
+  [-3.5, -3.1, -0.8, -0.4], // fire extinguisher
   [-3.5, -3.0, 0.1, 2.1], // shelving
   [2.82, 3.5, -0.4, 1.65], // row of cabinets
   [2.97, 3.5, 1.95, 3.25], // cupboard under the pegboard

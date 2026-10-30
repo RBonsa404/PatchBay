@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import { contactShadow, outsideTexture, sunPatchTexture } from './materials.js';
+import { contactShadow, outsideTexture, photo, sunPatchTexture } from './materials.js';
+import { placeProp } from './props.js';
 import { textTexture } from './textures.js';
 
 /**
@@ -21,7 +22,7 @@ const M = {
   crateLid: lit('#22418f', 0.5, 0.12),
   black: lit('#1b2028', 0.6, 0.25),
   plastic: lit('#20262f', 0.45),
-  wood: lit('#b08a5e', 0.7),
+  wood: new THREE.MeshStandardMaterial({ ...photo('plywood', 1, 0.5), roughness: 0.8 }),
   amber: lit('#fbbf24', 0.6),
   blue: lit('#1d4ed8', 0.6),
   red: lit('#dc2626', 0.5),
@@ -198,7 +199,8 @@ function desk(): THREE.Group {
   g.add(box(0.4, 0.016, 0.13, M.plastic, x - 0.1, top + 0.026, z - 0.12), box(0.06, 0.02, 0.09, M.plastic, x + 0.17, top + 0.028, z - 0.12));
   const binders = ['#1d4ed8', '#fbbf24', '#0b1e3f', '#1d4ed8', '#94a3b8'];
   binders.forEach((colour, i) => g.add(box(0.05, 0.28, 0.2, lit(colour, 0.7), x + 0.42 + i * 0.056, top + 0.158, z + 0.2)));
-  g.add(cylinder(0.04, 0.095, M.white, x + 0.3, top + 0.066, z - 0.1));
+  placeProp(g, 'clipboard', { x: x + 0.34, y: top + 0.018, z: z - 0.1, turn: 0.2 });
+  placeProp(g, 'desk_lamp_arm_01', { x: x - 0.55, y: top + 0.1, z: z + 0.16, turn: 0.6, scale: 0.75 });
 
   // Chair: five spokes on the floor, a column, a seat and a back.
   const chair = new THREE.Group();
@@ -274,8 +276,9 @@ function walls(): THREE.Group {
   g.add(box(0.46, 0.03, 1.28, M.wood, 3.25, 0.865, 2.6));
   g.add(box(0.004, 0.75, 0.003, M.black, 3.031, 0.42, 2.6, false));
   for (const dz of [-0.06, 0.06]) g.add(box(0.016, 0.12, 0.016, M.steel, 3.025, 0.5, 2.6 + dz, false));
-  // Two identical tool cases, squared up on the cupboard.
-  for (const dz of [-0.28, 0.28]) g.add(soft(0.26, 0.13, 0.42, M.red, 3.25, 0.945, 2.6 + dz, 0.02), soft(0.03, 0.02, 0.16, M.steel, 3.25, 1.02, 2.6 + dz, 0.006), soft(0.008, 0.03, 0.04, M.steel, 3.118, 0.97, 2.6 + dz - 0.1, 0.003), soft(0.008, 0.03, 0.04, M.steel, 3.118, 0.97, 2.6 + dz + 0.1, 0.003));
+  // A real toolbox and a multimeter on the cupboard.
+  placeProp(g, 'metal_toolbox', { x: 3.25, y: 0.88, z: 2.25, turn: -Math.PI / 2 });
+  placeProp(g, 'retro_multimeter', { x: 3.25, y: 0.88, z: 2.95, turn: -Math.PI / 2 - 0.25, scale: 0.8 });
   const cupboardShadow = contactShadow(0.8, 1.6, 0.5);
   cupboardShadow.position.set(3.2, 0.003, 2.6);
   g.add(cupboardShadow);
@@ -298,13 +301,7 @@ function walls(): THREE.Group {
   }
 
   // Back wall: a clock, safety signs, a rack diagram.
-  const clockX = -1.95;
-  g.add(cylinder(0.14, 0.02, M.white, clockX, 2.38, back + 0.012, 'z'), cylinder(0.148, 0.012, M.black, clockX, 2.38, back + 0.008, 'z'));
-  const hour = box(0.011, 0.075, 0.003, M.black, clockX + 0.018, 2.41, back + 0.024, false);
-  hour.rotation.z = -0.5;
-  const minute = box(0.008, 0.115, 0.003, M.black, clockX - 0.04, 2.41, back + 0.026, false);
-  minute.rotation.z = 0.8;
-  g.add(hour, minute);
+  placeProp(g, 'wall_clock', { x: -1.95, y: 2.38, z: back });
   const esd = sign(0.26, 0.17, '#1d4ed8', '#ffffff', ['ZONE ESD', 'BRACELET OBLIGATOIRE']);
   esd.position.set(0.72, 1.62, back + 0.002);
   const reserved = sign(0.3, 0.12, '#0b1e3f', '#fbbf24', ['ACCÈS RÉSERVÉ']);
@@ -312,6 +309,9 @@ function walls(): THREE.Group {
   g.add(esd);
   // The sign rides on the door's leaf: added once the room is assembled.
   g.userData.doorSign = reserved;
+
+  placeProp(g, 'security_camera_01', { x: 0.75, y: 2.62, z: back + 0.32, turn: 0.35 });
+  placeProp(g, 'fire_alarm', { x: -2.32, y: 1.45, z: back + 0.002 });
 
   // Ceiling: an air duct with its grilles, a smoke detector.
   g.add(box(4.8, 0.26, 0.42, M.paintedGrey, -0.4, 2.86, 3.15));
