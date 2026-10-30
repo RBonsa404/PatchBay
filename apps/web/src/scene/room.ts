@@ -12,6 +12,13 @@ export const BENCH_TOP = 0.76;
  */
 export const RACK = { x: 0, frontZ: -0.36, depth: 0.6, height: 1.5, railX: 0.236 } as const;
 
+/** The vertical cable managers beside the rack's rails (centre, from the rack's axis, and width). */
+export const MANAGER = { x: 0.325, width: 0.06 } as const;
+
+const RACK_UNIT = 0.0445;
+/** The free part of the rack: above the UPS, below the patch panel. */
+const RACK_FREE = { from: 0.07 + RACK_UNIT * 3, to: 1.335 } as const;
+
 const ROOM = { width: 7, back: -1.6, front: 3.6, height: 3 } as const;
 
 const box = (w: number, h: number, d: number, material: THREE.Material, shadows = true): THREE.Mesh => {
@@ -176,8 +183,8 @@ function rack(): THREE.Group {
     g.add(rail);
   }
 
-  // Fillers. The level's own gear goes between 0.85 m and 1.32 m.
-  const unit = 0.0445;
+  // The UPS at the bottom; `rackFillers` closes the units the level's own gear leaves free.
+  const unit = RACK_UNIT;
   const ups = box(0.44, unit * 3 - 0.002, 0.45, steel('#1f2937', 0.5, 0.4));
   ups.position.set(x, 0.07 + (unit * 3) / 2, frontZ - 0.225);
   const lcd = new THREE.Mesh(new THREE.PlaneGeometry(0.06, 0.025), new THREE.MeshBasicMaterial({ color: '#7dd3fc', toneMapped: false }));
@@ -186,11 +193,19 @@ function rack(): THREE.Group {
   upsLed.position.set(x + 0.15, 0.07 + unit * 1.5, frontZ + 0.0005);
   g.add(ups, lcd, upsLed);
 
-  const blank = steel('#1b2028', 0.55, 0.5);
-  for (const [u, n] of [[4, 2], [6, 1], [8, 2], [11, 3]] as const) {
-    const panel = box(0.465, unit * n - 0.003, 0.004, blank, false);
-    panel.position.set(x, 0.07 + unit * u + (unit * n) / 2, frontZ - 0.002);
-    g.add(panel);
+  // Vertical cable managers on both sides: a back and fingers, so cables run down the rack instead of across it.
+  const duct = steel('#111418', 0.6, 0.3);
+  for (const side of [-1, 1]) {
+    const back = box(MANAGER.width, height - 0.14, 0.006, duct);
+    back.position.set(x + side * MANAGER.x, height / 2, frontZ - 0.05);
+    const outer = box(0.004, height - 0.14, 0.06, duct, false);
+    outer.position.set(x + side * (MANAGER.x + MANAGER.width / 2), height / 2, frontZ - 0.02);
+    g.add(back, outer);
+    for (let y = 0.12; y < height - 0.08; y += 0.0445 * 2) {
+      const finger = box(0.012, 0.012, 0.06, duct, false);
+      finger.position.set(x + side * (MANAGER.x - MANAGER.width / 2), y, frontZ - 0.02);
+      g.add(finger);
+    }
   }
 
   // Patch panel (24 sockets) and a brush cable manager above the gear.
@@ -211,6 +226,63 @@ function rack(): THREE.Group {
   const shadow = contactShadow(0.85, depth + 0.25, 0.6);
   shadow.position.set(x, 0.003, midZ);
   g.add(shadow);
+  return g;
+}
+
+/**
+ * Closes the rack's free units around the gear of a level (`occupied`: bottom and top of each device, in metres), as
+ * in a real rack: blanking panels, vented panels, horizontal cable managers and a fibre drawer. Nothing stays empty.
+ */
+export function rackFillers(occupied: [number, number][]): THREE.Group {
+  const g = new THREE.Group();
+  const { x, frontZ } = RACK;
+  const blank = steel('#1b2028', 0.55, 0.5);
+  const dark = new THREE.MeshBasicMaterial({ color: '#05070a' });
+  const screw = steel('#94a3b8', 0.3, 1);
+  const panel = (y: number, h: number, kind: number): void => {
+    const face = box(0.465, h - 0.003, 0.004, blank, false);
+    face.position.set(x, y + h / 2, frontZ - 0.002);
+    g.add(face);
+    for (const side of [-1, 1]) {
+      const s = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.002, 10), screw);
+      s.rotation.x = Math.PI / 2;
+      s.position.set(x + side * 0.222, y + h / 2, frontZ + 0.001);
+      g.add(s);
+    }
+    if (kind === 1) {
+      // Vented panel: rows of slots.
+      for (let i = 0; i < 16; i++) {
+        const slot = new THREE.Mesh(new THREE.PlaneGeometry(0.018, h * 0.42), dark);
+        slot.position.set(x - 0.18 + i * 0.024, y + h / 2, frontZ + 0.0004);
+        g.add(slot);
+      }
+    } else if (kind === 2) {
+      // Horizontal cable manager: a row of fingers.
+      for (let i = 0; i < 9; i++) {
+        const finger = box(0.012, h * 0.62, 0.022, blank, false);
+        finger.position.set(x - 0.192 + i * 0.048, y + h / 2, frontZ + 0.011);
+        g.add(finger);
+      }
+    } else if (kind === 3) {
+      // Fibre drawer with its handle and label.
+      const handle = box(0.09, 0.008, 0.012, steel('#475569', 0.6, 0.4), false);
+      handle.position.set(x, y + h / 2, frontZ + 0.006);
+      const tag = new THREE.Mesh(new THREE.PlaneGeometry(0.05, 0.012), new THREE.MeshBasicMaterial({ map: textTexture('FIBRE', { width: 200, height: 48, color: '#e2e8f0', font: '600 34px Inter, sans-serif' }), transparent: true }));
+      tag.position.set(x - 0.14, y + h / 2, frontZ + 0.0006);
+      g.add(handle, tag);
+    }
+  };
+  const KINDS = [0, 1, 0, 2, 0, 3, 1, 0, 2];
+  let next = 0;
+  let from: number = RACK_FREE.from;
+  for (const [bottom, top] of [...occupied.slice().sort((p, q) => p[0] - q[0]), [RACK_FREE.to, RACK_FREE.to] as [number, number]]) {
+    const free = bottom - from;
+    if (free > 0.012) {
+      const count = Math.max(1, Math.floor(free / RACK_UNIT + 0.001));
+      for (let i = 0; i < count; i++) panel(from + (i * free) / count, free / count, KINDS[next++ % KINDS.length] as number);
+    }
+    from = Math.max(from, top);
+  }
   return g;
 }
 
@@ -290,13 +362,13 @@ function wallItems(): THREE.Group {
   const g = new THREE.Group();
   const z = ROOM.back + 0.005;
 
-  // The club's logo in a white frame, and its name painted above the rack.
+  // The club's logo in a navy frame (its white background would wash out under the lights), and its name above the rack.
   const logoTex = new THREE.TextureLoader().load(clubLogoUrl);
   logoTex.colorSpace = THREE.SRGBColorSpace;
   logoTex.anisotropy = 8;
-  const frame = box(0.66, 0.66, 0.02, new THREE.MeshStandardMaterial({ color: '#f8fafc', roughness: 0.6 }));
+  const frame = box(0.66, 0.66, 0.02, new THREE.MeshStandardMaterial({ color: '#0b1e3f', roughness: 0.6 }));
   frame.position.set(1.3, 1.72, z + 0.01);
-  const logo = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.6), new THREE.MeshStandardMaterial({ map: logoTex, roughness: 0.5 }));
+  const logo = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.6), new THREE.MeshStandardMaterial({ map: logoTex, color: '#b4b4b4', roughness: 0.9, envMapIntensity: 0 }));
   logo.position.set(1.3, 1.72, z + 0.021);
   g.add(frame, logo);
 

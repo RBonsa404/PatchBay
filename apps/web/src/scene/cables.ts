@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { Cable, CableEnd, CableType } from '@patchbay/sim-core';
 import type { PortView } from './devices.js';
-import { BENCH_TOP } from './room.js';
+import { BENCH_TOP, MANAGER, RACK } from './room.js';
 import type { Stage } from './stage.js';
 
 /** Cable colours: the usual workshop habits (blue straight, amber crossover, light-blue console, dark serial). */
@@ -23,7 +23,7 @@ export function portFrame(port: PortView): { point: THREE.Vector3; normal: THREE
 }
 
 /** A hanging path: out of each port, then a sag between them that never goes through the bench (cable in hand). */
-function curveBetween(a: THREE.Vector3, na: THREE.Vector3, b: THREE.Vector3, nb: THREE.Vector3): THREE.CatmullRomCurve3 {
+function curveBetween(a: THREE.Vector3, na: THREE.Vector3, b: THREE.Vector3, nb: THREE.Vector3, obstacles: THREE.Box3[]): THREE.CatmullRomCurve3 {
   const lead = 0.07;
   const a1 = a.clone().addScaledVector(na, lead);
   const b1 = b.clone().addScaledVector(nb, lead);
@@ -31,6 +31,11 @@ function curveBetween(a: THREE.Vector3, na: THREE.Vector3, b: THREE.Vector3, nb:
   const mid = a1.clone().lerp(b1, 0.5);
   mid.y = Math.max(Math.min(a1.y, b1.y) - 0.04 - span * 0.18, BENCH_TOP + 0.015);
   mid.z = Math.max(a1.z, b1.z) + 0.04 + span * 0.05;
+  // Held over whatever stands between the two ends, rather than through it.
+  const margin = 0.02;
+  for (const box of obstacles) {
+    if (segmentHitsRect(a1, b1, box.min.x - margin, box.max.x + margin, box.min.z - margin, box.max.z + margin) !== null) mid.y = Math.max(mid.y, box.max.y + 0.04);
+  }
   return new THREE.CatmullRomCurve3([a, a1, mid, b1, b], false, 'centripetal', 0.5);
 }
 
@@ -61,22 +66,25 @@ function routeBetween(a: THREE.Vector3, na: THREE.Vector3, b: THREE.Vector3, nb:
   }
 
   // Touch-down points on the bench, just past each port, shifted into this cable's lane.
-  const down = (p: THREE.Vector3, n: THREE.Vector3, high: boolean): THREE.Vector3[] => {
+  const down = (p: THREE.Vector3, n: THREE.Vector3, high: boolean, other: THREE.Vector3): THREE.Vector3[] => {
     const flat = new THREE.Vector3(n.x, 0, n.z).normalize();
     if (!high) {
       const t = p.clone().addScaledVector(flat, 0.04 + offset);
       t.y = rest;
       return [t];
     }
-    // From the rack: hang straight down in front of it, then rest on the bench's back edge.
-    const fall = p.clone().addScaledVector(flat, 0.02 + offset * 0.5);
-    fall.y = (p.y + rest) / 2;
-    const t = p.clone().addScaledVector(flat, 0.09 + offset);
-    t.y = rest;
-    return [fall, t];
+    // From the rack: along the front of the gear to the nearest cable manager, down inside it, then out onto the
+    // bench's back edge. Cables never hang in front of the ports below.
+    const side = other.x < RACK.x ? -1 : 1;
+    const x = RACK.x + side * (MANAGER.x - 0.012 + (lane % 4) * 0.006);
+    const z = RACK.frontZ + 0.03;
+    const across = new THREE.Vector3(x, p.y - 0.018 - (lane % 4) * 0.004, z);
+    const low = new THREE.Vector3(x, rest + 0.1, z);
+    const t = new THREE.Vector3(x, rest, RACK.frontZ + 0.13 + offset);
+    return [across, low, t];
   };
-  const da = down(a1, na, highA);
-  const db = down(b1, nb, highB).reverse();
+  const da = down(a1, na, highA, b1);
+  const db = down(b1, nb, highB, a1).reverse();
   const ta = da[da.length - 1] as THREE.Vector3;
   const tb = db[0] as THREE.Vector3;
   // Lie flat along the bench, going around whatever stands on it.
@@ -88,7 +96,10 @@ function routeBetween(a: THREE.Vector3, na: THREE.Vector3, b: THREE.Vector3, nb:
     run = [mid];
   }
   for (const p of run) p.y = rest;
-  return new THREE.CatmullRomCurve3([a, a1, ...da, ...run, ...db, b1, b], false, 'centripetal', 0.5);
+  // A smooth curve overshoots its points a little: flatten what would dip into the bench.
+  const smooth = new THREE.CatmullRomCurve3([a, a1, ...da, ...run, ...db, b1, b], false, 'centripetal', 0.5);
+  const flattened = smooth.getPoints(120).map((p) => p.setY(Math.max(p.y, rest)));
+  return new THREE.CatmullRomCurve3(flattened, false, 'centripetal', 0.5);
 }
 
 /** Clearance kept between a cable lying on the bench and the objects standing on it. */
@@ -307,7 +318,10 @@ export class CableLayer {
       return;
     }
     const a = portFrame(from);
-    const curve = curveBetween(a.point, a.normal, pointer, new THREE.Vector3(0, 1, 0));
+    // The hand stays above the bench, even when the pointer aims below it.
+    const hand = pointer.clone();
+    hand.y = Math.max(hand.y, BENCH_TOP + 0.02);
+    const curve = curveBetween(a.point, a.normal, hand, new THREE.Vector3(0, 1, 0), this.obstacles);
     this.preview = new THREE.Mesh(
       new THREE.TubeGeometry(curve, 64, CABLE_STYLE[type].radius, 8, false),
       new THREE.MeshStandardMaterial({ color: CABLE_STYLE[type].colour, emissive: '#38bdf8', emissiveIntensity: 0.35, transparent: true, opacity: 0.85 }),

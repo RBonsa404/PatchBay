@@ -6,8 +6,9 @@ import { Avatar, type MoveInput } from './avatar.js';
 import { Coach, type CoachView } from './coach.js';
 import { setGameTarget, type GameTarget } from './gamepad.js';
 import { CableLayer, portFrame } from '../scene/cables.js';
-import { buildDevice, highlightSocket, setLed, type DeviceView, type PortView } from '../scene/devices.js';
+import { buildDevice, highlightSocket, rackOccupied, setLed, type DeviceView, type PortView } from '../scene/devices.js';
 import { buildWhiteboard } from '../scene/details.js';
+import { rackFillers } from '../scene/room.js';
 import type { Quality, Stage } from '../scene/stage.js';
 import { CABLE_ORDER, Hud } from '../ui/hud.js';
 import { closePanel, Consoles, openPanelKey, resetHostShells, showHostPanel, showNotice } from '../ui/panels.js';
@@ -96,7 +97,7 @@ export class Mission {
         return v.body.map((mesh) => new THREE.Box3().setFromObject(mesh));
       }),
     );
-    stage.level.add(this.cables.group, buildWhiteboard(level));
+    stage.level.add(this.cables.group, buildWhiteboard(level), rackFillers(rackOccupied([...this.devices.values()])));
     this.avatar.place(0, 1.1);
     stage.level.add(this.avatar.root);
     stage.controls.enabled = true;
@@ -285,7 +286,7 @@ export class Mission {
 
     if (port) {
       const verdict = this.canTake(port);
-      if (this.selected) highlightSocket(port, verdict === null ? 'ok' : 'bad');
+      highlightSocket(port, !this.selected ? 'hover' : verdict === null ? 'ok' : 'bad');
       const name = `${port.device} · ${port.port}`;
       this.hud.showTooltip(verdict && this.selected ? `${name} — ${verdict}` : name, e.clientX, e.clientY, verdict !== null && this.selected !== null);
     } else if (device) {
@@ -348,6 +349,7 @@ export class Mission {
       sound.play('error');
       return;
     }
+    this.avatar.reach(portFrame(port).point);
     if (!this.firstEnd) {
       this.firstEnd = port;
       sound.play('plug');
@@ -377,6 +379,7 @@ export class Mission {
     }
     if (!this.inReach(port.device)) return;
     if (this.net.disconnect({ device: port.device, port: port.port })) {
+      this.avatar.reach(portFrame(port).point);
       sound.play('unplug');
       this.hud.toast(t('cable.unplugged'));
       this.afterChange();
@@ -478,6 +481,7 @@ export class Mission {
   private openDevice(id: string): void {
     const view = this.devices.get(id);
     if (!view) return;
+    this.avatar.reach(view.root.getWorldPosition(new THREE.Vector3()).setY(view.root.position.y + view.height / 2));
     if (view.shape === 'router' || view.shape === 'switch') {
       const laptop = this.consoleLaptop(id);
       if (laptop) this.consoles.open(id, laptop);

@@ -12,7 +12,7 @@ import { contactShadow } from '../scene/materials.js';
 /** Furniture footprints seen from above (x0, x1, z0, z1), in metres: the room's layout in `scene/room.ts`. */
 const OBSTACLES: [number, number, number, number][] = [
   [-1.6, 1.6, -0.3, 0.8], // workbench
-  [-0.31, 0.31, -0.96, -0.36], // rack
+  [-0.36, 0.36, -0.96, -0.33], // rack and its cable managers
   [2.45, 3.05, -1.55, -0.65], // server cabinet
   [-3.5, -3.3, -0.75, -0.45], // fire extinguisher
 ];
@@ -20,6 +20,8 @@ const ROOM = { x0: -3.5, x1: 3.5, z0: -1.6, z1: 3.6 };
 const RADIUS = 0.24;
 const WALK = 1.35;
 const RUN = 2.6;
+/** How long the arm stays out when the character reaches for a port, in seconds. */
+const REACH_TIME = 0.7;
 
 const skin = new THREE.MeshStandardMaterial({ color: '#8b5532', roughness: 0.65 });
 
@@ -50,6 +52,8 @@ export class Avatar {
   private phase = 0;
   private speed = 0;
   private time = 0;
+  private forearm!: THREE.Group;
+  private gesture: { time: number; heading: number; lift: number } | null = null;
 
   constructor() {
     const polo = new THREE.MeshStandardMaterial({ color: '#1d4ed8', roughness: 0.75 });
@@ -103,6 +107,7 @@ export class Avatar {
       hand.position.y = -0.3;
       fore.add(hand);
       a.add(fore);
+      if (x > 0) this.forearm = fore;
       return a;
     };
     this.arms = [arm(-0.235), arm(0.235)];
@@ -200,9 +205,42 @@ export class Avatar {
     this.arms[1].rotation.x = swing * 0.8;
     this.arms[0].rotation.z = -0.06;
     this.arms[1].rotation.z = 0.06;
+    this.reachOut(dt, amount > 0.05);
     this.body.position.y = Math.abs(Math.cos(this.phase)) * 0.03 * Math.min(1, stride) + Math.sin(this.time * 1.6) * 0.004;
     this.head.rotation.y = Math.sin(this.time * 0.35) * 0.12 * (1 - Math.min(1, stride));
     return moved;
+  }
+
+  /** Turn towards `point` and stretch the right arm to it: plugging a cable in, opening a device. */
+  reach(point: THREE.Vector3): void {
+    const p = this.root.position;
+    const shoulderY = 1.42;
+    const distance = Math.hypot(point.x - p.x, point.z - p.z);
+    this.gesture = { time: 0, heading: Math.atan2(point.x - p.x, point.z - p.z), lift: -Math.atan2(distance, shoulderY - point.y) };
+  }
+
+  /** Play the current gesture on top of the walk cycle. Walking keeps the arm's motion but not the turn. */
+  private reachOut(dt: number, walking: boolean): void {
+    if (!this.gesture) return;
+    const g = this.gesture;
+    g.time += dt;
+    const t = g.time / REACH_TIME;
+    if (t >= 1) {
+      this.gesture = null;
+      this.forearm.rotation.x = 0;
+      return;
+    }
+    if (!walking) {
+      const delta = Math.atan2(Math.sin(g.heading - this.heading), Math.cos(g.heading - this.heading));
+      this.heading += delta * Math.min(1, dt * 12);
+      this.root.rotation.y = this.heading;
+    }
+    // Up quickly, a short hold at the port, back down.
+    const e = Math.min(1, Math.min(t / 0.3, (1 - t) / 0.3));
+    const smooth = e * e * (3 - 2 * e);
+    const arm = this.arms[1];
+    arm.rotation.x += (g.lift - arm.rotation.x) * smooth;
+    this.forearm.rotation.x = -0.25 * smooth;
   }
 
   /** Move by (dx, dz), sliding along walls and furniture instead of passing through them. */

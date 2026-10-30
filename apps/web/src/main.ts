@@ -11,8 +11,8 @@ import { sound } from './audio.js';
 import { Avatar } from './game/avatar.js';
 import { startGamepad } from './game/gamepad.js';
 import { Mission } from './game/mission.js';
-import { buildDevice } from './scene/devices.js';
-import { buildRoom } from './scene/room.js';
+import { buildDevice, rackOccupied } from './scene/devices.js';
+import { buildRoom, rackFillers } from './scene/room.js';
 import { detectQuality, Stage } from './scene/stage.js';
 import { h } from './ui/dom.js';
 import { progress, showBriefing, showMissions, showResults, showTitle } from './ui/screens.js';
@@ -49,7 +49,8 @@ function showcase(): void {
   mission = null;
   stage.clearLevel();
   const level = campaign[0]!;
-  for (const d of level.devices) stage.level.add(buildDevice(d.id, catalog[d.model]!, d.position, d.id).root);
+  const views = level.devices.map((d) => buildDevice(d.id, catalog[d.model]!, d.position, d.id));
+  stage.level.add(...views.map((v) => v.root), rackFillers(rackOccupied(views)));
   // The technician stands behind the bench beside the rack, breathing, glancing around.
   const avatar = new Avatar();
   avatar.place(0.78, -0.8, -Math.PI * 0.2);

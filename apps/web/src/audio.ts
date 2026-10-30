@@ -60,7 +60,26 @@ class Sound {
       seed = (seed * 1103515245 + 12345) % 2147483648;
       data[i] = (seed / 1073741824 - 1) * (1 - i / length);
     }
+    this.startFans();
     return this.ctx;
+  }
+
+  /** The room's ambience: the low, steady breath of the server fans, under everything else (and muted with it). */
+  private startFans(): void {
+    const ctx = this.ctx as AudioContext;
+    const buffer = ctx.createBuffer(1, ctx.sampleRate * 3, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.loop = true;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 340;
+    const gain = ctx.createGain();
+    gain.gain.value = 0.05;
+    src.connect(filter).connect(gain).connect(this.master as GainNode);
+    src.start();
   }
 
   private tone(freq: number, start: number, duration: number, type: OscillatorType, volume: number, glideTo?: number): void {

@@ -111,12 +111,13 @@ Retours du porteur de projet après la première version jouable (à traiter qua
 
 État après la première passe (2026-10-29) — fait : interface, icônes Lucide, logo PatchBay et logo du club, salle réaliste, équipements ancrés, câbles rangés, personnage d'Aïcha (portrait + texte qui s'écrit). Reste à faire :
 - Interface validée par le porteur de projet (2026-10-29) : « beaucoup plus pro ». Garder cette direction, l'affiner sans tout casser.
-- ✔ **Personnage jouable** (2026-10-30, `game/avatar.ts`) : technicien du club en polo (logo au dos, casque), vue à la troisième personne par-dessus l'épaule ; ZQSD ou flèches (touches physiques : WASD sur un clavier anglais), Maj pour courir, stick gauche de la manette (la croix déplace alors le curseur) ; cycle de marche procédural ; collisions avec l'établi, la baie, l'armoire et les murs ; caméra qui suit et reste dans la salle ; il faut être à moins de 2 m d'un équipement pour le brancher ou l'ouvrir. Il attend aussi derrière l'établi sur l'écran titre. Pistes : animation des bras quand il branche, choix du personnage (fille/garçon, tenue), s'asseoir devant le portable pour la console.
-- ✔ **Physique des câbles** (2026-10-30) : les câbles posés contournent les équipements de l'établi (objets voisins regroupés). Reste : collisions des câbles en l'air (boucles de brassage dans la baie) et câble tenu en main.
-- Baie : panneaux d'obturation dans les unités vides selon le niveau (la baie du niveau 2 paraît vide), guide-câbles verticaux.
+- ✔ **Personnage jouable** (2026-10-30, `game/avatar.ts`) : technicien du club en polo (logo au dos, casque), vue à la troisième personne par-dessus l'épaule ; ZQSD ou flèches (touches physiques : WASD sur un clavier anglais), Maj pour courir, stick gauche de la manette (la croix déplace alors le curseur) ; cycle de marche procédural ; collisions avec l'établi, la baie, l'armoire et les murs ; caméra qui suit et reste dans la salle ; il faut être à moins de 2 m d'un équipement pour le brancher ou l'ouvrir. Il attend aussi derrière l'établi sur l'écran titre. Pistes : choix du personnage (fille/garçon, tenue), s'asseoir devant le portable pour la console.
+- ✔ **Physique des câbles** (2026-10-30) : les câbles posés contournent les équipements de l'établi (objets voisins regroupés). Câbles de la baie descendus par les guide-câbles verticaux, câble tenu en main qui passe au-dessus des objets et reste au-dessus de l'établi. Mesuré sur les 2 missions : aucun point de câble dans un équipement ni sous l'établi (hors géométrie fine des prises).
+- ✔ **Baie** (2026-10-30) : `rackFillers` ferme les unités libres selon le niveau (obturateurs, panneaux ventilés, passe-câbles, tiroir fibre), guide-câbles verticaux.
+- ✔ **Finitions** (2026-10-30) : le personnage tend le bras vers le port ou l'appareil et se tourne vers lui ; surbrillance des ports au survol sans câble en main ; souffle des ventilateurs (`startFans`, jamais écouté par une oreille humaine : à régler au besoin).
 - Équipements plus fins (sérigraphie, faces arrière) ou modèles GLB CC0.
 - Aïcha en 3D ou animée (expressions, voix synthétisée en option), et un assistant qui répond aux questions de l'élève.
-- Ambiance sonore (ventilation des serveurs), animation d'entrée dans la salle, surbrillance des ports au survol sans câble en main.
+- Animation d'entrée dans la salle.
 - Vérifier sur un vrai Chrome : installation PWA et hors ligne, manette réelle.
 
 Autres points :

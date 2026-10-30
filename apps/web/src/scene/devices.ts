@@ -34,6 +34,8 @@ export interface DeviceView {
   height: number;
   width: number;
   depth: number;
+  /** Mounted in the rack, rather than standing on the bench. */
+  inRack: boolean;
 }
 
 const SOCKET: Record<string, [w: number, h: number]> = {
@@ -302,7 +304,7 @@ export function buildDevice(id: string, model: DeviceModel, position: [number, n
   const m = materials();
   const shape: DeviceShape =
     model.kind === 'router' ? 'router' : model.kind === 'switch' ? 'switch' : model.kind === 'server' ? 'server' : id.toUpperCase().startsWith('ADMIN') ? 'laptop' : 'pc';
-  const view: DeviceView = { id, shape, root: new THREE.Group(), ports: new Map(), body: [], height: 0.1, width: 0.4, depth: 0.3 };
+  const view: DeviceView = { id, shape, root: new THREE.Group(), ports: new Map(), body: [], height: 0.1, width: 0.4, depth: 0.3, inRack: false };
   view.root.name = id;
 
   if (shape === 'router') buildRouter(id, model, m, view);
@@ -313,6 +315,7 @@ export function buildDevice(id: string, model: DeviceModel, position: [number, n
   const [x, y, z] = position ?? [0, BENCH_TOP, 0];
   // Rack-mounted gear keeps its height; everything else stands on the bench.
   const inRack = (shape === 'router' || shape === 'switch') && Math.abs(x) < 0.3 && z < -0.15;
+  view.inRack = inRack;
   if (inRack) addRackEars(view.root, view.width, view.height, view.depth);
   else if (shape === 'router' || shape === 'switch') addFeet(view.root, view.width, view.depth);
   // Desktop units stand on their feet, 4 mm above the bench, over a soft contact shadow. Rack gear is pushed back so
@@ -329,6 +332,11 @@ export function buildDevice(id: string, model: DeviceModel, position: [number, n
   return view;
 }
 
+/** Bottom and top of each device mounted in the rack, for the fillers to close the units around them. */
+export function rackOccupied(views: DeviceView[]): [number, number][] {
+  return views.filter((v) => v.inRack).map((v) => [v.root.position.y, v.root.position.y + v.height]);
+}
+
 const LED_COLOURS: Record<LedState, [string, number]> = { off: ['#1f2937', 0], green: ['#10b981', 4], amber: ['#fbbf24', 3.5] };
 
 export function setLed(port: PortView, state: LedState): void {
@@ -340,10 +348,10 @@ export function setLed(port: PortView, state: LedState): void {
   material.emissiveIntensity = intensity;
 }
 
-/** Tint a socket: cyan when it can take the cable in hand, red when it cannot, back to black otherwise. */
-export function highlightSocket(port: PortView, mode: 'none' | 'ok' | 'bad'): void {
+/** Tint a socket: cyan when it can take the cable in hand, red when it cannot, soft white when only pointed at. */
+export function highlightSocket(port: PortView, mode: 'none' | 'hover' | 'ok' | 'bad'): void {
   const material = port.socket.material as THREE.MeshStandardMaterial;
-  const colour = mode === 'ok' ? '#38bdf8' : mode === 'bad' ? '#ef4444' : '#000000';
+  const colour = mode === 'ok' ? '#38bdf8' : mode === 'bad' ? '#ef4444' : mode === 'hover' ? '#e2e8f0' : '#000000';
   material.emissive.set(colour);
-  material.emissiveIntensity = mode === 'none' ? 0 : 1.8;
+  material.emissiveIntensity = mode === 'none' ? 0 : mode === 'hover' ? 0.7 : 1.8;
 }
