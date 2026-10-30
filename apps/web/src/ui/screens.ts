@@ -93,7 +93,7 @@ export function showMissions(levels: Level[], onPick: (level: Level) => void, on
           return h(
             'button',
             { class: 'mission-row', onclick: () => void leave(screen).then(() => onPick(level)) },
-            h('span', { class: 'num' }, String(i + 1).padStart(2, '0')),
+            h('span', { class: 'thumb', style: { backgroundImage: `url(${import.meta.env.BASE_URL}missions/${i + 1}.jpg)` } }, h('span', { class: 'num' }, String(i + 1).padStart(2, '0'))),
             h(
               'span',
               { class: 'body' },

@@ -132,6 +132,9 @@ export class Mission {
   private viewPitch = 0;
   private ledsIn = 0;
   private lamps: THREE.Object3D | null = null;
+  /** What belongs to each part of the building, to draw only what can be seen. */
+  private readonly parts = new Map<string, THREE.Object3D[]>();
+  private shown = '';
   private lastTick = 0;
   private readonly aicha: AskAicha;
   /** Sitting at the laptop: getting up when the console closes. */
@@ -153,6 +156,7 @@ export class Mission {
       const caption = host?.ip ? `${d.id} · ${host.ip}` : d.id;
       const origin = ORIGINS[d.room ?? ''] as Origin;
       const view = buildDevice(d.id, catalog[d.model]!, d.position, caption, origin.z, origin.y);
+      this.inPart(d.room, view.root);
       this.devices.set(d.id, view);
       stage.level.add(view.root);
       this.picks.push(...view.body, ...[...view.ports.values()].map((p) => p.hit));
@@ -174,6 +178,7 @@ export class Mission {
       const view = buildPatchPanel(panel.id, ports, origin.z, origin.y);
       this.panels.set(panel.id, view);
       stage.level.add(view.root);
+      this.inPart(panel.room, view.root);
       this.picks.push(...view.body, ...[...view.ports.values()].map((p) => p.hit));
     }
     const racked = [...this.devices.values(), ...this.panels.values()];
@@ -181,7 +186,9 @@ export class Mission {
       const origin = ORIGINS[room] as Origin;
       const board = buildWhiteboard(level, origin.z, origin.y);
       this.picks.push(...board.children.filter((o) => o.userData.whiteboard));
-      stage.level.add(board, rackFillers(rackOccupied(racked, origin.z, origin.y), origin.z, origin.y));
+      const fillers = rackFillers(rackOccupied(racked, origin.z, origin.y), origin.z, origin.y);
+      stage.level.add(board, fillers);
+      this.inPart(room || undefined, board, fillers);
     }
     stage.level.add(this.cables.group);
     // A mission across rooms opens the door at the back of the technical room.
@@ -192,6 +199,12 @@ export class Mission {
       const annex = buildAnnex(floors);
       this.lamps = annex.getObjectByName('corridor-lamps') ?? null;
       stage.level.add(annex);
+      for (const [key, name] of [['lab', 'part-lab'], ['lower', 'part-lower'], ['stairs', 'part-stairs'], ['office', 'part-office'], ['upper', 'part-upper']] as const) {
+        const object = annex.getObjectByName(name);
+        if (object) this.parts.set(key, [...(this.parts.get(key) ?? []), object]);
+      }
+      const main = stage.scene.getObjectByName('technical-room');
+      if (main) this.parts.set('room', [...(this.parts.get('room') ?? []), main]);
     }
     stage.controls.enabled = false;
     stage.manualCamera = true;
@@ -273,6 +286,8 @@ export class Mission {
     this.stage.zoom = 1;
     this.stage.setRig(0, 0);
     setMainDoorOpen(false);
+    const main = this.stage.scene.getObjectByName('technical-room');
+    if (main) main.visible = true;
     this.stage.clearLevel();
   }
 
@@ -401,6 +416,7 @@ export class Mission {
       if (e.code === 'KeyH' && !typing && !this.exam) this.aicha.open();
       if (e.code === 'KeyP' && !typing) this.showPorts();
       if (e.code === 'KeyB' && !typing) this.showBrief();
+      if (e.code === 'KeyO' && !typing) this.hud.toggleObjectives();
       if (e.key === 'F1') {
         e.preventDefault();
         showHelp();
@@ -811,6 +827,32 @@ export class Mission {
     if (this.remaining <= 0) this.finish(evaluate(this.net, this.level.objectives), true);
   }
 
+  private inPart(room: string | undefined, ...objects: THREE.Object3D[]): void {
+    const key = room === 'annexe' ? 'lab' : room === 'etage' ? 'office' : 'room';
+    this.parts.set(key, [...(this.parts.get(key) ?? []), ...objects]);
+  }
+
+  /** Walls hide everything beyond them: draw only the parts of the building that can be seen from here. */
+  private cull(): void {
+    if (!this.building) return;
+    const zone = zoneOf(this.player.x, this.player.floorY + 0.1, this.player.z);
+    // Through the two aligned doors, the far room shows only from the door's side of the room.
+    const nearDoors = this.player.x < -1.6;
+    const seen: Record<Zone, string[]> = {
+      room: ['room', 'lower', ...(nearDoors ? ['lab'] : [])],
+      corridor: ['room', 'lower', 'lab', 'stairs'],
+      lab: ['lab', 'lower', ...(nearDoors ? ['room'] : [])],
+      stairs: ['lower', 'upper', 'stairs'],
+      corridor1: ['upper', 'office', 'stairs'],
+      office: ['office', 'upper'],
+    };
+    const key = seen[zone].join();
+    if (key === this.shown) return;
+    this.shown = key;
+    for (const [part, objects] of this.parts) for (const o of objects) o.visible = seen[zone].includes(part);
+    this.stage.refreshShadows(0.2);
+  }
+
   /** Link LEDs flicker with the traffic, as they do on real gear. */
   private twinkle(dt: number): void {
     this.ledsIn -= dt;
@@ -882,6 +924,7 @@ export class Mission {
       );
     }
     this.followZone();
+    this.cull();
     camera.lookAt(this.stage.controls.target);
   }
 

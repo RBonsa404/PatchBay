@@ -61,10 +61,10 @@ function routeBetween(a: THREE.Vector3, na: THREE.Vector3, b: THREE.Vector3, nb:
     // Patch cord: along the gear to the nearest cable manager, along the manager, and back along the other device.
     const side = (a1.x + b1.x) / 2 < RACK.x ? -1 : 1;
     // A soft bow towards the manager, staying inside the rack's width whatever the distance between the ports.
-    const x = RACK.x + side * (MANAGER.x - 0.045 + (lane % 4) * 0.005);
+    const x = RACK.x + side * Math.min(MANAGER.x - 0.05, Math.max(Math.abs(a1.x), Math.abs(b1.x)) + 0.03 + (lane % 4) * 0.005);
     const z = frontZ + 0.03;
     const drop = 0.016 + (lane % 4) * 0.004;
-    return new THREE.CatmullRomCurve3([a, a1, new THREE.Vector3(x - side * 0.08, a1.y - drop, z), new THREE.Vector3(x, (a1.y + b1.y) / 2 - drop, z), new THREE.Vector3(x - side * 0.08, b1.y - drop, z), b1, b], false, 'centripetal', 0.5);
+    return new THREE.CatmullRomCurve3([a, a1, new THREE.Vector3(x - side * 0.03, a1.y - drop * 0.6, z), new THREE.Vector3(x, (a1.y + b1.y) / 2 - drop, z), new THREE.Vector3(x - side * 0.03, b1.y + drop * 0.6, z), b1, b], false, 'centripetal', 0.5);
   }
 
   // Touch-down points on the bench, just past each port, shifted into this cable's lane.

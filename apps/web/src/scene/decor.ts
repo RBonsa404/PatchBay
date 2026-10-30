@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { contactShadow } from './materials.js';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
+import { contactShadow, outsideTexture, sunPatchTexture } from './materials.js';
 import { textTexture } from './textures.js';
 
 /**
@@ -12,13 +13,13 @@ const lit = (color: string, roughness = 0.6, metalness = 0.1): THREE.MeshStandar
 
 const M = {
   steel: lit('#475569', 0.45, 0.75),
-  darkSteel: lit('#1b2028', 0.5, 0.6),
+  darkSteel: lit('#2c333e', 0.45, 0.6),
   paintedGrey: lit('#94a3b8', 0.65, 0.2),
   white: lit('#e8ebef', 0.7),
   trunking: lit('#d6dae0', 0.6),
   crate: lit('#334155', 0.6, 0.1),
-  crateLid: lit('#1d4ed8', 0.55, 0.1),
-  black: lit('#0e1116', 0.7, 0.2),
+  crateLid: lit('#22418f', 0.5, 0.12),
+  black: lit('#1b2028', 0.6, 0.25),
   plastic: lit('#20262f', 0.45),
   wood: lit('#b08a5e', 0.7),
   amber: lit('#fbbf24', 0.6),
@@ -30,6 +31,15 @@ function box(w: number, h: number, d: number, material: THREE.Material, x: numbe
   const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
   m.position.set(x, y, z);
   m.castShadow = shadow;
+  m.receiveShadow = true;
+  return m;
+}
+
+/** A box with softened edges: what makes an object look made rather than modelled. */
+function soft(w: number, h: number, d: number, material: THREE.Material, x: number, y: number, z: number, radius = 0.012): THREE.Mesh {
+  const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 2, Math.min(radius, h / 2.2, w / 2.2, d / 2.2)), material);
+  m.position.set(x, y, z);
+  m.castShadow = true;
   m.receiveShadow = true;
   return m;
 }
@@ -54,9 +64,13 @@ function sign(w: number, h: number, background: string, color: string, lines: st
   c.fillStyle = color;
   c.textAlign = 'center';
   c.textBaseline = 'middle';
-  const size = Math.min(canvas.height / (lines.length + 0.8), 74);
+  // The largest size at which the longest line fits: text is never squeezed.
+  let size = Math.min(canvas.height / (lines.length + 0.8), 74);
   c.font = `700 ${Math.round(size)}px Inter, sans-serif`;
-  lines.forEach((line, i) => c.fillText(line, canvas.width / 2, (canvas.height * (i + 1)) / (lines.length + 1), canvas.width - 24));
+  const widest = Math.max(...lines.map((line) => c.measureText(line).width));
+  if (widest > canvas.width - 36) size *= (canvas.width - 36) / widest;
+  c.font = `700 ${Math.round(size)}px Inter, sans-serif`;
+  lines.forEach((line, i) => c.fillText(line, canvas.width / 2, (canvas.height * (i + 1)) / (lines.length + 1)));
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 4;
@@ -91,7 +105,9 @@ function coil(colour: string, x: number, y: number): THREE.Group {
 /** A labelled storage crate: all the same size and lined up, as in a kept stockroom. */
 function crate(x: number, y: number, z: number, label: string, w = 0.36, h = 0.26, d = 0.5): THREE.Group {
   const g = new THREE.Group();
-  g.add(box(w, h, d, M.crate, 0, h / 2, 0), box(w + 0.012, 0.018, d + 0.012, M.crateLid, 0, h, 0));
+  g.add(soft(w, h, d, M.crate, 0, h / 2, 0), soft(w + 0.012, 0.022, d + 0.012, M.crateLid, 0, h, 0, 0.008));
+  // A carrying handle on the end.
+  g.add(soft(0.012, 0.02, 0.12, M.steel, w / 2 + 0.004, h * 0.86, 0, 0.004));
   const tag = sign(0.26, 0.09, '#f8fafc', '#0b1e3f', [label]);
   tag.rotation.y = Math.PI / 2;
   tag.position.set(w / 2 + 0.002, h * 0.55, 0);
@@ -172,7 +188,7 @@ function desk(): THREE.Group {
   for (let i = 0; i < 3; i++) g.add(box(0.1, 0.012, 0.012, M.steel, x + 0.48, 0.47 - i * 0.17, z - 0.282, false));
   // Monitor turned towards the chair, with a dim terminal.
   const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.52, 0.3), new THREE.MeshBasicMaterial({ map: textTexture('$ show running-config', { width: 512, height: 296, color: '#7dd3fc', font: '400 26px "JetBrains Mono", monospace' }), color: '#ffffff', transparent: true }));
-  const back = box(0.55, 0.33, 0.025, M.black, x - 0.1, top + 0.3, z + 0.14);
+  const back = soft(0.55, 0.33, 0.025, M.black, x - 0.1, top + 0.3, z + 0.14, 0.01);
   screen.rotation.y = Math.PI;
   screen.position.set(x - 0.1, top + 0.3, z + 0.126);
   const screenBase = new THREE.Mesh(new THREE.PlaneGeometry(0.52, 0.3), new THREE.MeshBasicMaterial({ color: '#07111f' }));
@@ -192,7 +208,7 @@ function desk(): THREE.Group {
     spoke.translateX(0.14);
     chair.add(spoke, cylinder(0.024, 0.04, M.black, Math.cos((i * Math.PI * 2) / 5) * 0.28, 0.024, -Math.sin((i * Math.PI * 2) / 5) * 0.28));
   }
-  chair.add(cylinder(0.024, 0.34, M.steel, 0, 0.26, 0), box(0.44, 0.07, 0.42, M.plastic, 0, 0.46, 0), box(0.4, 0.46, 0.05, M.plastic, 0, 0.8, -0.22));
+  chair.add(cylinder(0.024, 0.34, M.steel, 0, 0.26, 0), soft(0.46, 0.08, 0.44, M.plastic, 0, 0.47, 0, 0.035), soft(0.42, 0.48, 0.06, M.plastic, 0, 0.82, -0.22, 0.028), soft(0.05, 0.3, 0.02, M.steel, 0, 0.62, -0.25, 0.008));
   chair.position.set(x - 0.05, 0, z - 0.72);
   chair.rotation.y = 0.5;
   const chairShadow = contactShadow(0.8, 0.8, 0.5);
@@ -201,14 +217,20 @@ function desk(): THREE.Group {
   deskShadow.position.set(x, 0.003, z);
   g.add(chair, chairShadow, deskShadow);
 
-  // Window onto the corridor, with its blind half down and daylight behind.
+  // The window: the campus outside, the blind half down, and the daylight it lets in.
   const wz = 3.59;
-  const frame = box(1.5, 1.2, 0.03, M.paintedGrey, 1.85, 1.65, wz, false);
-  const light = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.1), new THREE.MeshBasicMaterial({ color: '#dfeaf7' }));
-  light.rotation.y = Math.PI;
-  light.position.set(1.85, 1.65, wz - 0.017);
-  g.add(frame, light);
-  for (let i = 0; i < 14; i++) g.add(box(1.4, 0.004, 0.022, M.white, 1.85, 2.18 - i * 0.043, wz - 0.03, false));
+  g.add(box(1.5, 1.2, 0.03, M.paintedGrey, 1.85, 1.65, wz, false));
+  const outside = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.1), new THREE.MeshBasicMaterial({ map: outsideTexture() }));
+  outside.rotation.y = Math.PI;
+  outside.position.set(1.85, 1.65, wz - 0.017);
+  g.add(outside, box(0.03, 1.1, 0.02, M.paintedGrey, 1.85, 1.65, wz - 0.022, false), box(1.46, 0.05, 0.1, M.white, 1.85, 1.08, wz - 0.05));
+  for (let i = 0; i < 12; i++) g.add(box(1.4, 0.004, 0.024, M.white, 1.85, 2.18 - i * 0.034, wz - 0.03, false));
+  const patch = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 2.2), new THREE.MeshBasicMaterial({ map: sunPatchTexture(), transparent: true, depthWrite: false, opacity: 0.55, toneMapped: false }));
+  patch.rotation.x = -Math.PI / 2;
+  patch.rotation.z = Math.PI;
+  patch.position.set(1.75, 0.006, 2.45);
+  patch.renderOrder = -1;
+  g.add(patch);
   return g;
 }
 
@@ -253,7 +275,7 @@ function walls(): THREE.Group {
   g.add(box(0.004, 0.75, 0.003, M.black, 3.031, 0.42, 2.6, false));
   for (const dz of [-0.06, 0.06]) g.add(box(0.016, 0.12, 0.016, M.steel, 3.025, 0.5, 2.6 + dz, false));
   // Two identical tool cases, squared up on the cupboard.
-  for (const dz of [-0.28, 0.28]) g.add(box(0.26, 0.13, 0.42, M.red, 3.25, 0.945, 2.6 + dz), box(0.03, 0.02, 0.14, M.steel, 3.25, 1.02, 2.6 + dz, false));
+  for (const dz of [-0.28, 0.28]) g.add(soft(0.26, 0.13, 0.42, M.red, 3.25, 0.945, 2.6 + dz, 0.02), soft(0.03, 0.02, 0.16, M.steel, 3.25, 1.02, 2.6 + dz, 0.006), soft(0.008, 0.03, 0.04, M.steel, 3.118, 0.97, 2.6 + dz - 0.1, 0.003), soft(0.008, 0.03, 0.04, M.steel, 3.118, 0.97, 2.6 + dz + 0.1, 0.003));
   const cupboardShadow = contactShadow(0.8, 1.6, 0.5);
   cupboardShadow.position.set(3.2, 0.003, 2.6);
   g.add(cupboardShadow);

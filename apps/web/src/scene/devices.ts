@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { DeviceModel, PortSpec } from '@patchbay/sim-core';
 import { bake } from './bake.js';
-import { contactShadow } from './materials.js';
+import { brushedTexture, contactShadow, keyboardTexture, rj45Texture } from './materials.js';
 import { BENCH_TOP, RACK } from './room.js';
 import { addFeet, addRackEars, addVents, powerButton, roundedChassis } from './details.js';
 import { screenTexture, textTexture } from './textures.js';
@@ -64,16 +64,23 @@ interface Materials {
   plastic: THREE.MeshStandardMaterial;
 }
 
+let brushedMap: THREE.Texture | null = null;
+const brushed = (): THREE.Texture => (brushedMap ??= brushedTexture());
+let rj45Map: THREE.Texture | null = null;
+const rj45 = (): THREE.Texture => (rj45Map ??= rj45Texture());
+let keysMap: THREE.Texture | null = null;
+const keys = (): THREE.Texture => (keysMap ??= keyboardTexture());
+
 function materials(): Materials {
   return {
-    chassis: new THREE.MeshStandardMaterial({ color: '#2b3442', metalness: 0.65, roughness: 0.38 }),
-    panel: new THREE.MeshStandardMaterial({ color: '#1a2230', metalness: 0.5, roughness: 0.45 }),
-    socket: new THREE.MeshStandardMaterial({ color: '#03060c', roughness: 0.9 }),
+    chassis: new THREE.MeshStandardMaterial({ color: '#37404f', metalness: 0.7, roughness: 0.62, roughnessMap: brushed() }),
+    panel: new THREE.MeshStandardMaterial({ color: '#232c3a', metalness: 0.6, roughness: 0.68, roughnessMap: brushed() }),
+    socket: new THREE.MeshStandardMaterial({ map: rj45(), roughness: 0.6 }),
     frame: new THREE.MeshStandardMaterial({ color: '#9aa4b2', metalness: 0.9, roughness: 0.25 }),
     consoleFrame: new THREE.MeshStandardMaterial({ color: '#7dd3fc', metalness: 0.2, roughness: 0.5 }),
     serialPlate: new THREE.MeshStandardMaterial({ color: '#13254a', metalness: 0.5, roughness: 0.4 }),
     pick: new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }),
-    plastic: new THREE.MeshStandardMaterial({ color: '#111827', metalness: 0.1, roughness: 0.6 }),
+    plastic: new THREE.MeshStandardMaterial({ color: '#1c222c', metalness: 0.15, roughness: 0.48 }),
   };
 }
 
@@ -107,7 +114,13 @@ function addSocket(
   const frameMat = spec.kind === 'console' ? m.consoleFrame : spec.kind === 'serial' ? m.serialPlate : m.frame;
   const frame = mesh(new THREE.BoxGeometry(w + 0.003, h + 0.003, 0.002), frameMat, false);
   frame.position.set(x, y, face + 0.001);
-  const socket = mesh(new THREE.BoxGeometry(w, h, 0.0025), m.socket.clone(), false);
+  const socketMaterial = m.socket.clone();
+  // Serial and console DB connectors have no RJ45 contacts.
+  if (spec.kind === 'serial' || spec.kind === 'rs232') {
+    socketMaterial.map = null;
+    socketMaterial.color.set('#0a0d12');
+  }
+  const socket = mesh(new THREE.BoxGeometry(w, h, 0.0025), socketMaterial, false);
   socket.position.set(x, y, face + 0.0016);
   // Slightly bigger than the socket, but never reaching the neighbours (switch ports sit 17 mm apart).
   const hit = new THREE.Mesh(new THREE.BoxGeometry(w + 0.0015, h + 0.004, 0.04), m.pick);
@@ -275,19 +288,25 @@ function buildDesktop(id: string, model: DeviceModel, m: Materials, view: Device
   tower.position.set(0.2, 0.18, 0);
   const stripe = mesh(new THREE.BoxGeometry(0.004, 0.28, 0.002), new THREE.MeshStandardMaterial({ color: '#38bdf8', emissive: '#38bdf8', emissiveIntensity: 1.6 }), false);
   stripe.position.set(0.15, 0.2, 0.171);
-  const screenFrame = mesh(new THREE.BoxGeometry(0.46, 0.29, 0.02), m.plastic);
-  screenFrame.position.set(-0.12, 0.27, -0.02);
-  const screen = plane(0.43, 0.26, screenTexture([caption, '', '> ipconfig']), true);
-  screen.position.set(-0.12, 0.27, -0.009);
-  const stand = mesh(new THREE.BoxGeometry(0.04, 0.12, 0.03), m.chassis);
-  stand.position.set(-0.12, 0.06, -0.03);
-  const base = mesh(new THREE.BoxGeometry(0.18, 0.01, 0.12), m.chassis);
-  base.position.set(-0.12, 0.005, -0.02);
-  const keyboard = mesh(new THREE.BoxGeometry(0.34, 0.015, 0.11), m.plastic);
-  keyboard.position.set(-0.12, 0.0075, 0.16);
+  // A thin-bezel monitor on a neck and foot, its keyboard and mouse.
+  const screenFrame = roundedChassis(0.45, 0.275, 0.016, m.plastic);
+  screenFrame.position.set(-0.12, 0.275, -0.02);
+  const screen = plane(0.44, 0.262, screenTexture([caption, '', '> ipconfig']), true);
+  screen.position.set(-0.12, 0.275, -0.0115);
+  const stand = roundedChassis(0.034, 0.14, 0.02, m.chassis);
+  stand.position.set(-0.12, 0.07, -0.04);
+  const base = roundedChassis(0.17, 0.008, 0.12, m.chassis);
+  base.position.set(-0.12, 0.004, -0.03);
+  const keyboard = roundedChassis(0.34, 0.012, 0.115, m.plastic);
+  keyboard.position.set(-0.12, 0.006, 0.16);
+  const caps = new THREE.Mesh(new THREE.PlaneGeometry(0.33, 0.106), new THREE.MeshStandardMaterial({ map: keys(), roughness: 0.55 }));
+  caps.rotation.x = -Math.PI / 2;
+  caps.position.set(-0.12, 0.0125, 0.16);
+  const mouse = roundedChassis(0.055, 0.02, 0.09, m.plastic);
+  mouse.position.set(0.1, 0.01, 0.17);
   const bay = mesh(new THREE.BoxGeometry(0.12, 0.004, 0.002), m.chassis, false);
   bay.position.set(0.21, 0.29, 0.171);
-  view.root.add(tower, stripe, screenFrame, screen, stand, base, keyboard, bay);
+  view.root.add(tower, stripe, screenFrame, screen, stand, base, keyboard, caps, mouse, bay);
   powerButton(view.root, 0.21, 0.25, 0.172);
   view.depth = 0.34;
   view.body.push(tower, screenFrame, screen, keyboard);
@@ -308,12 +327,13 @@ function buildDesktop(id: string, model: DeviceModel, m: Materials, view: Device
 }
 
 function buildLaptop(id: string, model: DeviceModel, m: Materials, view: DeviceView, caption: string): void {
-  const base = mesh(new THREE.BoxGeometry(0.33, 0.02, 0.23), m.chassis);
+  const base = roundedChassis(0.33, 0.016, 0.23, m.chassis);
   base.position.y = 0.01;
-  const keys = mesh(new THREE.BoxGeometry(0.29, 0.002, 0.11), m.plastic, false);
-  keys.position.set(0, 0.021, -0.02);
+  const deck = new THREE.Mesh(new THREE.PlaneGeometry(0.29, 0.105), new THREE.MeshStandardMaterial({ map: keys(), roughness: 0.55 }));
+  deck.rotation.x = -Math.PI / 2;
+  deck.position.set(0, 0.0185, -0.02);
   const lid = new THREE.Group();
-  const lidShell = mesh(new THREE.BoxGeometry(0.33, 0.22, 0.01), m.chassis);
+  const lidShell = roundedChassis(0.33, 0.22, 0.008, m.chassis);
   lidShell.position.y = 0.11;
   const screen = plane(0.3, 0.19, screenTexture([caption, '', 'Console série prête', '> _']), true);
   screen.position.set(0, 0.11, 0.0055);
@@ -321,10 +341,10 @@ function buildLaptop(id: string, model: DeviceModel, m: Materials, view: DeviceV
   lid.position.set(0, 0.02, -0.115);
   lid.rotation.x = -0.28;
   const pad = mesh(new THREE.BoxGeometry(0.1, 0.001, 0.06), new THREE.MeshStandardMaterial({ color: '#1e293b', metalness: 0.3, roughness: 0.35 }), false);
-  pad.position.set(0, 0.0205, 0.075);
-  view.root.add(base, keys, lid, pad);
+  pad.position.set(0, 0.0186, 0.075);
+  view.root.add(base, deck, lid, pad);
   view.depth = 0.23;
-  view.body.push(base, keys, lidShell, screen);
+  view.body.push(base, deck, lidShell, screen);
   const face = 0.115;
   const rs232 = model.ports.find((p) => p.kind === 'rs232');
   const nic = model.ports.find((p) => p.kind === 'ethernet');
@@ -400,11 +420,11 @@ export function buildPatchPanel(id: string, ports: { name: string; label: string
   const face = d / 2 + 0.001;
   label(view.root, id, -w / 2 + 0.04, h / 2, face, 0.06, 0.012, '#fbbf24');
   ports.forEach((p, i) => {
-    const x = -w / 2 + 0.1 + i * 0.05;
+    const x = w / 2 - 0.07 - (ports.length - 1 - i) * 0.05;
     const spec: PortSpec = { name: p.name, kind: 'ethernet' };
     view.ports.set(p.name, addSocket(view.root, m, id, spec, x, h / 2 + 0.005, face, 'none'));
     label(view.root, String(i + 1), x, h / 2 - 0.012, face, 0.012, 0.007, '#e2e8f0');
-    if (p.label) label(view.root, p.label, x + 0.02, h / 2 + 0.019, face, 0.05, 0.005, '#94a3b8');
+    if (p.label) label(view.root, p.label, x, h / 2 + 0.0165, face, 0.046, 0.006, '#cbd5e1');
   });
   view.root.position.set(0, PANEL_Y + roomY, RACK.frontZ - d / 2 + roomZ);
   for (const b of view.body) {

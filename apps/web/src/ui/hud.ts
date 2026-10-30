@@ -41,6 +41,7 @@ const toolButton = (label: string, glyph: IconNode, onclick: (e: Event) => void)
 /** Mission title, objectives checklist, cable inventory, tooltip and toasts. */
 export class Hud {
   private readonly root: HTMLElement;
+  private readonly objectivesBox: HTMLElement;
   private readonly objectivesList: HTMLElement;
   private readonly scoreLabel: HTMLElement;
   private readonly scoreBar: HTMLElement;
@@ -78,7 +79,7 @@ export class Hud {
       soundButton.title = muted ? t('hud.soundOff') : t('hud.sound');
     });
 
-    this.root = h(
+    const root = h(
       'div',
       { class: 'hud' },
       h(
@@ -90,10 +91,12 @@ export class Hud {
           { class: 'toolbar panel-solid' },
           toolButton(t('brief.tool'), BookOpen, () => actions.brief()),
           toolButton(t('hud.view'), Scan, () => actions.overview()),
+          h('i', { class: 'tool-sep' }),
           exam ? null : toolButton(t('hud.hint'), Lightbulb, () => actions.hint()),
           exam ? null : toolButton(t('assistant.tool'), MessageCircleQuestion, () => actions.ask()),
           toolButton(t('ports.tool'), Keyboard, () => actions.ports()),
           toolButton(t('help.tool'), CircleHelp, () => actions.help()),
+          h('i', { class: 'tool-sep' }),
           qualityButton,
           soundButton,
           toolButton(t('hud.menu'), Menu, () => actions.menu()),
@@ -103,7 +106,7 @@ export class Hud {
       h(
         'aside',
         { class: 'objectives panel-solid' },
-        h('header', {}, h('span', { class: 'label' }, exam ? t('exam.tasks') : t('hud.objectives')), exam ? null : h('span', { class: 'score-line' }, this.scoreLabel, h('small', {}, '/ 100'))),
+        h('header', { onclick: () => this.toggleObjectives(), title: t('objectives.toggle') }, h('span', { class: 'label' }, exam ? t('exam.tasks') : t('hud.objectives')), exam ? null : h('span', { class: 'score-line' }, this.scoreLabel, h('small', {}, '/ 100'))),
         exam ? null : h('div', { class: 'progress' }, this.scoreBar),
         this.objectivesList,
       ),
@@ -112,6 +115,8 @@ export class Hud {
       this.tooltip,
       this.toasts,
     );
+    this.root = root;
+    this.objectivesBox = root.querySelector('.objectives') as HTMLElement;
     ui().append(this.root);
   }
 
@@ -155,15 +160,18 @@ export class Hud {
     const score = results.reduce((n, r) => n + r.points, 0);
     this.scoreLabel.textContent = String(score);
     this.scoreBar.style.width = `${score}%`;
+    let foundCurrent = false;
     this.objectivesList.replaceChildren(
       ...this.level.objectives.map((o) => {
         const done = passed.get(o.id)?.passed ?? false;
         const fresh = done && !this.doneBefore.has(o.id) && !this.firstObjectives;
+        const current = !done && !foundCurrent;
+        if (current) foundCurrent = true;
         if (done) this.doneBefore.add(o.id);
         else this.doneBefore.delete(o.id);
         return h(
           'li',
-          { class: `objective${done ? ' done' : ''}${fresh ? ' fresh' : ''}`, 'data-gain': `+${o.points}` },
+          { class: `objective${done ? ' done' : ''}${fresh ? ' fresh' : ''}${current ? ' current' : ''}`, 'data-gain': `+${o.points}` },
           h('span', { class: 'tick', 'aria-label': done ? 'fait' : 'à faire' }, done ? icon(Check, 12) : null),
           h('span', { class: 'text' }, tx(o.label)),
           h('span', { class: 'pts' }, String(o.points)),
@@ -172,6 +180,12 @@ export class Hud {
       }),
     );
     this.firstObjectives = false;
+    // The next thing to do stays in view, however long the list.
+    this.objectivesList.querySelector('.current')?.scrollIntoView({ block: 'nearest' });
+  }
+
+  toggleObjectives(): void {
+    this.objectivesBox.classList.toggle('collapsed');
   }
 
   /** Reveal the hints of these objectives in the checklist. */
@@ -215,9 +229,11 @@ export class Hud {
   }
 
   toast(message: string, kind: 'info' | 'good' | 'bad' = 'info'): void {
+    // The same message twice in a row replaces itself; two at most on screen.
+    for (const old of [...this.toasts.children]) if (old.textContent === message) old.remove();
     const el = h('div', { class: `toast ${kind}` }, message);
     this.toasts.append(el);
-    while (this.toasts.children.length > 3) this.toasts.firstElementChild?.remove();
+    while (this.toasts.children.length > 2) this.toasts.firstElementChild?.remove();
     setTimeout(() => el.remove(), 3200);
   }
 }

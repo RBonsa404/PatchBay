@@ -65,10 +65,10 @@ function showcase(): void {
   const views = level.devices.map((d) => buildDevice(d.id, catalog[d.model]!, d.position, d.id));
   stage.level.add(...views.map((v) => v.root), rackFillers(rackOccupied(views)));
   stage.controls.enabled = false;
-  const target = new THREE.Vector3(0, 1.05, -0.2);
+  const target = new THREE.Vector3(-0.5, 1.05, -0.4);
   stopShowcase = stage.onFrame((_dt, time) => {
     const a = Math.sin(time * 0.11) * 0.55;
-    stage.camera.position.set(Math.sin(a) * 2.6, 1.55 + Math.sin(time * 0.17) * 0.12, Math.cos(a) * 2.6);
+    stage.camera.position.set(0.5 + Math.sin(a) * 3.0, 1.75 + Math.sin(time * 0.17) * 0.1, 0.4 + Math.cos(a) * 3.0);
     stage.controls.target.copy(target);
   });
 }

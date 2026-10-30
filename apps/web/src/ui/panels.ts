@@ -292,6 +292,7 @@ const CONTROLS: [string, string][] = [
   ['1 à 4', 'prendre un câble'],
   ['Clic / clic droit', 'brancher / débrancher, ouvrir un appareil'],
   ['B', 'ordre de travail'],
+  ['O', 'replier les objectifs'],
   ['T', 'schéma au tableau'],
   ['H', 'demander à Aïcha'],
   ['P', 'liste des ports, pour tout faire au clavier'],

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { dustTexture } from './materials.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
@@ -10,6 +11,21 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { VignetteShader } from 'three/examples/jsm/shaders/VignetteShader.js';
 
 export type Quality = 'low' | 'medium' | 'high';
+
+function dustMotes(): THREE.Points {
+  const count = 260;
+  const positions = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    positions[i * 3] = (Math.random() - 0.5) * 6.4;
+    positions[i * 3 + 1] = 0.3 + Math.random() * 2.4;
+    positions[i * 3 + 2] = (Math.random() - 0.5) * 4.6;
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const points = new THREE.Points(geometry, new THREE.PointsMaterial({ color: '#fff4e0', map: dustTexture(), size: 0.012, transparent: true, opacity: 0.16, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true }));
+  points.position.z = 1;
+  return points;
+}
 
 /** Vertical field of view on a wide screen, in degrees. */
 const BASE_FOV = 48;
@@ -66,14 +82,16 @@ export class Stage {
   private relief = 0;
   private sampled = 0;
   private frames = 0;
+  /** Dust in the air, catching the light: slow, faint, and what makes the air of a room visible. */
+  private readonly dust = dustMotes();
   /** A mission drives the camera itself (first-person eyes); otherwise the orbit controls do. */
   manualCamera = false;
 
   constructor(private readonly container: HTMLElement, quality: Quality) {
     this.quality = quality;
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 0.95;
+    this.renderer.toneMapping = THREE.NeutralToneMapping;
+    this.renderer.toneMappingExposure = 1;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.shadowMap.type = THREE.VSMShadowMap;
     // The room stands still: shadows are drawn again only when something in it changes (see `refreshShadows`).
@@ -102,8 +120,8 @@ export class Stage {
     // pool of light; two of them cast shadows (one on the bench and the rack, one behind the player, so everything
     // standing on the floor or the bench is grounded). Cool panels against the warm key, and small coloured glows from
     // the machines themselves.
-    this.scene.add(new THREE.HemisphereLight('#dfe8ff', '#3a3f4a', 0.44));
-    this.key = new THREE.SpotLight('#ffe9cf', 15, 0, 0.82, 0.85, 1.6);
+    this.scene.add(new THREE.HemisphereLight('#f5f3ee', '#5d5a55', 0.62));
+    this.key = new THREE.SpotLight('#fff1dd', 13, 0, 0.9, 0.9, 1.6);
     this.key.position.set(0.4, 2.95, 0.6);
     this.key.target.position.set(0, 0.8, -0.1);
     this.key.shadow.mapSize.set(4096, 4096);
@@ -111,7 +129,7 @@ export class Stage {
     this.key.shadow.normalBias = 0.02;
     this.key.shadow.radius = 5;
     this.key.shadow.blurSamples = 16;
-    this.frontKey = new THREE.SpotLight('#f1f5ff', 9, 0, 0.95, 1, 1.6);
+    this.frontKey = new THREE.SpotLight('#fff7ec', 8, 0, 1, 1, 1.6);
     this.frontKey.position.set(0.4, 2.95, 2.4);
     this.frontKey.target.position.set(0.1, 0, 1.3);
     this.frontKey.shadow.mapSize.set(2048, 2048);
@@ -121,7 +139,7 @@ export class Stage {
     this.frontKey.shadow.blurSamples = 16;
     this.scene.add(this.key, this.key.target, this.frontKey, this.frontKey.target);
     for (const [x, z] of [[-1.5, 0.3], [2.2, 0.3], [-1.5, 2.2], [2.2, 2.2]] as const) {
-      const panel = new THREE.SpotLight('#dfe9ff', 7, 0, 1.05, 1, 1.6);
+      const panel = new THREE.SpotLight('#fff5e8', 6, 0, 1.1, 1, 1.6);
       panel.position.set(x, 2.95, z);
       panel.target.position.set(x, 0, z);
       this.scene.add(panel, panel.target);
@@ -129,9 +147,9 @@ export class Stage {
     }
     // The server cabinet's glow on the floor and wall, the exit sign, and the screens on the bench.
     for (const [colour, power, reach, x, y, z] of [
-      ['#38bdf8', 1.6, 2.8, 2.6, 1.0, 0.1],
+      ['#38bdf8', 0.9, 2.4, 2.05, 0.5, 0.2],
       ['#22c55e', 0.5, 1.5, -2.95, 2.25, -1.4],
-      ['#60a5fa', 0.5, 1.4, 0, 1.05, 0.2],
+      ['#a8c4f0', 0.16, 1.2, 0, 1.2, 0.2],
     ] as const) {
       const glow = new THREE.PointLight(colour, power, reach, 1.6);
       glow.position.set(x, y, z);
@@ -139,6 +157,7 @@ export class Stage {
       this.accents.push(glow);
     }
     this.scene.add(this.level);
+    this.scene.add(this.dust);
 
     // Multisampled, or the post-processing would lose the renderer's anti-aliasing.
     this.composer = new EffectComposer(this.renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 }));
@@ -146,15 +165,15 @@ export class Stage {
     // Ambient occlusion: the soft darkening where objects meet, which anchors them in the room.
     this.ao = new GTAOPass(this.scene, this.camera, 1, 1);
     this.ao.blendIntensity = 0.85;
-    this.ao.updateGtaoMaterial({ radius: 0.22, distanceExponent: 1.4, thickness: 1, scale: 1.1, samples: 16, distanceFallOff: 1, screenSpaceRadius: false });
+    this.ao.updateGtaoMaterial({ radius: 0.3, distanceExponent: 1.4, thickness: 1, scale: 1.1, samples: 10, distanceFallOff: 1, screenSpaceRadius: false });
     this.composer.addPass(this.ao);
     // High threshold: only LEDs, screens and ceiling panels glow, not the lit walls.
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.4, 0.35, 0.97);
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.28, 0.5, 1);
     this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
     this.vignette = new ShaderPass(VignetteShader);
     this.vignette.uniforms.offset!.value = 0.95;
-    this.vignette.uniforms.darkness!.value = 1.15;
+    this.vignette.uniforms.darkness!.value = 0.75;
     this.composer.addPass(this.vignette);
     // A light grade: a little more contrast and colour than the raw render.
     this.grade = new ShaderPass({
@@ -164,9 +183,11 @@ export class Stage {
         void main() {
           vec4 c = texture2D(tDiffuse, vUv);
           float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
-          vec3 v = mix(vec3(l), c.rgb, 1.1);
-          v = mix(v, v * v * (3.0 - 2.0 * v), 0.22);
-          gl_FragColor = vec4(v, c.a);
+          vec3 v = mix(vec3(l), c.rgb, 1.06);
+          v = mix(v, v * v * (3.0 - 2.0 * v), 0.14);
+          // Dither: no banding in the walls' soft gradients.
+          float n = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
+          gl_FragColor = vec4(v + (n - 0.5) / 255.0, c.a);
         }`,
     });
     this.composer.addPass(this.grade);
@@ -193,6 +214,7 @@ export class Stage {
     this.bloom.enabled = q !== 'low';
     this.ao.enabled = q !== 'low';
     this.vignette.enabled = q !== 'low';
+    this.dust.visible = q !== 'low';
     this.grade.enabled = q !== 'low';
     this.relief = 0;
     this.refreshShadows(1);
@@ -357,6 +379,9 @@ export class Stage {
     const dt = Math.min(this.clock.getDelta(), 0.1);
     const time = this.clock.elapsedTime;
     for (const fn of [...this.frameHandlers]) fn(dt, time);
+    this.dust.rotation.y = time * 0.006;
+    this.dust.position.y = Math.sin(time * 0.1) * 0.04 + this.rigY;
+    this.dust.position.z = 1 + this.rigZ;
     if (!this.manualCamera) this.controls.update();
     if (this.shadowTime > 0) {
       this.renderer.shadowMap.needsUpdate = true;

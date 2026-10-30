@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import clubLogoUrl from '../assets/club-logo-512.webp';
 import { bake } from './bake.js';
 import { buildDecor } from './decor.js';
-import { contactShadow, esdMatTexture, laminateTexture, paintTexture, perforatedTexture, rackRailTexture, raisedFloorTexture } from './materials.js';
+import { ceilingTexture, contactShadow, esdMatNormal, esdMatTexture, laminateTexture, paintTexture, perforatedTexture, plasterNormal, rackRailTexture, raisedFloorNormal, raisedFloorTexture } from './materials.js';
 import { textTexture } from './textures.js';
 
 /** Height of the bench top, in metres: devices in the levels are placed relative to it. */
@@ -39,16 +39,26 @@ export function roomOrigin(y: number, z: number): { y: number; z: number } {
 }
 
 let paintMaterial: THREE.Material | null = null;
+const wallPaint = (): THREE.Material => new THREE.MeshStandardMaterial({ map: paintTexture(), normalMap: plasterNormal(), normalScale: new THREE.Vector2(0.1, 0.1), roughness: 0.82 });
+let dadoMaterial: THREE.Material | null = null;
 
 /** A painted wall with its skirting board and the club's colours as a band at hand height. */
 export function paintedWall(g: THREE.Object3D, w: number, x: number, z: number, ry: number): void {
-  paintMaterial ??= new THREE.MeshStandardMaterial({ map: paintTexture(), roughness: 0.92 });
+  paintMaterial ??= wallPaint();
   const m = new THREE.Mesh(new THREE.PlaneGeometry(w, ROOM.height), paintMaterial);
   m.position.set(x, ROOM.height / 2, z);
   m.rotation.y = ry;
   m.receiveShadow = true;
   g.add(m);
-  const skirting = box(w, 0.1, 0.015, steel('#2b313b', 0.6, 0.2), false);
+  // The lower part of the wall in a darker, harder-wearing paint, under the club's colours.
+  dadoMaterial ??= new THREE.MeshStandardMaterial({ color: '#aab2bd', map: paintTexture(), normalMap: plasterNormal(), normalScale: new THREE.Vector2(0.08, 0.08), roughness: 0.55 });
+  const dado = new THREE.Mesh(new THREE.PlaneGeometry(w, 1.1), dadoMaterial);
+  dado.position.set(x, 0.55, z);
+  dado.rotation.y = ry;
+  dado.receiveShadow = true;
+  dado.translateZ(0.0015);
+  g.add(dado);
+  const skirting = box(w, 0.1, 0.015, steel('#39414d', 0.55, 0.3), false);
   const band = new THREE.Mesh(new THREE.PlaneGeometry(w, 0.05), new THREE.MeshStandardMaterial({ color: '#1d4ed8', roughness: 0.8 }));
   const thin = new THREE.Mesh(new THREE.PlaneGeometry(w, 0.012), new THREE.MeshStandardMaterial({ color: '#fbbf24', roughness: 0.8 }));
   const inward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), ry);
@@ -65,7 +75,7 @@ export function doorWall(g: THREE.Object3D, width: number, z: number, ry: number
   const [left, right] = [-width / 2, width / 2];
   paintedWall(g, doorX - doorW / 2 - left, (left + doorX - doorW / 2) / 2, z, ry);
   paintedWall(g, right - doorX - doorW / 2, (right + doorX + doorW / 2) / 2, z, ry);
-  paintMaterial ??= new THREE.MeshStandardMaterial({ map: paintTexture(), roughness: 0.92 });
+  paintMaterial ??= wallPaint();
   const lintel = new THREE.Mesh(new THREE.PlaneGeometry(doorW, ROOM.height - doorH), paintMaterial);
   lintel.position.set(doorX, (ROOM.height + doorH) / 2, z);
   lintel.rotation.y = ry;
@@ -113,6 +123,7 @@ const steel = (color: string, roughness = 0.4, metalness = 0.75): THREE.MeshStan
  */
 export function buildRoom(): THREE.Group {
   const room = new THREE.Group();
+  room.name = 'technical-room';
   const decor = buildDecor();
   room.add(shell('back'), bench(), rack(), serverCabinet(), cableTray(), wallItems(), decor);
   decor.traverse((o) => {
@@ -129,7 +140,9 @@ function shell(door: 'back' | 'front'): THREE.Group {
 
   const floorTex = raisedFloorTexture();
   floorTex.repeat.set(ROOM.width / 1.2, depth / 1.2);
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.width, depth), new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.32, metalness: 0.12 }));
+  const floorNormal = raisedFloorNormal();
+  floorNormal.repeat.set(ROOM.width / 1.2, depth / 1.2);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.width, depth), new THREE.MeshStandardMaterial({ map: floorTex, normalMap: floorNormal, normalScale: new THREE.Vector2(0.8, 0.8), roughness: 0.3, metalness: 0.1 }));
   floor.rotation.x = -Math.PI / 2;
   floor.position.z = (ROOM.front + ROOM.back) / 2;
   floor.receiveShadow = true;
@@ -145,7 +158,9 @@ function shell(door: 'back' | 'front'): THREE.Group {
   paintedWall(g, depth, -ROOM.width / 2, (ROOM.front + ROOM.back) / 2, Math.PI / 2);
   paintedWall(g, depth, ROOM.width / 2, (ROOM.front + ROOM.back) / 2, -Math.PI / 2);
 
-  const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.width, depth), new THREE.MeshStandardMaterial({ color: '#e5e7eb', roughness: 0.95 }));
+  const tiles = ceilingTexture();
+  tiles.repeat.set(ROOM.width / 0.6, depth / 0.6);
+  const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.width, depth), new THREE.MeshStandardMaterial({ map: tiles, roughness: 0.95 }));
   ceiling.rotation.x = Math.PI / 2;
   ceiling.position.set(0, ROOM.height, (ROOM.front + ROOM.back) / 2);
   g.add(ceiling);
@@ -171,7 +186,7 @@ function bench(): THREE.Group {
   const laminate = new THREE.MeshStandardMaterial({ map: laminateTexture(), roughness: 0.38 });
   const top = box(w, 0.04, d, laminate);
   top.position.set(0, BENCH_TOP - 0.022, z);
-  const mat = new THREE.Mesh(new THREE.BoxGeometry(w - 0.12, 0.003, d - 0.1), new THREE.MeshStandardMaterial({ map: esdMatTexture(), roughness: 0.85 }));
+  const mat = new THREE.Mesh(new THREE.BoxGeometry(w - 0.12, 0.003, d - 0.1), new THREE.MeshStandardMaterial({ map: esdMatTexture(), normalMap: esdMatNormal(), normalScale: new THREE.Vector2(0.5, 0.5), roughness: 0.72 }));
   mat.position.set(0, BENCH_TOP - 0.0005, z);
   mat.receiveShadow = true;
   // Grounding cord from the mat's stud down the back edge.
@@ -223,7 +238,7 @@ function rack(): THREE.Group {
   const { x, frontZ, depth, height, railX } = RACK;
   const backZ = frontZ - depth;
   const midZ = frontZ - depth / 2;
-  const black = steel('#15191f', 0.45, 0.7);
+  const black = steel('#2a303a', 0.42, 0.65);
 
   for (const px of [-0.29, 0.29]) {
     for (const pz of [frontZ + 0.005, backZ + 0.015]) {
@@ -278,7 +293,7 @@ function rack(): THREE.Group {
 
   // Patch panel (24 sockets) and a brush cable manager above the gear.
   const patchY = 1.335;
-  const patch = box(0.465, unit - 0.003, 0.05, steel('#111827', 0.5, 0.6));
+  const patch = box(0.465, unit - 0.003, 0.05, steel('#232a35', 0.45, 0.6));
   patch.position.set(x, patchY + unit / 2, frontZ - 0.025);
   g.add(patch);
   const socketMaterial = new THREE.MeshBasicMaterial({ color: '#05070a' });
@@ -287,7 +302,7 @@ function rack(): THREE.Group {
     s.position.set(x - 0.19 + (i % 12) * 0.016 + (i >= 12 ? 0.19 : 0), patchY + unit / 2, frontZ + 0.0006);
     g.add(s);
   }
-  const brush = box(0.465, unit - 0.003, 0.03, steel('#0b0d10', 0.9, 0.1));
+  const brush = box(0.465, unit - 0.003, 0.03, steel('#1a1e25', 0.9, 0.1));
   brush.position.set(x, patchY + unit * 1.5, frontZ - 0.015);
   g.add(brush);
 
@@ -305,7 +320,7 @@ export function rackFillers(occupied: [number, number][], z = 0, y = 0): THREE.G
   const g = new THREE.Group();
   g.position.set(0, y, z);
   const { x, frontZ } = RACK;
-  const blank = steel('#1b2028', 0.55, 0.5);
+  const blank = steel('#2c333e', 0.5, 0.55);
   const dark = new THREE.MeshBasicMaterial({ color: '#05070a' });
   const screw = steel('#94a3b8', 0.3, 1);
   const panel = (y: number, h: number, kind: number): void => {
@@ -360,7 +375,7 @@ export function rackFillers(occupied: [number, number][], z = 0, y = 0): THREE.G
 function serverCabinet(): THREE.Group {
   const g = new THREE.Group();
   const [w, h, d] = [0.6, 2.0, 0.9];
-  const body = box(w, h, d, steel('#111418', 0.5, 0.6));
+  const body = box(w, h, d, steel('#262c35', 0.45, 0.6));
   body.position.set(0, h / 2, 0);
   g.add(body);
   const inner = box(w - 0.06, h - 0.12, 0.01, steel('#05070a', 0.8, 0.2), false);

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { bake } from './bake.js';
-import { contactShadow } from './materials.js';
+import { ceilingTexture, contactShadow, outsideTexture } from './materials.js';
 import { BUILDING, buildRoomParts, doorWall, paintedWall } from './room.js';
 import { textTexture } from './textures.js';
 
@@ -16,7 +17,7 @@ const WALL = lit('#d6dbe3', 0.9);
 const CEILING = lit('#e5e7eb', 0.95);
 const FRAME = lit('#475569', 0.5, 0.5);
 const STEEL = lit('#475569', 0.45, 0.75);
-const BLACK = lit('#0e1116', 0.6, 0.2);
+const BLACK = lit('#1b2028', 0.55, 0.25);
 const WOOD = lit('#b08a5e', 0.7);
 const GREY = lit('#94a3b8', 0.65, 0.2);
 
@@ -24,6 +25,14 @@ function box(w: number, h: number, d: number, material: THREE.Material, x: numbe
   const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
   m.position.set(x, y, z);
   m.castShadow = shadow;
+  m.receiveShadow = true;
+  return m;
+}
+
+function soft(w: number, h: number, d: number, material: THREE.Material, x: number, y: number, z: number, radius = 0.012): THREE.Mesh {
+  const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 2, Math.min(radius, h / 2.2, w / 2.2, d / 2.2)), material);
+  m.position.set(x, y, z);
+  m.castShadow = true;
   m.receiveShadow = true;
   return m;
 }
@@ -65,7 +74,9 @@ function corridor(upper: boolean, stairs: boolean): THREE.Group {
   floor.rotation.x = -Math.PI / 2;
   floor.position.set(0, 0.002, mid);
   floor.receiveShadow = true;
-  const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(9, depth), CEILING);
+  const tiles = ceilingTexture();
+  tiles.repeat.set(9 / 0.6, depth / 0.6);
+  const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(9, depth), new THREE.MeshStandardMaterial({ map: tiles, roughness: 0.95 }));
   ceiling.rotation.x = Math.PI / 2;
   ceiling.position.set(0, 3, mid);
   g.add(floor, ceiling);
@@ -121,7 +132,7 @@ function corridor(upper: boolean, stairs: boolean): THREE.Group {
     toLab.position.set(BUILDING.door.x, 2.25, back + 0.012);
     g.add(toLab);
   }
-  const hose = box(0.5, 0.7, 0.12, lit('#dc2626', 0.45, 0.2), 0.9, 1.25, front - 0.07);
+  const hose = soft(0.5, 0.7, 0.12, lit('#c62222', 0.4, 0.2), 0.9, 1.25, front - 0.07, 0.012);
   const hoseSign = plate(0.34, 0.16, '#ffffff', '#b91c1c', ['INCENDIE']);
   hoseSign.rotation.y = Math.PI;
   hoseSign.position.set(0.9, 1.25, front - 0.135);
@@ -168,6 +179,14 @@ function stairwell(): THREE.Group {
   roof.position.set((start + landingEnd) / 2, top - 0.01, (back + front) / 2);
   g.add(roof);
 
+  // The painted bands carry on along the stairwell's walls, on both levels.
+  const blue = lit('#1d4ed8', 0.8);
+  const amber = lit('#fbbf24', 0.8);
+  for (const y of [1.12, half + 1.12, rise + 1.12]) {
+    for (const z of [back + 0.002, front - 0.002]) g.add(box(wide, 0.05, 0.004, blue, (start + landingEnd) / 2, y, z, false), box(wide, 0.012, 0.004, amber, (start + landingEnd) / 2, y + 0.045, z, false));
+    g.add(box(0.004, 0.05, front - back, blue, landingEnd - 0.002, y, (back + front) / 2, false), box(0.004, 0.012, front - back, amber, landingEnd - 0.002, y + 0.045, (back + front) / 2, false));
+  }
+
   // Handrails along the slope.
   const slope = Math.atan2(half, run);
   const length = Math.hypot(run, half);
@@ -178,8 +197,9 @@ function stairwell(): THREE.Group {
   g.add(low, high);
 
   // A tall window on the landing, daylight behind it, and the floor number on the wall.
-  const glass = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.9), new THREE.MeshBasicMaterial({ color: '#e6f0fb' }));
+  const glass = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.9), new THREE.MeshBasicMaterial({ map: outsideTexture() }));
   glass.rotation.y = -Math.PI / 2;
+  (glass.material as THREE.MeshBasicMaterial).color.set('#c4c8cc');
   glass.position.set(landingEnd - 0.012, half + 1.5, (back + front) / 2);
   g.add(box(0.012, 2.0, 1.2, FRAME, landingEnd - 0.002, half + 1.5, (back + front) / 2, false), glass);
   const first = plate(0.5, 0.5, '#1d4ed8', '#ffffff', ['1']);
@@ -198,7 +218,7 @@ function workstation(x: number, z: number, wallX: number, label: string): THREE.
   const side = Math.sign(wallX - x);
   g.add(box(0.8, 0.03, 1.0, WOOD, x, 0.74, z));
   for (const dz of [-0.45, 0.45]) g.add(box(0.72, 0.03, 0.03, STEEL, x, 0.12, z + dz), box(0.03, 0.74, 0.03, STEEL, x + 0.36, 0.37, z + dz), box(0.03, 0.74, 0.03, STEEL, x - 0.36, 0.37, z + dz));
-  g.add(box(0.03, 0.34, 0.5, BLACK, x + side * 0.2, 1.02, z), box(0.05, 0.14, 0.05, BLACK, x + side * 0.22, 0.82, z), box(0.16, 0.012, 0.22, BLACK, x + side * 0.22, 0.76, z));
+  g.add(soft(0.024, 0.33, 0.5, BLACK, x + side * 0.2, 1.02, z, 0.008), soft(0.04, 0.16, 0.05, STEEL, x + side * 0.22, 0.83, z, 0.012), soft(0.17, 0.012, 0.22, STEEL, x + side * 0.22, 0.76, z, 0.005));
   const screen = new THREE.Mesh(
     new THREE.PlaneGeometry(0.47, 0.3),
     new THREE.MeshBasicMaterial({ map: textTexture(label, { width: 470, height: 300, color: '#7dd3fc', font: '600 30px "JetBrains Mono", monospace' }), color: '#d8e9ff', toneMapped: false, transparent: true }),
@@ -209,11 +229,11 @@ function workstation(x: number, z: number, wallX: number, label: string): THREE.
   back.rotation.y = screen.rotation.y;
   back.position.set(x + side * 0.1835, 1.02, z);
   g.add(back, screen);
-  g.add(box(0.14, 0.012, 0.36, BLACK, x - side * 0.12, 0.762, z), box(0.08, 0.016, 0.05, BLACK, x - side * 0.12, 0.764, z + 0.26));
-  g.add(box(0.36, 0.38, 0.17, BLACK, x + side * 0.12, 0.2, z - 0.28));
+  g.add(soft(0.14, 0.014, 0.36, BLACK, x - side * 0.12, 0.762, z, 0.005), soft(0.095, 0.022, 0.058, BLACK, x - side * 0.12, 0.766, z + 0.27, 0.01));
+  g.add(soft(0.36, 0.38, 0.17, BLACK, x + side * 0.12, 0.2, z - 0.28, 0.012));
   // The chair: a pedestal, a seat and a back, turned to the table.
   const cx = x - side * 0.72;
-  g.add(box(0.42, 0.06, 0.4, lit('#20262f', 0.5), cx, 0.47, z), box(0.05, 0.42, 0.38, lit('#20262f', 0.5), cx - side * 0.2, 0.8, z), box(0.05, 0.4, 0.05, STEEL, cx, 0.24, z), box(0.42, 0.03, 0.05, BLACK, cx, 0.04, z), box(0.05, 0.03, 0.42, BLACK, cx, 0.04, z));
+  g.add(soft(0.44, 0.08, 0.42, lit('#2a313c', 0.55), cx, 0.47, z, 0.035), soft(0.06, 0.44, 0.4, lit('#2a313c', 0.55), cx - side * 0.2, 0.8, z, 0.026), box(0.05, 0.4, 0.05, STEEL, cx, 0.24, z), box(0.42, 0.03, 0.05, BLACK, cx, 0.04, z), box(0.05, 0.03, 0.42, BLACK, cx, 0.04, z));
   // The socket under the table, on the trunking.
   g.add(box(0.012, 0.075, 0.075, lit('#e8ebef', 0.7), wallX - side * 0.04, 0.42, z, false), box(0.003, 0.02, 0.022, BLACK, wallX - side * 0.048, 0.42, z, false));
   const shadow = contactShadow(1.1, 1.25, 0.45);
@@ -261,7 +281,7 @@ function officeFurniture(): THREE.Group {
   g.add(box(0.03, 0.06, 4.0, lit('#d6dae0', 0.6), wallX - 0.01, 0.42, 0.45, false));
   // Windows onto the outside, on the front wall, and binders on a long low cabinet.
   for (const x of [-1.7, 1.2]) {
-    const sky = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.15), new THREE.MeshBasicMaterial({ color: '#e6f0fb' }));
+    const sky = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.15), new THREE.MeshBasicMaterial({ map: outsideTexture() }));
     sky.rotation.y = Math.PI;
     sky.position.set(x, 1.75, 3.585);
     g.add(box(1.9, 1.25, 0.012, FRAME, x, 1.75, 3.594, false), sky);
@@ -277,6 +297,15 @@ function officeFurniture(): THREE.Group {
   return g;
 }
 
+/** Each part of the building is merged on its own, so that what cannot be seen need not be drawn. */
+function part(name: string, ...content: THREE.Object3D[]): THREE.Group {
+  const g = new THREE.Group();
+  g.name = name;
+  g.add(...content);
+  bake(g);
+  return g;
+}
+
 export function buildAnnex(floors: boolean): THREE.Group {
   const g = new THREE.Group();
   const lab = buildRoomParts('front');
@@ -287,22 +316,21 @@ export function buildAnnex(floors: boolean): THREE.Group {
   sub.position.set(0, 2.08, -1.59);
   lab.add(name, sub);
   lab.position.z = BUILDING.annexZ;
-  g.add(lab, corridor(false, floors));
+  g.add(part('part-lab', lab), part('part-lower', corridor(false, floors)));
   if (floors) {
     const office = buildRoomParts('back');
     office.add(officeFurniture());
     office.position.y = BUILDING.floorY;
     const upper = corridor(true, true);
     upper.position.y = BUILDING.floorY;
-    g.add(stairwell(), office, upper);
+    g.add(part('part-stairs', stairwell()), part('part-office', office), part('part-upper', upper));
   }
-  bake(g);
   // Two lamps only, moved to whichever corridor the player is in: every light costs on every pixel.
   const lamps = new THREE.Group();
   lamps.name = 'corridor-lamps';
   for (const x of [-2.2, 2.2]) {
-    const lamp = new THREE.PointLight('#eaf1ff', 5.5, 8, 1.6);
-    lamp.position.set(x, 2.8, (BUILDING.corridor.back + BUILDING.corridor.front) / 2);
+    const lamp = new THREE.PointLight('#fff4e4', 3.2, 7, 1.5);
+    lamp.position.set(x, 2.25, (BUILDING.corridor.back + BUILDING.corridor.front) / 2);
     lamps.add(lamp);
   }
   g.add(lamps);

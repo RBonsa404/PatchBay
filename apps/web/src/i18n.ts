@@ -65,6 +65,7 @@ const fr = {
   'error.panelToPanel': 'Deux panneaux se relient par le câblage du bâtiment : un cordon va d’un panneau à un appareil.',
   'panel.patch': 'Panneau de brassage : le câblage du bâtiment arrive ici, dans les murs. Avec un câble droit, relie un port de ce panneau à un appareil. Fais de même au même numéro de lien sur le panneau de l’autre salle : la liaison s’établit quand les deux côtés sont brassés.',
   'host.dhcp': 'Obtenir par DHCP',
+  'objectives.toggle': 'Replier ou déplier (O)',
   'brief.tool': 'Ordre de travail (B)',
   'brief.title': 'Ordre de travail',
   'help.tool': 'Commandes (F1)',
