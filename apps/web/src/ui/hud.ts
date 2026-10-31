@@ -56,6 +56,8 @@ export class Hud {
   private firstObjectives = true;
   private shownSecond = -1;
 
+  private readonly qualityButton: HTMLElement;
+
   constructor(private readonly level: Level, private readonly actions: HudActions, quality: Quality, index = 0, private readonly exam = false) {
     this.objectivesList = h('ol', { class: 'objective-list' });
     this.scoreLabel = h('span', { class: 'score' }, '0');
@@ -67,12 +69,8 @@ export class Hud {
     this.timerBar = h('i', {});
     this.timerBox = h('div', { class: 'hud-timer panel-solid', role: 'timer', 'aria-label': t('timer.label') }, icon(Timer, 18), this.timerText, h('span', { class: 'timer-bar' }, this.timerBar));
 
-    const qualityButton = toolButton(this.qualityLabel(quality), Gauge, () => {
-      const label = this.qualityLabel(actions.cycleQuality());
-      qualityButton.title = label;
-      qualityButton.setAttribute('aria-label', label);
-      this.toast(label);
-    });
+    const qualityButton = toolButton(this.qualityLabel(quality), Gauge, () => this.showQuality(actions.cycleQuality()));
+    this.qualityButton = qualityButton;
     const soundButton = toolButton(sound.isMuted ? t('hud.soundOff') : t('hud.sound'), sound.isMuted ? VolumeX : Volume2, () => {
       const muted = sound.toggleMute();
       soundButton.replaceChildren(icon(muted ? VolumeX : Volume2, 18));
@@ -118,6 +116,14 @@ export class Hud {
     this.root = root;
     this.objectivesBox = root.querySelector('.objectives') as HTMLElement;
     ui().append(this.root);
+  }
+
+  /** Say which quality is on, after the player's choice or when the game has lowered it. */
+  showQuality(q: Quality): void {
+    const label = this.qualityLabel(q);
+    this.qualityButton.title = label;
+    this.qualityButton.setAttribute('aria-label', label);
+    this.toast(label);
   }
 
   private qualityLabel(q: Quality): string {

@@ -185,7 +185,7 @@ export function buildWhiteboard(level: Level, roomZ = 0, roomY = 0): THREE.Group
 
   const texture = new THREE.CanvasTexture(c);
   texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 8;
+  texture.anisotropy = 4;
   const board = new THREE.Mesh(new THREE.PlaneGeometry(1.28, 0.86), new THREE.MeshStandardMaterial({ map: texture, roughness: 0.35, metalness: 0 }));
   const frame = new THREE.Mesh(new THREE.BoxGeometry(1.34, 0.92, 0.02), new THREE.MeshStandardMaterial({ color: '#94a3b8', metalness: 0.8, roughness: 0.3 }));
   frame.position.z = -0.011;

@@ -106,6 +106,7 @@ export function startGamepad(stage: Stage, notify: (text: string) => void): void
     if (!active) return;
     const pad = [...navigator.getGamepads()].find((p): p is Gamepad => !!p && p.connected);
     if (!pad) return;
+    stage.wake();
     const [lx = 0, ly = 0, rx = 0, ry = 0] = pad.axes.map(deadZone);
     const buttons = pad.buttons.map((b) => b.pressed);
     const dpadX = (buttons[15] ? 1 : 0) - (buttons[14] ? 1 : 0);

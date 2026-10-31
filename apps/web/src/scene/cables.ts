@@ -313,7 +313,7 @@ export class CableLayer {
     pb.visible = false;
     // Unroll: grow the drawn part of each tube, then show the far plug.
     for (const curve of curves) {
-      const geometry = new THREE.TubeGeometry(curve, 200, style.radius, 10, false);
+      const geometry = new THREE.TubeGeometry(curve, 90, style.radius, 6, false);
       const tube = new THREE.Mesh(geometry, material);
       tube.castShadow = true;
       group.add(tube);
@@ -375,7 +375,7 @@ export class CableLayer {
     hand.y = Math.max(hand.y, BENCH_TOP + 0.02 + roomOrigin(a.point.y, a.point.z).y);
     const curve = curveBetween(a.point, a.normal, hand, new THREE.Vector3(0, 1, 0), []);
     this.preview = new THREE.Mesh(
-      new THREE.TubeGeometry(curve, 64, CABLE_STYLE[type].radius, 8, false),
+      new THREE.TubeGeometry(curve, 32, CABLE_STYLE[type].radius, 6, false),
       new THREE.MeshStandardMaterial({ color: CABLE_STYLE[type].colour, emissive: '#38bdf8', emissiveIntensity: 0.35, transparent: true, opacity: 0.85 }),
     );
     this.group.add(this.preview);

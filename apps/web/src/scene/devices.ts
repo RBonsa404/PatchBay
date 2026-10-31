@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import type { DeviceModel, PortSpec } from '@patchbay/sim-core';
-import { bake } from './bake.js';
+import { bake, freeze } from './bake.js';
 import { brushedTexture, contactShadow, keyboardTexture, rj45Texture } from './materials.js';
 import { BENCH_TOP, RACK } from './room.js';
 import { addFeet, addRackEars, addVents, powerButton, roundedChassis } from './details.js';
-import { screenTexture, textTexture } from './textures.js';
+import { atlasLabel, screenTexture } from './textures.js';
 
 export type LedState = 'off' | 'green' | 'amber';
 
@@ -15,15 +15,18 @@ export interface PortView {
   spec: PortSpec;
   /** Invisible, generous box for picking. */
   hit: THREE.Mesh;
-  /** Visible socket, tinted when hovered. */
+  /** Laid over the socket, shown only when it is lit: the sockets themselves are merged with the rest of the device. */
   socket: THREE.Mesh;
-  led?: THREE.Mesh;
+  /** Its place among the device's LEDs, all drawn together. */
+  led?: { mesh: THREE.InstancedMesh; index: number; state: LedState };
   /** Where a plug sits, pointing out of the panel along +Z of the device. */
   mouth: THREE.Object3D;
 }
 
 /** Height of a patch panel's bottom in the rack. */
 const PANEL_Y = 1.285;
+
+const LED_COLOURS: Record<LedState, [string, number]> = { off: ['#1f2937', 1], green: ['#10b981', 2.5], amber: ['#fbbf24', 2] };
 
 export type DeviceShape = 'router' | 'switch' | 'pc' | 'laptop' | 'server';
 
@@ -57,6 +60,7 @@ interface Materials {
   chassis: THREE.MeshStandardMaterial;
   panel: THREE.MeshStandardMaterial;
   socket: THREE.MeshStandardMaterial;
+  socketPlain: THREE.MeshStandardMaterial;
   frame: THREE.MeshStandardMaterial;
   consoleFrame: THREE.MeshStandardMaterial;
   serialPlate: THREE.MeshStandardMaterial;
@@ -71,18 +75,82 @@ const rj45 = (): THREE.Texture => (rj45Map ??= rj45Texture());
 let keysMap: THREE.Texture | null = null;
 const keys = (): THREE.Texture => (keysMap ??= keyboardTexture());
 
+let shared: Materials | null = null;
+
+/** The same few materials for every device: what lets them merge. */
 function materials(): Materials {
-  return {
+  return (shared ??= {
     chassis: new THREE.MeshStandardMaterial({ color: '#7c8796', metalness: 0.35, roughness: 0.62, roughnessMap: brushed() }),
     // Light faces, whatever the light in the rack: the dark sockets must read at a glance.
     panel: new THREE.MeshStandardMaterial({ color: '#c6ccd5', metalness: 0.1, roughness: 0.7, roughnessMap: brushed(), emissive: '#8a93a0', emissiveIntensity: 0.14 }),
     socket: new THREE.MeshStandardMaterial({ map: rj45(), roughness: 0.6 }),
+    socketPlain: new THREE.MeshStandardMaterial({ color: '#0a0d12', roughness: 0.6 }),
     frame: new THREE.MeshStandardMaterial({ color: '#111827', metalness: 0.2, roughness: 0.5 }),
     consoleFrame: new THREE.MeshStandardMaterial({ color: '#0ea5e9', metalness: 0.1, roughness: 0.5, emissive: '#0ea5e9', emissiveIntensity: 0.25 }),
     serialPlate: new THREE.MeshStandardMaterial({ color: '#93b4dd', metalness: 0.1, roughness: 0.55 }),
     pick: new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }),
     plastic: new THREE.MeshStandardMaterial({ color: '#1c222c', metalness: 0.15, roughness: 0.48 }),
-  };
+  });
+}
+
+type SocketLight = 'hint' | 'hover' | 'ok' | 'bad';
+const SOCKET_LIGHTS: Record<SocketLight, [colour: string, intensity: number]> = { hint: ['#22c55e', 1.1], hover: ['#e2e8f0', 0.7], ok: ['#38bdf8', 1.8], bad: ['#ef4444', 1.8] };
+const socketLights = new Map<string, THREE.MeshStandardMaterial>();
+
+function socketLight(mode: SocketLight, plain: boolean): THREE.MeshStandardMaterial {
+  const key = `${mode}${plain}`;
+  let material = socketLights.get(key);
+  if (!material) {
+    const [colour, intensity] = SOCKET_LIGHTS[mode];
+    material = new THREE.MeshStandardMaterial({ roughness: 0.6, emissive: colour, emissiveIntensity: intensity, ...(plain ? { color: '#0a0d12' } : { map: rj45() }) });
+    socketLights.set(key, material);
+  }
+  return material;
+}
+
+/** The LEDs waiting to be drawn together, once the device being built has all its ports. */
+let pendingLeds: { view: PortView; x: number; y: number; z: number }[] = [];
+const LED_SHAPE = new THREE.BoxGeometry(0.0042, 0.0026, 0.002);
+const LED_MATERIAL = new THREE.MeshBasicMaterial({ toneMapped: false });
+const ledColour = new THREE.Color();
+
+function addLeds(root: THREE.Object3D): void {
+  if (pendingLeds.length === 0) return;
+  const mesh = new THREE.InstancedMesh(LED_SHAPE, LED_MATERIAL, pendingLeds.length);
+  const place = new THREE.Matrix4();
+  pendingLeds.forEach(({ view, x, y, z }, index) => {
+    mesh.setMatrixAt(index, place.makeTranslation(x, y, z));
+    mesh.setColorAt(index, ledColour.set(LED_COLOURS.off[0]));
+    view.led = { mesh, index, state: 'off' };
+  });
+  mesh.userData.dynamic = true;
+  root.add(mesh);
+  pendingLeds = [];
+}
+
+const labelMaterials = new Map<THREE.Texture, THREE.MeshStandardMaterial>();
+
+function labelMaterial(map: THREE.Texture): THREE.MeshStandardMaterial {
+  let material = labelMaterials.get(map);
+  if (!material) {
+    material = new THREE.MeshStandardMaterial({ map, transparent: true, roughness: 0.6, depthWrite: false });
+    labelMaterials.set(map, material);
+  }
+  return material;
+}
+
+/** What is clicked on a device is an invisible copy of each part: the visible parts merge with the rest. */
+function pickCopies(view: DeviceView, m: Materials): void {
+  view.body = view.body.map((part) => {
+    const pick = new THREE.Mesh((part as THREE.Mesh).geometry, m.pick);
+    pick.position.copy(part.position);
+    pick.quaternion.copy(part.quaternion);
+    pick.scale.copy(part.scale);
+    pick.visible = false;
+    pick.userData.dynamic = true;
+    part.parent?.add(pick);
+    return pick;
+  });
 }
 
 const mesh = (geometry: THREE.BufferGeometry, material: THREE.Material, shadow = true): THREE.Mesh => {
@@ -115,34 +183,32 @@ function addSocket(
   const frameMat = spec.kind === 'console' ? m.consoleFrame : spec.kind === 'serial' ? m.serialPlate : m.frame;
   const frame = mesh(new THREE.BoxGeometry(w + 0.003, h + 0.003, 0.002), frameMat, false);
   frame.position.set(x, y, face + 0.001);
-  const socketMaterial = m.socket.clone();
   // Serial and console DB connectors have no RJ45 contacts.
-  if (spec.kind === 'serial' || spec.kind === 'rs232') {
-    socketMaterial.map = null;
-    socketMaterial.color.set('#0a0d12');
-  }
-  const socket = mesh(new THREE.BoxGeometry(w, h, 0.0025), socketMaterial, false);
-  socket.position.set(x, y, face + 0.0016);
+  const plain = spec.kind === 'serial' || spec.kind === 'rs232';
+  const body = mesh(new THREE.BoxGeometry(w, h, 0.0025), plain ? m.socketPlain : m.socket, false);
+  body.position.set(x, y, face + 0.0016);
+  const socket = new THREE.Mesh(new THREE.PlaneGeometry(w, h), socketLight('hover', plain));
+  socket.position.set(x, y, face + 0.0031);
+  socket.visible = false;
+  socket.userData.plain = plain;
   // Slightly bigger than the socket, but never reaching the neighbours (switch ports sit 17 mm apart).
   const hit = new THREE.Mesh(new THREE.BoxGeometry(w + 0.0015, h + 0.004, 0.04), m.pick);
   hit.position.set(x, y, face + 0.01);
   const mouth = new THREE.Object3D();
   mouth.position.set(x, y, face + 0.004);
-  parent.add(frame, socket, hit, mouth);
+  parent.add(frame, body, socket, hit, mouth);
 
-  let led: THREE.Mesh | undefined;
-  if (ledAt !== 'none') {
-    led = mesh(new THREE.BoxGeometry(0.0042, 0.0026, 0.002), new THREE.MeshStandardMaterial({ color: '#1f2937', emissive: '#000000' }), false);
-    led.position.set(x + w / 2 - 0.0025, y + (ledAt === 'above' ? h / 2 + 0.0035 : -h / 2 - 0.0035), face + 0.0012);
-    parent.add(led);
-  }
-  const view: PortView = { device, port: spec.name, spec, hit, socket, mouth, ...(led ? { led } : {}) };
+  const view: PortView = { device, port: spec.name, spec, hit, socket, mouth };
+  if (ledAt !== 'none') pendingLeds.push({ view, x: x + w / 2 - 0.0025, y: y + (ledAt === 'above' ? h / 2 + 0.0035 : -h / 2 - 0.0035), z: face + 0.0012 });
   hit.userData.port = view;
   return view;
 }
 
 function label(parent: THREE.Object3D, text: string, x: number, y: number, face: number, w: number, h: number, color = '#1e293b'): void {
-  const p = plane(w, h, textTexture(text, { width: Math.round(w * 6000), height: Math.round(h * 6000), color, font: `600 ${Math.round(h * 3600)}px Inter, sans-serif` }));
+  const { texture, uv: [u0, v0, u1, v1] } = atlasLabel(text, Math.round(w * 6000), Math.round(h * 6000), color, `600 ${Math.round(h * 3600)}px Inter, sans-serif`);
+  const shape = new THREE.PlaneGeometry(w, h);
+  (shape.attributes.uv as THREE.BufferAttribute).set([u0, v1, u1, v1, u0, v0, u1, v0]);
+  const p = new THREE.Mesh(shape, labelMaterial(texture));
   p.position.set(x, y, face + 0.0015);
   parent.add(p);
 }
@@ -389,16 +455,17 @@ export function buildDevice(id: string, model: DeviceModel, position: [number, n
   view.root.position.set(x, (inRack ? y : BENCH_TOP + lift) + roomY, (inRack ? RACK.frontZ - view.depth / 2 : z) + roomZ);
   view.roomZ = roomZ;
   view.roomY = roomY;
+  // Everything visible on a device is merged, but for its screens' own pictures and the sockets while lit.
+  pickCopies(view, m);
   for (const b of view.body) b.userData.device = id;
-  // What stays still on a device is merged; what is clicked or lights up stays separate. Pick boxes are never drawn.
-  for (const b of view.body) b.userData.dynamic = true;
   for (const port of view.ports.values()) {
     port.hit.visible = false;
     port.hit.userData.dynamic = true;
     port.socket.userData.dynamic = true;
-    if (port.led) port.led.userData.dynamic = true;
   }
+  addLeds(view.root);
   bake(view.root);
+  freeze(view.root);
   return view;
 }
 
@@ -428,34 +495,35 @@ export function buildPatchPanel(id: string, ports: { name: string; label: string
     if (p.label) label(view.root, p.label, x, h / 2 + 0.0165, face, 0.046, 0.006, '#1e293b');
   });
   view.root.position.set(0, PANEL_Y + roomY, RACK.frontZ - d / 2 + roomZ);
-  for (const b of view.body) {
-    b.userData.device = id;
-    b.userData.dynamic = true;
-  }
+  pickCopies(view, m);
+  for (const b of view.body) b.userData.device = id;
   for (const port of view.ports.values()) {
     port.hit.visible = false;
     port.hit.userData.dynamic = true;
     port.socket.userData.dynamic = true;
   }
   bake(view.root);
+  freeze(view.root);
   return view;
 }
 
-const LED_COLOURS: Record<LedState, [string, number]> = { off: ['#1f2937', 0], green: ['#10b981', 4], amber: ['#fbbf24', 3.5] };
-
 export function setLed(port: PortView, state: LedState): void {
-  if (!port.led) return;
-  const material = port.led.material as THREE.MeshStandardMaterial;
+  if (!port.led || port.led.state === state) return;
+  port.led.state = state;
   const [colour, intensity] = LED_COLOURS[state];
-  material.color.set(state === 'off' ? colour : '#0b1e3f');
-  material.emissive.set(state === 'off' ? '#000000' : colour);
-  material.emissiveIntensity = intensity;
+  port.led.mesh.setColorAt(port.led.index, ledColour.set(colour).multiplyScalar(intensity));
+  (port.led.mesh.instanceColor as THREE.InstancedBufferAttribute).needsUpdate = true;
+}
+
+/** A link LED flickering with the traffic. */
+export function flickerLed(port: PortView): void {
+  if (port.led?.state !== 'green') return;
+  port.led.mesh.setColorAt(port.led.index, ledColour.set(LED_COLOURS.green[0]).multiplyScalar(1 + Math.random() * 2.5));
+  (port.led.mesh.instanceColor as THREE.InstancedBufferAttribute).needsUpdate = true;
 }
 
 /** Tint a socket: green where the cable in hand can go, cyan when pointed at and able to take it, red when not, soft white with empty hands. */
-export function highlightSocket(port: PortView, mode: 'none' | 'hint' | 'hover' | 'ok' | 'bad'): void {
-  const material = port.socket.material as THREE.MeshStandardMaterial;
-  const colour = mode === 'hint' ? '#22c55e' : mode === 'ok' ? '#38bdf8' : mode === 'bad' ? '#ef4444' : mode === 'hover' ? '#e2e8f0' : '#000000';
-  material.emissive.set(colour);
-  material.emissiveIntensity = mode === 'none' ? 0 : mode === 'hover' ? 0.7 : mode === 'hint' ? 1.1 : 1.8;
+export function highlightSocket(port: PortView, mode: 'none' | SocketLight): void {
+  port.socket.visible = mode !== 'none';
+  if (mode !== 'none') port.socket.material = socketLight(mode, port.socket.userData.plain as boolean);
 }

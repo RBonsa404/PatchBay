@@ -3,7 +3,7 @@
 // with no Internet, a phone in the bus).
 // - The page itself: network first (an update is picked up as soon as there is a connection), cache as fallback.
 // - Everything else (scripts, styles, fonts, icons): their names carry a content hash, so cache first is safe.
-const CACHE = 'patchbay-v1';
+const CACHE = 'patchbay-v2';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(['./', './manifest.webmanifest', './icon.svg'])));

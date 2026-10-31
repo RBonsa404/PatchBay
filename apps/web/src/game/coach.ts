@@ -99,6 +99,7 @@ export class Coach {
     this.bubble = h('div', { class: 'coach glass', role: 'status', 'aria-live': 'polite' });
     ui().append(this.bubble);
     this.stopFrame = stage.onFrame((_, time) => {
+      stage.wake();
       const s = 1 + Math.sin(time * 5) * 0.18;
       this.ring.scale.set(s, s, s);
       (this.ring.material as THREE.MeshBasicMaterial).opacity = 0.65 + Math.sin(time * 5) * 0.3;

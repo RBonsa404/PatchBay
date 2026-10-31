@@ -6,7 +6,7 @@ import { Player, type MoveInput } from './player.js';
 import { Coach, type CoachView } from './coach.js';
 import { setGameTarget, type GameTarget } from './gamepad.js';
 import { CableLayer, portFrame } from '../scene/cables.js';
-import { buildDevice, buildPatchPanel, highlightSocket, rackOccupied, setLed, type DeviceView, type PortView } from '../scene/devices.js';
+import { buildDevice, buildPatchPanel, flickerLed, highlightSocket, rackOccupied, setLed, type DeviceView, type PortView } from '../scene/devices.js';
 import { buildWhiteboard } from '../scene/details.js';
 import { buildAnnex } from '../scene/annex.js';
 import { BUILDING, rackFillers, setMainDoorOpen } from '../scene/room.js';
@@ -131,7 +131,6 @@ export class Mission {
   private viewYaw = 0;
   private viewPitch = 0;
   private ledsIn = 0;
-  private lamps: THREE.Object3D | null = null;
   /** What belongs to each part of the building, to draw only what can be seen. */
   private readonly parts = new Map<string, THREE.Object3D[]>();
   private shown = '';
@@ -197,7 +196,6 @@ export class Mission {
     if (this.building) {
       this.player.enterBuilding(floors);
       const annex = buildAnnex(floors);
-      this.lamps = annex.getObjectByName('corridor-lamps') ?? null;
       stage.level.add(annex);
       for (const [key, name] of [['lab', 'part-lab'], ['lower', 'part-lower'], ['stairs', 'part-stairs'], ['office', 'part-office'], ['upper', 'part-upper']] as const) {
         const object = annex.getObjectByName(name);
@@ -230,6 +228,10 @@ export class Mission {
       selectCable: (type) => this.select(type),
     }, stage.currentQuality, index, exam);
     setTimeout(() => this.hud.banner(`${t('briefing.mission')} ${String(index + 1).padStart(2, '0')}`, exam ? t('exam.start') : this.coach?.active ? t('timer.tutorial') : t('timer.start')), this.entrance * 1000);
+    stage.onQualityLowered = (q) => this.hud.showQuality(q);
+    this.cleanup.push(() => {
+      stage.onQualityLowered = null;
+    });
     this.listen();
     this.afterChange();
     this.coach = exam ? null : Coach.for(level.id, stage, () => this.coachView());
@@ -285,6 +287,7 @@ export class Mission {
     this.stage.manualCamera = false;
     this.stage.zoom = 1;
     this.stage.setRig(0, 0);
+    this.stage.placeLamps();
     setMainDoorOpen(false);
     const main = this.stage.scene.getObjectByName('technical-room');
     if (main) main.visible = true;
@@ -840,6 +843,11 @@ export class Mission {
     if (this.remaining <= 0) this.finish(evaluate(this.net, this.level.objectives), true);
   }
 
+  /** The mission is on screen now: what it took to get ready does not count. */
+  startClock(): void {
+    this.clockAt = performance.now();
+  }
+
   private inPart(room: string | undefined, ...objects: THREE.Object3D[]): void {
     const key = room === 'annexe' ? 'lab' : room === 'etage' ? 'office' : 'room';
     this.parts.set(key, [...(this.parts.get(key) ?? []), ...objects]);
@@ -873,8 +881,7 @@ export class Mission {
     this.ledsIn = 0.09;
     for (const view of this.devices.values()) {
       for (const port of view.ports.values()) {
-        const material = port.led?.material as THREE.MeshStandardMaterial | undefined;
-        if (material && material.emissiveIntensity >= 1 && material.emissive.g > material.emissive.r) material.emissiveIntensity = 1.4 + Math.random() * 3.6;
+        flickerLed(port);
       }
     }
   }
@@ -886,7 +893,14 @@ export class Mission {
     if (zone === this.lastZone) return;
     if (this.lastZone !== null) this.hud.toast(t(`zone.${zone}`));
     this.lastZone = zone;
-    if (this.lamps) this.lamps.position.y = zone === 'corridor1' || zone === 'office' ? BUILDING.floorY : 0;
+    const floor = zone === 'corridor1' || zone === 'office' ? BUILDING.floorY : 0;
+    const hall = (BUILDING.corridor.back + BUILDING.corridor.front) / 2;
+    const hallLamp = (x: number, y = floor): [number, number, number, number] => [x, y + 2.25, hall, 3.2];
+    // Over the room the player is in, and over the corridor they can see through its door.
+    if (zone === 'room' || zone === 'office') this.stage.placeLamps([0.4, floor + 2.9, 1.2, 4], hallLamp(-2.2));
+    else if (zone === 'lab') this.stage.placeLamps([0.4, 2.9, BUILDING.annexZ + 1.2, 4], hallLamp(-2.2));
+    else if (zone === 'stairs') this.stage.placeLamps([7.5, 4.25, hall, 4], [5.5, 1.6, hall, 3.2]);
+    else this.stage.placeLamps(hallLamp(-2.2), hallLamp(2.2));
     if (zone === 'room') this.stage.setRig(0, 0);
     if (zone === 'lab') this.stage.setRig(0, BUILDING.annexZ);
     if (zone === 'office') this.stage.setRig(BUILDING.floorY, 0);
@@ -1112,12 +1126,7 @@ export class Mission {
   private cycleQuality(): Quality {
     const order: Quality[] = ['low', 'medium', 'high'];
     const next = order[(order.indexOf(this.stage.currentQuality) + 1) % order.length] as Quality;
-    this.stage.setQuality(next);
-    try {
-      localStorage.setItem('patchbay.quality', next);
-    } catch {
-      // storage unavailable: the choice lasts until the page closes
-    }
+    this.stage.chooseQuality(next);
     return next;
   }
 }

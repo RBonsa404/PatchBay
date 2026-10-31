@@ -53,3 +53,5 @@ Convertis en GLB, textures réduites à 512 px en WebP.
 | clipboard | https://polyhaven.com/a/clipboard |
 | binder_notebook | https://polyhaven.com/a/binder_notebook |
 | pachira_aquatica_01 | https://polyhaven.com/a/pachira_aquatica_01 |
+
+Les modèles, les textures photo et les musiques sont allégés pour le jeu (moins de triangles, images de 256 à 512 px, MP3 à 96 kbit/s). Le socle de l'extincteur porte « EXTINCTEUR ».

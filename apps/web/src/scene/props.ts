@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { freeze } from './bake.js';
 
 /**
  * Objects modelled by artists (Poly Haven, CC0: see ASSETS.md), for what the player sees close up in the room. They
@@ -65,6 +66,7 @@ export function placeProp(parent: THREE.Object3D, name: string, at: Placement): 
         }
       });
       parent.add(holder);
+      freeze(holder);
       appeared();
     })
     .catch(() => undefined);

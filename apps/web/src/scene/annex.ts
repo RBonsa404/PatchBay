@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import { bake } from './bake.js';
+import { bake, freeze } from './bake.js';
 import { ceilingTexture, contactShadow, keyboardTexture, outsideTexture, photo, photoRelief } from './materials.js';
 import { placeProp } from './props.js';
 import { BUILDING, buildRoomParts, doorWall, paintedWall } from './room.js';
@@ -209,9 +209,6 @@ function stairwell(): THREE.Group {
   first.rotation.y = Math.PI;
   first.position.set(flightEnd - 1.6, rise + 1.7, front - 0.005);
   g.add(first);
-  const lamp = new THREE.PointLight('#f1f6ff', 4, 9, 1.6);
-  lamp.position.set((flightEnd + landingEnd) / 2, half + 2.6, (back + front) / 2);
-  g.add(lamp);
   return g;
 }
 
@@ -304,6 +301,7 @@ function part(name: string, ...content: THREE.Object3D[]): THREE.Group {
   g.name = name;
   g.add(...content);
   bake(g);
+  freeze(g);
   return g;
 }
 
@@ -332,14 +330,5 @@ export function buildAnnex(floors: boolean): THREE.Group {
     placeProp(officePart, 'binder_notebook', { x: -3.24, y: BUILDING.floorY + 0.88, z: 2.35, turn: Math.PI / 2 });
     g.add(part('part-stairs', stairwell()), officePart, part('part-upper', upper));
   }
-  // Two lamps only, moved to whichever corridor the player is in: every light costs on every pixel.
-  const lamps = new THREE.Group();
-  lamps.name = 'corridor-lamps';
-  for (const x of [-2.2, 2.2]) {
-    const lamp = new THREE.PointLight('#fff4e4', 3.2, 7, 1.5);
-    lamp.position.set(x, 2.25, (BUILDING.corridor.back + BUILDING.corridor.front) / 2);
-    lamps.add(lamp);
-  }
-  g.add(lamps);
   return g;
 }

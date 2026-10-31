@@ -26,7 +26,7 @@ function texture(c: HTMLCanvasElement, repeatX = 1, repeatY = repeatX, colour = 
   if (colour) t.colorSpace = THREE.SRGBColorSpace;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.repeat.set(repeatX, repeatY);
-  t.anisotropy = 8;
+  t.anisotropy = 4;
   return t;
 }
 
@@ -245,7 +245,8 @@ export function raisedFloorNormal(): THREE.CanvasTexture {
 
 /** Blue-grey anti-static mat on the workbench: a fine even surface with a stitched edge. */
 export function esdMatTexture(): THREE.CanvasTexture {
-  const [c, g] = canvas(2048, 1024);
+  const [c, g] = canvas(1024, 512);
+  g.scale(0.5, 0.5);
   g.fillStyle = '#46566b';
   g.fillRect(0, 0, 2048, 1024);
   grain(g, 2048, 1024, 26000, 9, 0.022);
@@ -343,7 +344,7 @@ export function rj45Texture(): THREE.CanvasTexture {
   for (let i = 0; i < 8; i++) g.fillRect(11 + i * 5.6, 15, 3, 13);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 8;
+  t.anisotropy = 4;
   return t;
 }
 
@@ -372,7 +373,7 @@ export function keyboardTexture(): THREE.CanvasTexture {
   row(128, 28, [1.2, 1.2, 1.2, 6.5, 1.2, 1.2, 1.2, 1.2, ...many(3)]);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 8;
+  t.anisotropy = 4;
   return t;
 }
 
@@ -407,7 +408,7 @@ export function photo(name: string, repeatX = 1, repeatY = repeatX): { map: THRE
     if (colour) t.colorSpace = THREE.SRGBColorSpace;
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     t.repeat.set(repeatX, repeatY);
-    t.anisotropy = 8;
+    t.anisotropy = 4;
     return t;
   };
   return { map: load('diff', true), normalMap: load('nor', false), roughnessMap: load('rough', false) };

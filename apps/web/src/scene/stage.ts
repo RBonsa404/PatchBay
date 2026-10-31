@@ -32,9 +32,27 @@ const BASE_FOV = 48;
 
 const easeInOut = (t: number): number => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 
-/** A guess good enough to start with; the player can change it from the HUD. */
+/** Frames per second: in a mission, behind the menus, and when nothing has moved for a moment. */
+const ACTIVE_FPS = 60;
+const MENU_FPS = 24;
+const REST_FPS = 8;
+/** Milliseconds without a movement before the rest pace. */
+const REST_AFTER = 1000;
+/** How much a generic reflection counts, without the picture of the real room that only the high quality takes. */
+const PLAIN_REFLECTIONS = 0.45;
+
+function softwareRenderer(): boolean {
+  const gl = document.createElement('canvas').getContext('webgl2');
+  if (!gl) return false;
+  const info = gl.getExtension('WEBGL_debug_renderer_info');
+  const name = String(info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : '');
+  gl.getExtension('WEBGL_lose_context')?.loseContext();
+  return /swiftshader|llvmpipe|basic render|software/i.test(name);
+}
+
+/** A guess good enough to start with; the game lowers it if the machine struggles, and the player can change it from the HUD. */
 export function detectQuality(): Quality {
-  // The reference machine has 8 GB: everything is on by default. Only a really small machine starts lower.
+  // Medium for everyone: the game is played for hours on laptops, on battery. The full effects are a choice.
   const cores = navigator.hardwareConcurrency ?? 8;
   const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8;
   try {
@@ -43,9 +61,8 @@ export function detectQuality(): Quality {
   } catch {
     // storage unavailable: detect each time
   }
-  if (cores <= 2 || memory <= 2) return 'low';
-  if (cores <= 3 || memory <= 4) return 'medium';
-  return 'high';
+  if (cores <= 2 || memory <= 2 || /Android|iPhone|iPad/.test(navigator.userAgent) || softwareRenderer()) return 'low';
+  return 'medium';
 }
 
 /**
@@ -66,6 +83,27 @@ export class Stage {
   private readonly clock = new THREE.Clock();
   private readonly frameHandlers = new Set<(dt: number, time: number) => void>();
   private quality: Quality;
+  private readonly sky = new THREE.HemisphereLight('#f5f3ee', '#6a6761', 0.74);
+  /** The game may lower the quality by itself, until the player chooses one. */
+  private adaptive = true;
+  private slowSpells = 0;
+  /** Told when the game has lowered the quality by itself. */
+  onQualityLowered: ((q: Quality) => void) | null = null;
+  /**
+   * Two lamps that follow the player from room to corridor to stairs. Their number never changes, whatever is on screen:
+   * a light appearing or disappearing would make every material compile again, in the middle of a walk.
+   */
+  private readonly lamps = [new THREE.PointLight('#fff4e4', 6, 9, 1.5), new THREE.PointLight('#fff4e4', 6, 9, 1.5)] as const;
+  private drawnAt = 0;
+  private readonly plainEnvironment: THREE.Texture;
+  /** Shaders are being compiled in the background: drawing now would freeze the page until they are ready. */
+  private preparing = false;
+  private readonly simplified = new WeakMap<THREE.Material, THREE.MeshLambertMaterial>();
+  private awakeUntil = 0;
+  private readonly seenPosition = new THREE.Vector3();
+  private readonly seenAngle = new THREE.Quaternion();
+  private shadowNow = false;
+  private shadowLater = 0;
   private flightId = 0;
   private rigZ = 0;
   private rigY = 0;
@@ -77,7 +115,6 @@ export class Stage {
   private readonly ao: GTAOPass;
   private readonly vignette: ShaderPass;
   private readonly grade: ShaderPass;
-  private shadowTime = 2;
   /** How far the game has lightened itself to stay fluid: 0 is everything on. */
   private relief = 0;
   private sampled = 0;
@@ -89,10 +126,18 @@ export class Stage {
 
   constructor(private readonly container: HTMLElement, quality: Quality) {
     this.quality = quality;
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    try {
+      this.adaptive = localStorage.getItem('patchbay.quality.chosen') === null;
+    } catch {
+      // storage unavailable: keep adapting
+    }
+    // The default graphics chip: asking for the most powerful one would drain a laptop's battery for a game about cables.
+    this.renderer = new THREE.WebGLRenderer({ antialias: quality !== 'low' });
     this.renderer.toneMapping = THREE.NeutralToneMapping;
     this.renderer.toneMappingExposure = 1;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    // Asking the driver for each shader's log makes every compilation wait.
+    this.renderer.debug.checkShaderErrors = import.meta.env.DEV;
     this.renderer.shadowMap.type = THREE.VSMShadowMap;
     // The room stands still: shadows are drawn again only when something in it changes (see `refreshShadows`).
     this.renderer.shadowMap.autoUpdate = false;
@@ -112,15 +157,16 @@ export class Stage {
 
     this.scene.background = new THREE.Color('#9aa3af');
     const pmrem = new THREE.PMREMGenerator(this.renderer);
-    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    this.scene.environmentIntensity = 0.3;
+    this.plainEnvironment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.scene.environment = this.plainEnvironment;
+    this.scene.environmentIntensity = PLAIN_REFLECTIONS;
     pmrem.dispose();
 
     // A room lit by its ceiling panels: little ambient light, so that the shadows stay dark. Each panel makes its own
     // pool of light; two of them cast shadows (one on the bench and the rack, one behind the player, so everything
     // standing on the floor or the bench is grounded). Cool panels against the warm key, and small coloured glows from
     // the machines themselves.
-    this.scene.add(new THREE.HemisphereLight('#f5f3ee', '#6a6761', 0.74));
+    this.scene.add(this.sky);
     this.key = new THREE.SpotLight('#fff1dd', 13, 0, 0.9, 0.9, 1.6);
     this.key.position.set(0.4, 2.95, 0.6);
     this.key.target.position.set(0, 0.8, -0.1);
@@ -156,6 +202,8 @@ export class Stage {
       this.scene.add(glow);
       this.accents.push(glow);
     }
+    this.scene.add(...this.lamps);
+    this.placeLamps();
     this.scene.add(this.level);
     this.scene.add(this.dust);
 
@@ -199,41 +247,154 @@ export class Stage {
     this.setQuality(quality);
     window.addEventListener('resize', () => this.resize());
     this.resize();
-    this.renderer.setAnimationLoop(() => this.frame());
+    this.listenForActivity();
+    this.renderer.setAnimationLoop((now) => this.frame(now));
   }
 
   get currentQuality(): Quality {
     return this.quality;
   }
 
+  /**
+   * High: every effect. Medium: drawn straight to the screen, no post-processing, half the small lights. Low: no shadows
+   * and two lights. Each step down roughly halves what the graphics chip has to do.
+   */
   setQuality(q: Quality): void {
     this.quality = q;
-    this.renderer.setPixelRatio(q === 'low' ? 1 : Math.min(window.devicePixelRatio, q === 'high' ? 2 : 1.5));
+    const full = q === 'high';
+    this.renderer.setPixelRatio(q === 'low' ? 1 : Math.min(window.devicePixelRatio, full ? 1.5 : 1.25));
     this.renderer.shadowMap.enabled = q !== 'low';
     this.key.castShadow = q !== 'low';
     this.frontKey.castShadow = q !== 'low';
-    this.key.shadow.mapSize.set(q === 'high' ? 4096 : 2048, q === 'high' ? 4096 : 2048);
-    this.key.shadow.map?.dispose();
-    this.key.shadow.map = null;
-    this.bloom.enabled = q !== 'low';
-    this.ao.enabled = q !== 'low';
-    this.vignette.enabled = q !== 'low';
+    const size = full ? 2048 : 1024;
+    this.key.shadow.mapSize.set(size, size);
+    this.frontKey.shadow.mapSize.set(1024, 1024);
+    this.key.shadow.blurSamples = this.frontKey.shadow.blurSamples = full ? 16 : 8;
+    for (const light of [this.key, this.frontKey]) {
+      light.shadow.map?.dispose();
+      light.shadow.map = null;
+    }
+    this.bloom.enabled = full;
+    this.ao.enabled = full;
+    this.vignette.enabled = full;
+    this.grade.enabled = full;
+    if (!full) {
+      this.composer.renderTarget1.dispose();
+      this.composer.renderTarget2.dispose();
+    }
     this.dust.visible = q !== 'low';
-    this.grade.enabled = q !== 'low';
     this.relief = 0;
     this.refreshShadows(1);
-    for (const light of this.extraLights) light.visible = q !== 'low';
-    for (const light of this.accents) light.visible = q !== 'low';
+    if (!full && this.scene.environment !== this.plainEnvironment) {
+      this.scene.environment?.dispose();
+      this.scene.environment = this.plainEnvironment;
+      this.scene.environmentIntensity = PLAIN_REFLECTIONS;
+    } else if (full && this.scene.getObjectByName('technical-room')) {
+      this.captureEnvironment();
+    }
+    this.setSimple(q === 'low');
+    // Fewer lights, the sky making up for them: a light costs on every pixel of the screen.
+    for (const light of this.extraLights) light.visible = full;
+    for (const light of this.accents) light.visible = full;
+    this.sky.intensity = full ? 0.74 : q === 'medium' ? 0.74 : 1.2;
     this.scene.traverse((o) => {
       const m = (o as THREE.Mesh).material as THREE.Material | undefined;
-      if (m) m.needsUpdate = true;
+      if (m && !Array.isArray(m)) m.needsUpdate = true;
     });
     this.resize();
   }
 
-  /** Draw the shadows again for this long: something in the room has just changed. */
+  /** Where the two lamps go, and how strong they are: [x, y, z, power]. By default, over the technical room. */
+  placeLamps(a: readonly [number, number, number, number] = [2.2, 2.9, 0.3, 4], b: readonly [number, number, number, number] = [-1.5, 2.9, 2.2, 4]): void {
+    [a, b].forEach(([x, y, z, power], i) => {
+      const lamp = this.lamps[i] as THREE.PointLight;
+      lamp.position.set(x, y, z);
+      lamp.intensity = power;
+    });
+  }
+
+  /** Compile what is in the scene without freezing the page. Nothing is drawn until it is done. */
+  async prepare(): Promise<void> {
+    this.preparing = true;
+    try {
+      await this.renderer.compileAsync(this.scene, this.camera);
+    } catch {
+      // the first frame will compile what is left
+    }
+    this.preparing = false;
+    this.wake();
+  }
+
+  /** Low quality: the plainest lit material on everything, many times cheaper to draw on a weak graphics chip. */
+  private setSimple(on: boolean): void {
+    this.scene.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      if (on) this.simplify(mesh);
+      else if (mesh.userData.fullMaterial) {
+        mesh.material = mesh.userData.fullMaterial as THREE.Material;
+        delete mesh.userData.fullMaterial;
+      }
+    });
+  }
+
+  private simplify(mesh: THREE.Mesh): void {
+    const full = mesh.material as THREE.MeshStandardMaterial;
+    if (!full.isMeshStandardMaterial) return;
+    let plain = this.simplified.get(full);
+    if (!plain) {
+      plain = new THREE.MeshLambertMaterial({
+        map: full.map,
+        color: full.color,
+        emissive: full.emissive,
+        emissiveMap: full.emissiveMap,
+        emissiveIntensity: full.emissiveIntensity,
+        transparent: full.transparent,
+        opacity: full.opacity,
+        side: full.side,
+        alphaTest: full.alphaTest,
+        depthWrite: full.depthWrite,
+      });
+      this.simplified.set(full, plain);
+    }
+    mesh.userData.fullMaterial = full;
+    mesh.material = plain;
+  }
+
+  /** The player's own choice: it is kept, and the game no longer changes it. */
+  chooseQuality(q: Quality): void {
+    this.adaptive = false;
+    this.setQuality(q);
+    try {
+      localStorage.setItem('patchbay.quality', q);
+      localStorage.setItem('patchbay.quality.chosen', '1');
+    } catch {
+      // storage unavailable: the choice lasts until the page closes
+    }
+  }
+
+  /** Something on screen is moving or about to: leave the rest pace. */
+  wake(): void {
+    this.awakeUntil = performance.now() + REST_AFTER;
+  }
+
+  /** Only what can change the 3D view wakes it: typing in a console or moving over a panel does not. */
+  private listenForActivity(): void {
+    const canvas = this.renderer.domElement;
+    const onCanvas = (e: Event): void => {
+      if (e.target === canvas) this.wake();
+    };
+    for (const name of ['pointermove', 'wheel', 'touchmove'] as const) document.addEventListener(name, onCanvas, { passive: true });
+    document.addEventListener('pointerdown', () => this.wake(), { passive: true });
+    document.addEventListener('keydown', (e) => {
+      if (!(e.target as HTMLElement).closest?.('input, textarea')) this.wake();
+    });
+  }
+
+  /** Draw the shadows again now, and once more when what has just changed has settled, `seconds` from now. */
   refreshShadows(seconds = 1): void {
-    this.shadowTime = Math.max(this.shadowTime, seconds);
+    this.shadowNow = true;
+    this.shadowLater = Math.max(this.shadowLater, performance.now() + seconds * 1000);
   }
 
   /**
@@ -251,33 +412,40 @@ export class Stage {
     this.scene.updateMatrixWorld(true);
     this.scene.environment = target.texture;
     this.scene.environmentIntensity = 0.75;
-    (previous as THREE.Texture | null)?.dispose();
+    if (previous !== this.plainEnvironment) previous?.dispose();
     pmrem.dispose();
   }
 
-  /** Stay fluid on the machine it is given: when the frame rate stays low, give up what costs most, one step at a time. */
-  private adapt(dt: number): void {
-    if (this.quality === 'low' || dt >= 0.1) return;
-    this.sampled += dt;
+  /** Stay fluid on the machine it is given: when a mission stays slow, step down, and start there next time. */
+  private adapt(gap: number): void {
+    if (!this.adaptive || gap > 0.5) return;
+    this.sampled += gap;
     this.frames++;
-    if (this.sampled < 2.5) return;
+    if (this.sampled < 3) return;
     const fps = this.frames / this.sampled;
     this.sampled = 0;
     this.frames = 0;
-    if (fps >= 50 || this.relief >= 3) return;
-    this.relief++;
-    if (this.relief === 1) {
-      this.ao.enabled = false;
-    } else if (this.relief === 2) {
-      this.renderer.setPixelRatio(1);
+    // Behind the menus the pace is lower by design: only a really slow machine counts as slow there.
+    if (fps >= (this.manualCamera ? 40 : 15)) {
+      this.slowSpells = 0;
+      return;
+    }
+    if (++this.slowSpells < 2) return;
+    this.slowSpells = 0;
+    if (this.quality === 'low') {
+      if (this.relief > 0) return;
+      this.relief = 1;
+      this.renderer.setPixelRatio(0.75);
       this.resize();
-    } else {
-      this.frontKey.castShadow = false;
-      this.scene.traverse((o) => {
-        const m = (o as THREE.Mesh).material as THREE.Material | undefined;
-        if (m && !Array.isArray(m)) m.needsUpdate = true;
-      });
-      this.refreshShadows(1);
+      return;
+    }
+    const lower: Quality = this.quality === 'high' ? 'medium' : 'low';
+    this.setQuality(lower);
+    this.onQualityLowered?.(lower);
+    try {
+      localStorage.setItem('patchbay.quality', lower);
+    } catch {
+      // storage unavailable: detect again next time
     }
   }
 
@@ -291,7 +459,9 @@ export class Stage {
   animate(seconds: number, step: (t: number) => void): Promise<void> {
     return new Promise((resolve) => {
       let elapsed = 0;
+      this.wake();
       const stop = this.onFrame((dt) => {
+        this.wake();
         elapsed += dt;
         const t = Math.min(1, elapsed / seconds);
         step(easeInOut(t));
@@ -348,13 +518,20 @@ export class Stage {
     });
   }
 
+  /**
+   * Materials are not disposed of: that would throw away their compiled shaders, and the next mission would compile them
+   * all over again. Textures are, for the screens and boards of each mission; one used again is simply sent back.
+   */
   clearLevel(): void {
+    const textures = new Set<THREE.Texture>();
     this.level.traverse((o) => {
       const mesh = o as THREE.Mesh;
+      (o as THREE.InstancedMesh).dispose?.();
       mesh.geometry?.dispose();
-      const mats = Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : [];
-      for (const m of mats) m.dispose();
+      const material = mesh.material as THREE.MeshStandardMaterial | undefined;
+      if (material?.map) textures.add(material.map);
     });
+    for (const texture of textures) texture.dispose();
     this.level.clear();
     this.refreshShadows(2);
   }
@@ -379,7 +556,13 @@ export class Stage {
     this.camera.updateProjectionMatrix();
   }
 
-  private frame(): void {
+  private frame(now: number): void {
+    if (this.preparing) return;
+    const awake = now < this.awakeUntil;
+    const pace = !awake ? REST_FPS : this.manualCamera ? ACTIVE_FPS : MENU_FPS;
+    if (now - this.drawnAt < 1000 / pace - 2) return;
+    const gap = (now - this.drawnAt) / 1000;
+    this.drawnAt = now;
     const dt = Math.min(this.clock.getDelta(), 0.1);
     const time = this.clock.elapsedTime;
     for (const fn of [...this.frameHandlers]) fn(dt, time);
@@ -387,12 +570,25 @@ export class Stage {
     this.dust.position.y = Math.sin(time * 0.1) * 0.04 + this.rigY;
     this.dust.position.z = 1 + this.rigZ;
     if (!this.manualCamera) this.controls.update();
-    if (this.shadowTime > 0) {
-      this.renderer.shadowMap.needsUpdate = true;
-      this.shadowTime -= dt;
+    if (this.camera.position.distanceToSquared(this.seenPosition) > 1e-8 || this.camera.quaternion.angleTo(this.seenAngle) > 1e-4) {
+      this.seenPosition.copy(this.camera.position);
+      this.seenAngle.copy(this.camera.quaternion);
+      this.wake();
     }
-    this.adapt(dt);
-    if (this.quality === 'low') this.renderer.render(this.scene, this.camera);
-    else this.composer.render(dt);
+    const due = this.shadowLater > 0 && now >= this.shadowLater;
+    if (this.shadowNow || due) {
+      this.renderer.shadowMap.needsUpdate = true;
+      this.shadowNow = false;
+      if (due) this.shadowLater = 0;
+    }
+    if (awake) this.adapt(gap);
+    // What has just been built or lit comes with its full material.
+    if (this.quality === 'low') {
+      this.scene.traverseVisible((o) => {
+        if ((o as THREE.Mesh).isMesh && !(o as THREE.Mesh).userData.fullMaterial) this.simplify(o as THREE.Mesh);
+      });
+    }
+    if (this.quality === 'high') this.composer.render(dt);
+    else this.renderer.render(this.scene, this.camera);
   }
 }

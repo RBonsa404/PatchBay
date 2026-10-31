@@ -451,7 +451,7 @@ function wallItems(): THREE.Group {
   // The club's logo in a navy frame (its white background would wash out under the lights), and its name above the rack.
   const logoTex = new THREE.TextureLoader().load(clubLogoUrl);
   logoTex.colorSpace = THREE.SRGBColorSpace;
-  logoTex.anisotropy = 8;
+  logoTex.anisotropy = 4;
   const frame = box(0.66, 0.66, 0.02, new THREE.MeshStandardMaterial({ color: '#0b1e3f', roughness: 0.6 }));
   frame.position.set(1.3, 1.72, z + 0.01);
   const logo = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.6), new THREE.MeshStandardMaterial({ map: logoTex, color: '#b4b4b4', roughness: 0.9, envMapIntensity: 0 }));

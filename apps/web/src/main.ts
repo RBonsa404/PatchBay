@@ -32,10 +32,11 @@ if (!document.createElement('canvas').getContext('webgl2')) {
 const stage = new Stage(document.getElementById('stage') as HTMLElement, detectQuality());
 stage.scene.add(buildRoom());
 onPropAppeared(() => stage.refreshShadows(1));
-stage.captureEnvironment();
-// Once the photo textures are in, the reflections are taken again from the finished room.
-setTimeout(() => stage.captureEnvironment(), 2500);
-document.getElementById('boot')?.remove();
+if (stage.currentQuality === 'high') {
+  stage.captureEnvironment();
+  // Once the photo textures are in, the reflections are taken again from the finished room.
+  setTimeout(() => stage.captureEnvironment(), 2500);
+}
 
 /** A message on top of whatever screen is shown (outside missions, which have their own toasts). */
 function notify(text: string): void {
@@ -56,6 +57,7 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
 }
 
 let mission: Mission | null = null;
+const bootScreen = document.getElementById('boot') as HTMLElement;
 let stopShowcase: (() => void) | null = null;
 
 /** Behind the menus: the first level's gear on the bench, and a slow camera sweep across the room. */
@@ -104,19 +106,31 @@ function briefing(index: number): void {
 }
 
 function play(index: number, exam = false): void {
-  endShowcase();
+  // A screen first, painted before the work starts: the mission is built, then its shaders compiled in the background.
+  const loading = bootScreen.cloneNode(true) as HTMLElement;
+  document.body.append(loading);
   sound.setMood('mission');
-  mission?.dispose();
-  const level = campaign[index] as Level;
-  mission = new Mission(stage, level, {
-    complete: (result) => {
-      if (exam) progress.recordExam(level.id, result.total);
-      else progress.record(level.id, result.total);
-      const next = index + 1 < campaign.length ? () => briefing(index + 1) : undefined;
-      showResults(level, result, { ...(next ? { next } : {}), retry: () => play(index, exam), menu: missions });
-    },
-    menu: missions,
-  }, index, exam);
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      endShowcase();
+      mission?.dispose();
+      const level = campaign[index] as Level;
+      const started = new Mission(stage, level, {
+        complete: (result) => {
+          if (exam) progress.recordExam(level.id, result.total);
+          else progress.record(level.id, result.total);
+          const next = index + 1 < campaign.length ? () => briefing(index + 1) : undefined;
+          showResults(level, result, { ...(next ? { next } : {}), retry: () => play(index, exam), menu: missions });
+        },
+        menu: missions,
+      }, index, exam);
+      mission = started;
+      void stage.prepare().then(() => {
+        started.startClock();
+        loading.remove();
+      });
+    });
+  });
 }
 
 // Development only: lets automated checks find where a port is on screen. Stripped from production builds.
@@ -140,3 +154,4 @@ if (import.meta.env.DEV) {
 }
 
 title();
+void stage.prepare().then(() => bootScreen.remove());
