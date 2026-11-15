@@ -610,7 +610,7 @@ export function buildPatchPanel(id: string, ports: { name: string; label: string
  * The operator's box (NTU) on the back wall of a site, right of the rack: where a leased line comes in. Its one serial
  * socket takes the router's V.35 cable; the line to the other site is the operator's.
  */
-export function buildNtu(id: string, ports: { name: string; label: string }[], roomZ = 0, roomY = 0): DeviceView {
+export function buildNtu(id: string, ports: { name: string; label: string }[], roomZ = 0, roomY = 0, slot = 0): DeviceView {
   const m = materials();
   const view: DeviceView = { id, shape: 'switch', root: new THREE.Group(), ports: new Map(), body: [], height: 0.17, width: 0.24, depth: 0.055, inRack: false, roomZ, roomY };
   view.root.name = id;
@@ -623,7 +623,8 @@ export function buildNtu(id: string, ports: { name: string; label: string }[], r
     ports.forEach((p, i) => view.ports.set(p.name, addSocket(view.root, m, id, { name: p.name, kind: 'serial' }, -0.05 + i * 0.1, 0.045, 0.03, 'none')));
   }
   // On the wall behind the bench, just right of the rack, at hand height (clear of the posters above).
-  view.root.position.set(0.8, 0.95 + roomY, -1.6 + 0.034 + roomZ);
+  // A second operator's box (another line) goes beside the first.
+  view.root.position.set(0.8 + slot * 0.5, 0.95 + roomY, -1.6 + 0.034 + roomZ);
   // The wall trunking beside it, white PVC with its lid, from the overhead tray down to just under the box: the
   // operator's line and the router's cable both run inside it.
   const pvc = new THREE.MeshStandardMaterial({ color: '#eef0f2', roughness: 0.5 });

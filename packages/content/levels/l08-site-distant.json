@@ -79,10 +79,11 @@
         "en": "Internet provider's router"
       },
       "position": [
-        -0.62,
-        0.76,
-        -0.05
-      ]
+        0,
+        0.9,
+        -0.4
+      ],
+      "room": "datacenter"
     },
     {
       "id": "R2",
@@ -126,7 +127,8 @@
       {
         "type": "serial",
         "a": "FAI:Serial0/0/0",
-        "b": "R1:Serial0/0/0"
+        "b": "R1:Serial0/0/0",
+        "leased": true
       },
       {
         "type": "straight",
@@ -462,9 +464,18 @@
       "kind": "ntu"
     },
     {
+      "id": "NTU-FAI",
+      "kind": "ntu"
+    },
+    {
       "id": "NTU2",
       "kind": "ntu",
       "room": "agence"
+    },
+    {
+      "id": "NTU-OP",
+      "kind": "ntu",
+      "room": "datacenter"
     }
   ],
   "patchLinks": [
@@ -478,6 +489,18 @@
       "labelB": {
         "fr": "Ligne louée vers le campus",
         "en": "Leased line to the campus"
+      }
+    },
+    {
+      "a": "NTU-FAI:LS1",
+      "b": "NTU-OP:LS1",
+      "label": {
+        "fr": "Ligne louée vers l'opérateur",
+        "en": "Leased line to the carrier"
+      },
+      "labelB": {
+        "fr": "Ligne louée vers le campus de l’IST",
+        "en": "Leased line to the IST campus"
       }
     }
   ]

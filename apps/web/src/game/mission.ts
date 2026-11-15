@@ -220,13 +220,15 @@ export class Mission {
     for (const panel of level.panels ?? []) {
       const origin = ORIGINS[panel.room ?? ''] as Origin;
       const ports = (level.patchLinks ?? []).flatMap((l) => [l.a, l.b]).filter((e) => e.startsWith(`${panel.id}:`)).map((e) => ({ name: e.split(':')[1] as string, label: patchLabel(level, e) }));
-      const view = panel.kind === 'ntu' ? buildNtu(panel.id, ports, origin.z, origin.y) : buildPatchPanel(panel.id, ports, origin.z, origin.y);
+      const slot = (level.panels ?? []).filter((p) => p.kind === 'ntu' && (p.room ?? '') === (panel.room ?? '') && this.ntus.has(p.id)).length;
+      const view = panel.kind === 'ntu' ? buildNtu(panel.id, ports, origin.z, origin.y, slot) : buildPatchPanel(panel.id, ports, origin.z, origin.y);
       if (panel.kind === 'ntu') this.ntus.add(panel.id);
       this.panels.set(panel.id, view);
       stage.level.add(view.root);
       this.inPart(panel.room, view.root);
       this.picks.push(...view.body, ...[...view.ports.values()].map((p) => p.hit));
     }
+    this.leasedCords();
     const racked = [...this.devices.values(), ...this.panels.values()];
     for (const room of rooms) {
       const origin = ORIGINS[room] as Origin;
@@ -872,6 +874,32 @@ export class Mission {
   /** The operator's boxes: a cord to one is a router's serial cable, two of them joined make a leased line. */
   private readonly ntus = new Set<string>();
 
+  /**
+   * A leased line already in service when the mission starts: what shows is each router's serial cable to the
+   * operator's box of its own site, the two boxes joined by the operator.
+   */
+  private leasedCords(): void {
+    const roomOf = (id: string): string => this.level.devices.find((d) => d.id === id)?.room ?? this.level.panels?.find((p) => p.id === id)?.room ?? '';
+    for (const cable of this.net.cables) {
+      if (!cable.leased) continue;
+      const link = (this.level.patchLinks ?? []).find((l) => {
+        const [pa, pb] = [l.a.split(':')[0] as string, l.b.split(':')[0] as string];
+        return this.ntus.has(pa) && this.ntus.has(pb) && ((roomOf(pa) === roomOf(cable.a.device) && roomOf(pb) === roomOf(cable.b.device)) || (roomOf(pb) === roomOf(cable.a.device) && roomOf(pa) === roomOf(cable.b.device)));
+      });
+      if (!link) continue;
+      const box = (end: string): PortView | undefined => this.panels.get(end.split(':')[0] as string)?.ports.get(end.split(':')[1] as string);
+      const [boxA, boxB] = roomOf(link.a.split(':')[0] as string) === roomOf(cable.a.device) ? [box(link.a), box(link.b)] : [box(link.b), box(link.a)];
+      const [endA, endB] = [this.devices.get(cable.a.device)?.ports.get(cable.a.port), this.devices.get(cable.b.device)?.ports.get(cable.b.port)];
+      if (!boxA || !boxB || !endA || !endB || this.cords.some((c) => c.panel === boxA || c.panel === boxB)) continue;
+      this.cords.push({ type: 'serial', end: endA, panel: boxA }, { type: 'serial', end: endB, panel: boxB });
+      // Two cords stand for that one cable of the start: the inventory counts both as already in place.
+      this.startCords++;
+    }
+  }
+
+  /** Extra cords in place at the start: each leased line already in service shows two cords for one cable. */
+  private startCords = 0;
+
   /** The sites this mission's equipment stands in: the campus, and maybe the agency or the operator's data centre. */
   private sites(): SiteName[] {
     const rooms = new Set([...this.level.devices.map((d) => d.room ?? ''), ...(this.level.panels ?? []).map((p) => p.room ?? '')]);
@@ -1458,7 +1486,7 @@ export class Mission {
   // ---- state -----------------------------------------------------------------------------------------------------
 
   private left(type: CableType): number {
-    const initial = this.level.initial.cables.filter((c) => c.type === type).length;
+    const initial = this.level.initial.cables.filter((c) => c.type === type).length + (type === 'serial' ? this.startCords : 0);
     // A joined pair of cords is one network cable but two cords taken from the inventory.
     const used = this.net.cables.filter((c) => c.type === type && !this.cordOf(c.a)).length - initial + this.cords.filter((c) => c.type === type).length;
     return Math.max(0, (this.level.inventory.cables[type] ?? 0) - used);

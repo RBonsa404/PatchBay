@@ -329,11 +329,12 @@ describe('level 9: troubleshooting', () => {
     expect(ev.results.filter((r) => r.passed).map((r) => r.id)).toEqual([]);
   });
 
-  it('hides the area mismatch behind the missing clock', () => {
+  it('hides the area mismatch behind the line left shut down', () => {
     const net = buildLevel(level);
+    expect(resultOf(net, level, 'wan-up').passed).toBe(false);
     net.device('R1').cli!.execute('configure terminal');
     net.device('R1').cli!.execute('interface s0/0/1');
-    net.device('R1').cli!.execute('clock rate 128000');
+    net.device('R1').cli!.execute('no shutdown');
     expect(resultOf(net, level, 'wan-up').passed).toBe(true);
     expect(resultOf(net, level, 'neighbors').passed).toBe(false);
   });

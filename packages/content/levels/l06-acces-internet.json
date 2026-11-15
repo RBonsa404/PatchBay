@@ -10,8 +10,8 @@
     "en": "The club finally has its Internet subscription. The provider delivered its router into our technical room, with a serial line and a small block of six public addresses. Trouble is, our PCs have private addresses the Internet cannot reach. Make R1 the club's way out: addresses handed out automatically, address translation for everyone, and one fixed public address to publish the club's website."
   },
   "brief": {
-    "fr": "Salle technique : R1 et S1 dans la baie, PC1, le serveur web du club SRV (192.168.10.5), le routeur du FAI et un serveur qui joue Internet (203.0.113.10, web et DNS). R1 Gi0/0 est déjà en 192.168.10.1/24. Le FAI est configuré : n'y touche pas.\n1. Câble S1 Gi0/1 → R1 Gi0/0, PC1 → S1 Fa0/1, SRV → S1 Fa0/2, et la liaison série FAI S0/0/0 (DCE) → R1 S0/0/0.\n2. R1 S0/0/0 : 198.51.100.2/29 (le FAI est en .1), no shutdown. Route par défaut vers 198.51.100.1.\n3. DHCP sur R1 : adresses .1 à .10 exclues, pool CLUB (192.168.10.0/24, passerelle 192.168.10.1, DNS 203.0.113.10). Puis ipconfig /renew sur PC1.\n4. NAT : ip nat inside sur Gi0/0, ip nat outside sur S0/0/0. PAT pour le réseau 192.168.10.0/24 (liste 1) sur l'adresse de S0/0/0. NAT statique 192.168.10.5 ↔ 198.51.100.5 pour le serveur.\n5. Vérifie : PC1 ouvre http://203.0.113.10, Internet ouvre http://198.51.100.5, show ip nat translations. Sauvegarde R1.",
-    "en": "Technical room: R1 and S1 in the rack, PC1, the club web server SRV (192.168.10.5), the ISP's router and a server standing in for the Internet (203.0.113.10, web and DNS). R1 Gi0/0 is already 192.168.10.1/24. The ISP router is configured: leave it alone.\n1. Cable S1 Gi0/1 → R1 Gi0/0, PC1 → S1 Fa0/1, SRV → S1 Fa0/2, and the serial line ISP S0/0/0 (DCE) → R1 S0/0/0.\n2. R1 S0/0/0: 198.51.100.2/29 (the ISP is .1), no shutdown. Default route to 198.51.100.1.\n3. DHCP on R1: .1 to .10 excluded, pool CLUB (192.168.10.0/24, gateway 192.168.10.1, DNS 203.0.113.10). Then ipconfig /renew on PC1.\n4. NAT: ip nat inside on Gi0/0, ip nat outside on S0/0/0. PAT for 192.168.10.0/24 (list 1) on S0/0/0's address. Static NAT 192.168.10.5 ↔ 198.51.100.5 for the server.\n5. Check: PC1 opens http://203.0.113.10, the Internet opens http://198.51.100.5, show ip nat translations. Save R1."
+    "fr": "Salle technique : R1 et S1 dans la baie, PC1, le serveur web du club SRV (192.168.10.5), et, au centre de données de l'opérateur, le routeur du FAI et un serveur qui joue Internet (203.0.113.10, web et DNS) ; « Changer de site » (G) pour y aller. R1 Gi0/0 est déjà en 192.168.10.1/24. Le FAI est configuré : n'y touche pas.\n1. Câble S1 Gi0/1 → R1 Gi0/0, PC1 → S1 Fa0/1, SRV → S1 Fa0/2, et la ligne louée : au centre de données, FAI S0/0/0 → boîtier de l'opérateur ; au campus, R1 S0/0/0 → boîtier « vers l'opérateur ». L'opérateur donne l'horloge.\n2. R1 S0/0/0 : 198.51.100.2/29 (le FAI est en .1), no shutdown. Route par défaut vers 198.51.100.1.\n3. DHCP sur R1 : adresses .1 à .10 exclues, pool CLUB (192.168.10.0/24, passerelle 192.168.10.1, DNS 203.0.113.10). Puis ipconfig /renew sur PC1.\n4. NAT : ip nat inside sur Gi0/0, ip nat outside sur S0/0/0. PAT pour le réseau 192.168.10.0/24 (liste 1) sur l'adresse de S0/0/0. NAT statique 192.168.10.5 ↔ 198.51.100.5 pour le serveur.\n5. Vérifie : PC1 ouvre http://203.0.113.10, Internet ouvre http://198.51.100.5, show ip nat translations. Sauvegarde R1.",
+    "en": "Technical room: R1 and S1 in the rack, PC1, the club web server SRV (192.168.10.5), and, at the carrier's data centre, the ISP's router and a server standing in for the Internet (203.0.113.10, web and DNS); « Changer de site » (G) to go there. R1 Gi0/0 is already 192.168.10.1/24. The ISP router is configured: leave it alone.\n1. Cable S1 Gi0/1 → R1 Gi0/0, PC1 → S1 Fa0/1, SRV → S1 Fa0/2, and the leased line: at the data centre, ISP S0/0/0 → the carrier's box; at the campus, R1 S0/0/0 → the « to the carrier » box. The carrier supplies the clock.\n2. R1 S0/0/0: 198.51.100.2/29 (the ISP is .1), no shutdown. Default route to 198.51.100.1.\n3. DHCP on R1: .1 to .10 excluded, pool CLUB (192.168.10.0/24, gateway 192.168.10.1, DNS 203.0.113.10). Then ipconfig /renew on PC1.\n4. NAT: ip nat inside on Gi0/0, ip nat outside on S0/0/0. PAT for 192.168.10.0/24 (list 1) on S0/0/0's address. Static NAT 192.168.10.5 ↔ 198.51.100.5 for the server.\n5. Check: PC1 opens http://203.0.113.10, the Internet opens http://198.51.100.5, show ip nat translations. Save R1."
   },
   "difficulty": 4,
   "timeLimit": 2100,
@@ -92,10 +92,11 @@
         "en": "Internet provider's router"
       },
       "position": [
-        0.62,
-        0.76,
-        -0.05
-      ]
+        0,
+        0.9,
+        -0.4
+      ],
+      "room": "datacenter"
     },
     {
       "id": "EXT",
@@ -105,10 +106,11 @@
         "en": "Server on the Internet (web and DNS)"
       },
       "position": [
-        1.25,
+        -0.62,
         0.76,
-        0.42
-      ]
+        -0.05
+      ],
+      "room": "datacenter"
     }
   ],
   "inventory": {
@@ -116,7 +118,7 @@
       "straight": 4,
       "crossover": 2,
       "console": 1,
-      "serial": 1
+      "serial": 2
     }
   },
   "initial": {
@@ -195,16 +197,17 @@
       "cable": {
         "type": "serial",
         "a": "FAI:Serial0/0/0",
-        "b": "R1:Serial0/0/0"
+        "b": "R1:Serial0/0/0",
+        "leased": true
       },
       "points": 8,
       "label": {
-        "fr": "Liaison série vers le FAI, côté DCE chez le FAI",
-        "en": "Serial link to the ISP, DCE end at the ISP"
+        "fr": "Ligne louée FAI S0/0/0 ↔ R1 S0/0/0, par les boîtiers de l'opérateur",
+        "en": "Leased line ISP S0/0/0 ↔ R1 S0/0/0, through the carrier's boxes"
       },
       "hint": {
-        "fr": "C'est le fournisseur qui donne l'horloge : l'extrémité DCE du câble se branche sur son routeur.",
-        "en": "The provider supplies the clock: the cable's DCE end goes into its router."
+        "fr": "Un câble série à chaque bout : au centre de données, du routeur du FAI (S0/0/0) au boîtier ; au campus, de R1 S0/0/0 au boîtier « Ligne louée vers l'opérateur ».",
+        "en": "A serial cable at each end: at the data centre, from the ISP's router (S0/0/0) to the box; at the campus, from R1 S0/0/0 to the « leased line to the carrier » box."
       }
     },
     {
@@ -218,8 +221,8 @@
         "en": "Serial link up/up"
       },
       "hint": {
-        "fr": "no shutdown sur S0/0/0 de R1. Le FAI a déjà réglé son horloge.",
-        "en": "no shutdown on R1 S0/0/0. The ISP has already set its clock."
+        "fr": "no shutdown sur S0/0/0 de R1. Sur une ligne louée, c’est l’opérateur qui donne l’horloge.",
+        "en": "no shutdown on R1 S0/0/0. On a leased line, the carrier supplies the clock."
       }
     },
     {
@@ -432,7 +435,8 @@
       {
         "type": "serial",
         "a": "FAI:Serial0/0/0",
-        "b": "R1:Serial0/0/0"
+        "b": "R1:Serial0/0/0",
+        "leased": true
       },
       {
         "type": "straight",
@@ -478,5 +482,30 @@
     "renew": [
       "PC1"
     ]
-  }
+  },
+  "panels": [
+    {
+      "id": "NTU-FAI",
+      "kind": "ntu"
+    },
+    {
+      "id": "NTU-OP",
+      "kind": "ntu",
+      "room": "datacenter"
+    }
+  ],
+  "patchLinks": [
+    {
+      "a": "NTU-FAI:LS1",
+      "b": "NTU-OP:LS1",
+      "label": {
+        "fr": "Ligne louée vers l'opérateur",
+        "en": "Leased line to the carrier"
+      },
+      "labelB": {
+        "fr": "Ligne louée vers le campus de l’IST",
+        "en": "Leased line to the IST campus"
+      }
+    }
+  ]
 }

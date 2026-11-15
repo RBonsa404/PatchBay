@@ -10,8 +10,8 @@
     "en": "A rough weekend: a power cut, a well-meaning intern who « tried something » on R2 without saving, and R1 rebooting on an old configuration. On Monday morning, the support inbox overflows. The campus and branch network is the one you built, but something is wrong in several places. This time nobody tells you what to type: start from the symptoms, test layer by layer, and fix."
   },
   "brief": {
-    "fr": "Même réseau qu'à la mission 8 : campus (R1, S1, PC1 192.168.10.10), FAI (Internet en 203.0.113.1), agence (R2, PC2 192.168.30.10) reliée par la ligne louée R1 S0/0/1 (DCE) – R2 S0/0/0, OSPF zone 0 au campus et zone 1 pour l'agence. Tout est branché.\nTickets ouverts :\n1. PC1 : « Câble réseau débranché », alors que le câble est bien là.\n2. Agence : plus rien ne passe vers le campus depuis le redémarrage de R1.\n3. Agence : même quand la ligne remonte, R2 n'apprend aucune route.\n4. PC2 : « Impossible de joindre l'hôte » vers tout ce qui n'est pas dans l'agence.\n5. Agence : le campus répond, mais pas Internet.\nMéthode : couche 1 (câbles, voyants, show ip interface brief), couche 2-3 (adresses, ipconfig, show ip ospf neighbor, show ip route), puis services (show ip nat translations). Sauvegarde chaque routeur corrigé.",
-    "en": "Same network as mission 8: campus (R1, S1, PC1 192.168.10.10), ISP (Internet at 203.0.113.1), branch (R2, PC2 192.168.30.10) joined by the leased line R1 S0/0/1 (DCE) – R2 S0/0/0, OSPF area 0 at the campus and area 1 for the branch. Everything is plugged in.\nOpen tickets:\n1. PC1: « Network cable unplugged », although the cable is there.\n2. Branch: nothing gets through to the campus since R1 rebooted.\n3. Branch: even when the line comes back, R2 learns no route.\n4. PC2: « Destination host unreachable » to anything outside the branch.\n5. Branch: the campus answers, the Internet doesn't.\nMethod: layer 1 (cables, LEDs, show ip interface brief), layers 2-3 (addresses, ipconfig, show ip ospf neighbor, show ip route), then services (show ip nat translations). Save each router you fix."
+    "fr": "Même réseau qu'à la mission 8 : campus (R1, S1, PC1 192.168.10.10), FAI (Internet en 203.0.113.1), agence (R2, PC2 192.168.30.10) reliée par la ligne louée R1 S0/0/1 – R2 S0/0/0 (boîtiers de l'opérateur) ; le FAI est au centre de données de l'opérateur, OSPF zone 0 au campus et zone 1 pour l'agence. Tout est branché.\nTickets ouverts :\n1. PC1 : « Câble réseau débranché », alors que le câble est bien là.\n2. Agence : plus rien ne passe vers le campus depuis le redémarrage de R1.\n3. Agence : même quand la ligne remonte, R2 n'apprend aucune route.\n4. PC2 : « Impossible de joindre l'hôte » vers tout ce qui n'est pas dans l'agence.\n5. Agence : le campus répond, mais pas Internet.\nMéthode : couche 1 (câbles, voyants, show ip interface brief), couche 2-3 (adresses, ipconfig, show ip ospf neighbor, show ip route), puis services (show ip nat translations). Sauvegarde chaque routeur corrigé.",
+    "en": "Same network as mission 8: campus (R1, S1, PC1 192.168.10.10), ISP (Internet at 203.0.113.1), branch (R2, PC2 192.168.30.10) joined by the leased line R1 S0/0/1 – R2 S0/0/0 (carrier's boxes), the ISP at the carrier's data centre, OSPF area 0 at the campus and area 1 for the branch. Everything is plugged in.\nOpen tickets:\n1. PC1: « Network cable unplugged », although the cable is there.\n2. Branch: nothing gets through to the campus since R1 rebooted.\n3. Branch: even when the line comes back, R2 learns no route.\n4. PC2: « Destination host unreachable » to anything outside the branch.\n5. Branch: the campus answers, the Internet doesn't.\nMethod: layer 1 (cables, LEDs, show ip interface brief), layers 2-3 (addresses, ipconfig, show ip ospf neighbor, show ip route), then services (show ip nat translations). Save each router you fix."
   },
   "difficulty": 5,
   "timeLimit": 1800,
@@ -79,10 +79,11 @@
         "en": "Internet provider's router"
       },
       "position": [
-        -0.62,
-        0.76,
-        -0.05
-      ]
+        0,
+        0.9,
+        -0.4
+      ],
+      "room": "datacenter"
     },
     {
       "id": "R2",
@@ -92,10 +93,11 @@
         "en": "Bobo-Dioulasso branch router"
       },
       "position": [
-        0.62,
-        0.76,
-        -0.05
-      ]
+        0,
+        0.9,
+        -0.4
+      ],
+      "room": "agence"
     },
     {
       "id": "PC2",
@@ -105,10 +107,11 @@
         "en": "Branch PC"
       },
       "position": [
-        1.25,
+        -0.6,
         0.76,
         0.42
-      ]
+      ],
+      "room": "agence"
     }
   ],
   "inventory": {
@@ -124,7 +127,8 @@
       {
         "type": "serial",
         "a": "FAI:Serial0/0/0",
-        "b": "R1:Serial0/0/0"
+        "b": "R1:Serial0/0/0",
+        "leased": true
       },
       {
         "type": "straight",
@@ -139,7 +143,8 @@
       {
         "type": "serial",
         "a": "R1:Serial0/0/1",
-        "b": "R2:Serial0/0/0"
+        "b": "R2:Serial0/0/0",
+        "leased": true
       },
       {
         "type": "crossover",
@@ -174,7 +179,7 @@
         "no shutdown",
         "interface s0/0/1",
         "ip address 10.0.0.1 255.255.255.252",
-        "no shutdown",
+        "shutdown",
         "exit",
         "ip route 0.0.0.0 0.0.0.0 198.51.100.1",
         "access-list 1 permit 192.168.10.0 0.0.0.255",
@@ -272,8 +277,8 @@
         "en": "Ticket 2: the leased line is back up (up/up)"
       },
       "hint": {
-        "fr": "show ip interface brief sur R1 : S0/0/1 « up/down » ? Sur une liaison série, le côté DCE (celui où est branché le bout DCE du câble) doit donner l'horloge, et la configuration d'avant le redémarrage n'avait pas été sauvegardée.",
-        "en": "show ip interface brief on R1: S0/0/1 « up/down »? On a serial link the DCE end (where the cable's DCE end is plugged) must supply the clock, and the configuration before the reboot had not been saved."
+        "fr": "show ip interface brief sur R1 : S0/0/1 « administratively down » ? L'ancienne configuration la laissait éteinte : interface s0/0/1, no shutdown, puis sauvegarde (copy running-config startup-config).",
+        "en": "show ip interface brief on R1: S0/0/1 « administratively down »? The old configuration left it shut: interface s0/0/1, no shutdown, then save (copy running-config startup-config)."
       }
     },
     {
@@ -384,7 +389,7 @@
       "R1": [
         "configure terminal",
         "interface s0/0/1",
-        "clock rate 128000",
+        "no shutdown",
         "ip nat inside",
         "end",
         "copy running-config startup-config",
@@ -400,5 +405,51 @@
         ""
       ]
     }
-  }
+  },
+  "panels": [
+    {
+      "id": "NTU1",
+      "kind": "ntu"
+    },
+    {
+      "id": "NTU-FAI",
+      "kind": "ntu"
+    },
+    {
+      "id": "NTU2",
+      "kind": "ntu",
+      "room": "agence"
+    },
+    {
+      "id": "NTU-OP",
+      "kind": "ntu",
+      "room": "datacenter"
+    }
+  ],
+  "patchLinks": [
+    {
+      "a": "NTU1:LS1",
+      "b": "NTU2:LS1",
+      "label": {
+        "fr": "Ligne louée vers Bobo-Dioulasso",
+        "en": "Leased line to Bobo-Dioulasso"
+      },
+      "labelB": {
+        "fr": "Ligne louée vers le campus",
+        "en": "Leased line to the campus"
+      }
+    },
+    {
+      "a": "NTU-FAI:LS1",
+      "b": "NTU-OP:LS1",
+      "label": {
+        "fr": "Ligne louée vers l'opérateur",
+        "en": "Leased line to the carrier"
+      },
+      "labelB": {
+        "fr": "Ligne louée vers le campus de l’IST",
+        "en": "Leased line to the IST campus"
+      }
+    }
+  ]
 }

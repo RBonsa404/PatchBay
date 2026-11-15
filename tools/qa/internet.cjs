@@ -5,7 +5,8 @@ const { open, startMission, go, hideHud, wait } = require('./lib.cjs');
 
 const OUT = process.argv[2];
 const CABLES = [
-  ['serial', 'FAI', 'Serial0/0/0', 'R1', 'Serial0/0/0'],
+  ['serial', 'FAI', 'Serial0/0/0', 'NTU-OP', 'LS1'],
+  ['serial', 'R1', 'Serial0/0/0', 'NTU-FAI', 'LS1'],
   ['straight', 'S1', 'GigabitEthernet0/1', 'R1', 'GigabitEthernet0/0'],
   ['straight', 'PC1', 'FastEthernet0', 'S1', 'FastEthernet0/1'],
   ['straight', 'SRV', 'FastEthernet0', 'S1', 'FastEthernet0/2'],
@@ -16,7 +17,7 @@ const CABLES = [
   await startMission(page, 6);
   const report = await page.evaluate((cables) => {
     const m = window.__patchbay.mission();
-    const end = (d, p) => m.devices.get(d)?.ports.get(p);
+    const end = (d, p) => (m.devices.get(d) ?? m.panels.get(d))?.ports.get(p);
     const missing = cables.flatMap(([, a, ap, b, bp]) => [[a, ap], [b, bp]]).filter(([d, p]) => !end(d, p)).map((x) => x.join(':'));
     for (const [type, a, ap, b, bp] of cables) {
       m.select(type);
@@ -40,7 +41,7 @@ const CABLES = [
   if (OUT) {
     fs.mkdirSync(OUT, { recursive: true });
     await hideHud(page);
-    const views = { bench: [-0.2, 1.1, Math.PI - 0.5, -0.55, 0, 1.6], room: [2.7, 3.0, Math.PI + 0.72, -0.2, 0], rack: [0, 1.05, Math.PI, -0.12, 0, 2.6] };
+    const views = { bench: [-0.2, 1.1, Math.PI - 0.5, -0.55, 0, 1.6], room: [2.7, 3.0, Math.PI + 0.72, -0.2, 0], rack: [0, 1.05, Math.PI, -0.12, 0, 2.6], 'datacenter-rack': [0.6, 800.9, Math.PI - 0.2, -0.12, 0, 1.4], 'datacenter-room': [2.7, 803.0, Math.PI + 0.72, -0.2, 0] };
     for (const [name, view] of Object.entries(views)) {
       await go(page, view);
       await wait(1600);
