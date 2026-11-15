@@ -550,9 +550,9 @@ export function groundAt(x: number, z: number, y: number): number | null {
 }
 
 /** Whether a body standing at (x, z) on floor height `y` touches a wall or an obstacle. */
-export function blockedAt(x: number, z: number, y: number): boolean {
+export function blockedAt(x: number, z: number, y: number, body = BODY): boolean {
   const head = y + 1.7;
-  const hits = (r: Rect): boolean => x > r.x0 - BODY && x < r.x1 + BODY && z > r.z0 - BODY && z < r.z1 + BODY;
+  const hits = (r: Rect): boolean => x > r.x0 - body && x < r.x1 + body && z > r.z0 - body && z < r.z1 + body;
   for (const w of WALLS) {
     if (w.y1 <= y + 0.05 || w.y0 >= head) continue;
     const alongX = w.z0 === w.z1;

@@ -24,6 +24,8 @@ import { clock, grade, type Grade } from './scoring.js';
 import { canListen, listenOnce } from '../voice.js';
 import { settings } from '../settings.js';
 import { Minimap } from '../ui/minimap.js';
+import { Person } from '../scene/people.js';
+import { COLLEAGUES, type Colleague } from './cast.js';
 import { playTrip, showSiteChooser } from '../ui/travel.js';
 import { buildExterior, buildStreet, ENTRANCES } from '../scene/exterior.js';
 import { journeyMap, journeyPath, journeyTrail, JOURNEY_ORIGIN } from '../scene/journey.js';
@@ -57,6 +59,15 @@ function patchLabel(level: Level, end: string): string {
 }
 
 /** Where each room of a level sits in the building. */
+/** The human characters (the student and the colleagues); localStorage 'patchbay.people' = '0' leaves them out. */
+const PEOPLE = ((): boolean => {
+  try {
+    return localStorage.getItem('patchbay.people') !== '0';
+  } catch {
+    return true;
+  }
+})();
+
 /** Which part of the building a zone is drawn in (see `buildAnnex` and the parts built later). */
 function partOf(zone: Zone): string {
   if (zone === 'corridor') return 'lower';
@@ -268,6 +279,7 @@ export class Mission {
     this.enter();
     this.cleanup.push(stage.onFrame((dt) => this.walk(dt)));
 
+    this.castPeople();
     this.consoles = new Consoles(this.net, () => this.afterChange(), (action) => this.recordTraffic(action));
     this.cleanup.push(
       this.net.onWire((from, to, frame) => {
@@ -430,6 +442,7 @@ export class Mission {
     this.cables.showPreview('straight', null, null);
     this.hud.destroy();
     this.minimap?.destroy();
+    this.talkBubble?.remove();
     closePanel();
     this.stage.manualCamera = false;
     this.stage.zoom = 1;
@@ -574,6 +587,12 @@ export class Mission {
       if (e.code === 'KeyO' && !typing) this.hud.toggleObjectives();
       if (e.code === 'KeyC' && !typing) this.minimap?.toggle();
       if (e.code === 'KeyG' && !typing) this.openTravel();
+      if (e.code === 'KeyF' && !typing && PEOPLE) {
+        settings.thirdPerson = !settings.thirdPerson;
+        settings.save();
+        this.hud.toast(t(settings.thirdPerson ? 'people.thirdPerson' : 'people.firstPerson'));
+      }
+      if (e.code === 'KeyE' && !typing) this.talk();
       if (e.key === 'F1') {
         e.preventDefault();
         showHelp();
@@ -746,6 +765,7 @@ export class Mission {
       this.afterChange();
       return;
     }
+    this.avatar?.gesture(port.hit.getWorldPosition(new THREE.Vector3()).y - this.player.floorY < 0.5 ? 'Fixing_Kneeling' : 'Interact');
     const r = this.net.connect(type, { device: a.device, port: a.port }, { device: port.device, port: port.port });
     if (!r.ok) {
       this.hud.toast(t('error.incompatible'), 'bad');
@@ -921,6 +941,154 @@ export class Mission {
     });
   }
   private travelling = false;
+  /** The student the player walks as, seen from behind; the colleagues in the buildings. */
+  private avatar: Person | null = null;
+  private readonly people: { person: Person; who: Colleague; leg: number; talking: number; line: number }[] = [];
+  private lastFoot = new THREE.Vector3();
+  private talkBubble: HTMLElement | null = null;
+
+  /** The player's student and the colleagues of the places this mission goes to. */
+  private castPeople(): void {
+    if (!PEOPLE) return;
+    this.avatar = new Person(settings.character);
+    this.stage.level.add(this.avatar.root);
+    if (!this.building) return;
+    const sites = new Set(this.sites());
+    for (const who of COLLEAGUES) {
+      const site = siteOf(who.at.z);
+      if (!sites.has(site)) continue;
+      const person = new Person(who.model);
+      person.root.position.set(who.at.x, who.at.y, who.at.z);
+      person.root.rotation.y = who.at.yaw;
+      person.play(who.motion, 0);
+      this.stage.level.add(person.root);
+      this.people.push({ person, who, leg: 0, talking: 0, line: 0 });
+    }
+    this.showPeople();
+  }
+
+  /**
+   * A colleague shows with the part of the building they are in: hidden behind closed walls like the room itself, and
+   * never standing in the air when a mission leaves their floor unbuilt.
+   */
+  private showPeople(): void {
+    const shown = this.shown.split(',');
+    for (const p of this.people) {
+      const r = p.person.root;
+      const part = partOf(zoneOf(r.position.x, r.position.y + 0.1, r.position.z));
+      r.visible = this.parts.has(part) && shown.includes(part);
+    }
+  }
+
+  /** Every frame: the colleagues breathe, walk their rounds, turn to the player when spoken to. */
+  private livePeople(dt: number): void {
+    let near: (typeof this.people)[number] | null = null;
+    let best = 2.2;
+    for (const p of this.people) {
+      const root = p.person.root;
+      const d = Math.hypot(root.position.x - this.player.x, root.position.z - this.player.z);
+      const sameFloor = Math.abs(root.position.y - this.player.floorY) < 1;
+      // Far away or out of sight: no need to animate.
+      if (d > 30 || !sameFloor || !root.visible) continue;
+      // Up close every frame; further away, 20 steps a second are enough.
+      p.person.update(dt, d > 10 ? 20 : 0);
+      if (p.talking > 0) {
+        p.talking -= dt;
+        const want = Math.atan2(this.player.x - root.position.x, this.player.z - root.position.z);
+        root.rotation.y += Math.atan2(Math.sin(want - root.rotation.y), Math.cos(want - root.rotation.y)) * Math.min(1, dt * 4);
+        if (p.talking <= 0) {
+          p.person.play(p.who.motion);
+          if (!p.who.walk) root.rotation.y = p.who.at.yaw;
+        }
+      } else if (p.who.walk) {
+        const target = p.who.walk[p.leg % p.who.walk.length] as [number, number];
+        const dx = target[0] - root.position.x;
+        const dz = target[1] - root.position.z;
+        const dist = Math.hypot(dx, dz);
+        if (dist < 0.2) p.leg++;
+        else {
+          const step = Math.min(dist, dt * 1.25);
+          root.position.x += (dx / dist) * step;
+          root.position.z += (dz / dist) * step;
+          root.rotation.y = Math.atan2(dx, dz);
+        }
+      }
+      if (d < best && sameFloor) {
+        best = d;
+        near = p;
+      }
+    }
+    this.hud.setTalkHint(near ? t('people.talkHint', { name: near.who.name }) : null);
+    this.nearPerson = near;
+  }
+  private nearPerson: (typeof this.people)[number] | null = null;
+
+  /** Talk to the colleague nearby: they turn to the player and say their next line. */
+  private talk(): void {
+    const p = this.nearPerson;
+    if (!p) return;
+    const line = p.who.lines[p.line] ?? '';
+    p.line = (p.line + 1) % p.who.lines.length;
+    p.talking = 7;
+    p.person.play(p.who.motion.startsWith('Sitting') ? 'Sitting_Talking_Loop' : 'Idle_Talking_Loop');
+    this.talkBubble?.remove();
+    this.talkBubble = h('div', { class: 'talk-bubble' }, h('strong', {}, p.who.name), h('small', {}, p.who.role), h('p', {}, line));
+    document.body.append(this.talkBubble);
+    const bubble = this.talkBubble;
+    setTimeout(() => bubble.classList.add('leaving'), 6400);
+    setTimeout(() => bubble.remove(), 7000);
+    sound.play('click');
+  }
+
+  /** The player's student follows the player: where they stand, the way they face, walking or standing still. */
+  private moveAvatar(dt: number): void {
+    const a = this.avatar;
+    if (!a) return;
+    a.update(dt);
+    const p = this.player;
+    const foot = new THREE.Vector3(p.x, p.floorY, p.z);
+    const speed = dt > 0 ? foot.distanceTo(this.lastFoot) / dt : 0;
+    this.lastFoot.copy(foot);
+    a.root.position.copy(foot);
+    a.root.rotation.y = p.yaw;
+    const view = settings.thirdPerson && !this.anchor && !this.seated && !this.tour;
+    a.root.visible = view;
+    if (this.seated) a.play('Sitting_Idle_Loop');
+    else if (speed > 2.4) a.play('Jog_Fwd_Loop', 0.2);
+    else if (speed > 0.25) a.play('Walk_Loop', 0.2);
+    else a.play('Idle_Loop', 0.3);
+  }
+
+  /**
+   * The camera behind the student's shoulder: a little above and to the right, pulled in when a wall or a piece of
+   * furniture would come between them, never through the ceiling.
+   */
+  private thirdPersonCamera(target: THREE.Vector3): void {
+    const camera = this.stage.camera;
+    const p = this.player;
+    const head = new THREE.Vector3(p.x, p.floorY + 1.62, p.z);
+    const c = Math.cos(this.viewPitch);
+    const dir = new THREE.Vector3(Math.sin(this.viewYaw) * c, Math.sin(this.viewPitch), Math.cos(this.viewYaw) * c);
+    const right = new THREE.Vector3(-Math.cos(this.viewYaw), 0, Math.sin(this.viewYaw));
+    const want = 2.1 / Math.max(0.6, this.zoom);
+    let dist = want;
+    // Only what stands at the camera's height stops it (walls, racks, people's heads), not desks or benches.
+    const camFloor = p.floorY + 1.45;
+    for (let d = 0.3; d <= want; d += 0.1) {
+      const q = head.clone().addScaledVector(dir, -d).addScaledVector(right, 0.45 * (d / want));
+      if (blockedAt(q.x, q.z, camFloor, 0.14)) {
+        dist = Math.max(0.35, d - 0.15);
+        break;
+      }
+    }
+    const pos = head.clone().addScaledVector(dir, -dist).addScaledVector(right, 0.45 * (dist / want)).add(new THREE.Vector3(0, 0.15, 0));
+    // Pulled in close (a wall behind): rise to look over the shoulder rather than into the back of the head.
+    if (dist < 1.2) pos.y += (1.2 - dist) * 0.55;
+    pos.y = Math.min(pos.y, p.floorY + 2.8);
+    camera.position.lerp(pos, 0.5);
+    target.copy(head).addScaledVector(dir, 4);
+  }
+
   private readonly outside = new Map<SiteName, { exterior: THREE.Object3D; street: THREE.Object3D }>();
 
   /** Each building from the street, built the first time the player goes out of it or arrives at it. */
@@ -1126,16 +1294,40 @@ export class Mission {
 
   /** Build one waiting part when the browser has a moment, then the next: the frame rate never drops for it. */
   private buildLater(): void {
-    const next = this.later.shift();
-    if (!next) return;
+    if (!this.later.length) return;
     const idle = (window as Window & { requestIdleCallback?: (fn: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
+    // The part stays in the queue until it is built: the culling can always build it at once if the player gets there
+    // first (a part taken out of the queue and not yet built could be neither, and the street would show through).
     const run = (): void => {
       if (this.disposed) return;
+      const next = this.later.shift();
+      if (!next) return;
       next();
       this.buildLater();
     };
     if (idle) idle(run, { timeout: 1500 });
     else setTimeout(run, 300);
+  }
+
+  /**
+   * Build at once the parts the player is about to see. Returns whether anything was built (the culling has then run
+   * again with them). A part in sight that no mission step can build is a bug of the level: it is reported.
+   */
+  private buildNow(shown: string[]): boolean {
+    let built = false;
+    while (this.later.length) {
+      (this.later.shift() as () => void)();
+      built = true;
+    }
+    for (const site of ['agence', 'datacenter'] as const) {
+      if ((shown.includes(site) || shown.includes(`${site}-wing`)) && !this.builtSites.has(site)) {
+        this.buildSiteOnce(site);
+        built = true;
+      }
+    }
+    const zone = partOf(zoneOf(this.player.x, this.player.floorY + 0.1, this.player.z));
+    if (!built && !this.parts.has(zone)) console.error(`part "${zone}" in sight but never built`);
+    return built;
   }
 
   /** Everything at once (the light bake and the checks need the whole building). */
@@ -1362,7 +1554,8 @@ export class Mission {
       for (const here of frontier) {
         for (const d of this.portalList()) {
           const other = d.a === here ? d.b : d.b === here ? d.a : null;
-          if (!other || seenZones.has(other)) continue;
+          // A door to a zone this mission keeps shut is a closed door: nothing is seen through it.
+          if (!other || seenZones.has(other) || !this.player.canEnter(other)) continue;
           if (!this.frustum.intersectsBox(d.box) && d.centre.distanceTo(eye) > 1.6) continue;
           seenZones.add(other);
           next.push(other);
@@ -1371,10 +1564,14 @@ export class Mission {
       frontier = next;
     }
     const shown = [...new Set([...seenZones].map(partOf))].sort();
+    // Never a room in sight that is not built yet (it would leave the street showing through it): what is still
+    // waiting for an idle moment is built right now, before this frame is drawn.
+    if (shown.some((part) => !this.parts.has(part)) && this.buildNow(shown)) return;
     const key = shown.join();
     if (key === this.shown) return;
     this.shown = key;
     for (const [part, objects] of this.parts) for (const o of objects) o.visible = shown.includes(part);
+    this.showPeople();
     this.stage.refreshShadows(0.2);
   }
 
@@ -1449,13 +1646,18 @@ export class Mission {
       this.viewYaw = this.player.yaw;
       this.viewPitch = this.player.pitch;
     }
+    this.moveAvatar(dt);
+    this.livePeople(dt);
     if (this.following) {
-      camera.position.copy(this.anchor ?? this.player.eye);
       const ease = 1 - Math.exp(-dt * 20);
       this.viewYaw += (this.player.yaw - this.viewYaw) * ease;
       this.viewPitch += (this.player.pitch - this.viewPitch) * ease;
-      const c = Math.cos(this.viewPitch);
-      this.stage.controls.target.copy(camera.position).add(new THREE.Vector3(Math.sin(this.viewYaw) * c, Math.sin(this.viewPitch), Math.cos(this.viewYaw) * c));
+      if (PEOPLE && settings.thirdPerson && !this.anchor && !this.seated) this.thirdPersonCamera(this.stage.controls.target);
+      else {
+        camera.position.copy(this.anchor ?? this.player.eye);
+        const c = Math.cos(this.viewPitch);
+        this.stage.controls.target.copy(camera.position).add(new THREE.Vector3(Math.sin(this.viewYaw) * c, Math.sin(this.viewPitch), Math.cos(this.viewYaw) * c));
+      }
     }
     // Never let the camera leave the room (it would see through the walls).
     if (!this.building) {

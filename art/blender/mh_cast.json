@@ -1,0 +1,622 @@
+{
+ "student-m": {
+  "sex": "male",
+  "age": 0.4,
+  "muscle": 0.62,
+  "weight": 0.45,
+  "height": 0.65,
+  "proportions": 0.75,
+  "skin": "young_african_male",
+  "hair": "afro01",
+  "hair_colour": "#2e2e2e",
+  "eyebrows": "eyebrow001",
+  "fade": {
+   "top": 0.075,
+   "low": 0.0
+  },
+  "beard": 0.6,
+  "lips": 0.6,
+  "targets": {
+   "mouth/mouth-upperlip-volume-decr": 0.45,
+   "mouth/mouth-lowerlip-volume-decr": 0.4,
+   "mouth/mouth-scale-horiz-decr": 0.15,
+   "mouth/mouth-angles-up": 0.25,
+   "nose/nose-flaring-decr": 0.4,
+   "nose/nose-scale-horiz-decr": 0.2,
+   "nose/nose-point-width-decr": 0.25,
+   "chin/chin-prominent-incr": 0.2,
+   "chin/chin-width-incr": 0.15,
+   "head/head-oval": 0.4,
+   "cheek/l-cheek-bones-incr": 0.35,
+   "cheek/r-cheek-bones-incr": 0.35
+  },
+  "clothes": [
+   [
+    "mindfront_male_trousers_1",
+    "#1e2a4a"
+   ],
+   [
+    "namuhekam_male_polo_shirt",
+    "#f4f6f8",
+    [
+     [
+      "front",
+      "art/prints/club-logo.png",
+      -0.385,
+      0.1
+     ],
+     [
+      "back",
+      "art/prints/club-back-dark.png",
+      -0.47,
+      0.25
+     ]
+    ],
+    true
+   ],
+   [
+    "punkduck_comfortable_sneakers",
+    null
+   ]
+  ]
+ },
+ "student-f": {
+  "sex": "female",
+  "age": 0.38,
+  "muscle": 0.45,
+  "weight": 0.42,
+  "height": 0.55,
+  "proportions": 0.8,
+  "waist": 1.08,
+  "skin": "young_african_female",
+  "hair": "elvs_braid_bun",
+  "hair_colour": "#2a2a2a",
+  "eyebrows": "eyebrow010",
+  "lips": 0.5,
+  "targets": {
+   "mouth/mouth-upperlip-volume-decr": 0.45,
+   "mouth/mouth-lowerlip-volume-decr": 0.4,
+   "mouth/mouth-scale-horiz-decr": 0.15,
+   "mouth/mouth-angles-up": 0.35,
+   "nose/nose-flaring-decr": 0.4,
+   "nose/nose-scale-horiz-decr": 0.25,
+   "nose/nose-point-width-decr": 0.25,
+   "mouth/mouth-dimples-in": 0.2,
+   "chin/chin-width-decr": 0.3,
+   "chin/chin-prominent-incr": 0.15,
+   "head/head-oval": 0.6,
+   "cheek/l-cheek-bones-incr": 0.45,
+   "cheek/r-cheek-bones-incr": 0.45,
+   "eyes/l-eye-scale-incr": 0.15,
+   "eyes/r-eye-scale-incr": 0.15
+  },
+  "clothes": [
+   [
+    "mindfront_female_trousers_1",
+    "#1e2a4a",
+    [],
+    true
+   ],
+   [
+    "namuhekam_male_polo_shirt",
+    "#1640b0",
+    [
+     [
+      "front",
+      "art/prints/club-logo.png",
+      -0.385,
+      0.1
+     ],
+     [
+      "back",
+      "art/prints/club-back.png",
+      -0.47,
+      0.25
+     ]
+    ],
+    true
+   ],
+   [
+    "punkduck_running_shoes_01",
+    null
+   ]
+  ]
+ },
+ "awa": {
+  "sex": "female",
+  "age": 0.36,
+  "muscle": 0.4,
+  "weight": 0.48,
+  "height": 0.5,
+  "proportions": 0.75,
+  "waist": 1.06,
+  "skin": "young_african_female",
+  "hair": "punkduck_alpha7_curly",
+  "hair_colour": "#1f1a17",
+  "eyebrows": "eyebrow011",
+  "lips": 0.5,
+  "targets": {
+   "mouth/mouth-upperlip-volume-decr": 0.45,
+   "mouth/mouth-lowerlip-volume-decr": 0.4,
+   "mouth/mouth-scale-horiz-decr": 0.15,
+   "mouth/mouth-angles-up": 0.4,
+   "nose/nose-flaring-decr": 0.4,
+   "nose/nose-scale-horiz-decr": 0.2,
+   "nose/nose-point-width-decr": 0.25,
+   "head/head-round": 0.35,
+   "mouth/mouth-dimples-in": 0.35,
+   "nose/nose-point-up": 0.2,
+   "chin/chin-width-decr": 0.2,
+   "cheek/l-cheek-volume-incr": 0.25,
+   "cheek/r-cheek-volume-incr": 0.25,
+   "eyes/l-eye-scale-incr": 0.2,
+   "eyes/r-eye-scale-incr": 0.2
+  },
+  "clothes": [
+   [
+    "mindfront_female_trousers_1",
+    "#1e2a4a",
+    [],
+    true
+   ],
+   [
+    "namuhekam_male_polo_shirt",
+    "#0b1e3f",
+    [
+     [
+      "front",
+      "art/prints/club-logo.png",
+      -0.385,
+      0.1
+     ],
+     [
+      "back",
+      "art/prints/club-back.png",
+      -0.47,
+      0.25
+     ]
+    ],
+    true
+   ],
+   [
+    "punkduck_tennis_shoes",
+    null
+   ]
+  ]
+ },
+ "ibrahim": {
+  "sex": "male",
+  "age": 0.42,
+  "muscle": 0.55,
+  "weight": 0.5,
+  "height": 0.7,
+  "proportions": 0.7,
+  "skin": "young_african_male",
+  "hair": "short03",
+  "hair_colour": "#121212",
+  "eyebrows": "eyebrow002",
+  "waist": 1.13,
+  "fade": {
+   "top": 0.1,
+   "low": 0.02,
+   "hairline": 0.075
+  },
+  "beard": 0.5,
+  "lips": 0.6,
+  "targets": {
+   "mouth/mouth-upperlip-volume-decr": 0.45,
+   "mouth/mouth-lowerlip-volume-decr": 0.4,
+   "mouth/mouth-scale-horiz-decr": 0.15,
+   "mouth/mouth-angles-up": 0.25,
+   "nose/nose-flaring-decr": 0.4,
+   "nose/nose-scale-horiz-decr": 0.2,
+   "nose/nose-point-width-decr": 0.25,
+   "head/head-rectangular": 0.35,
+   "chin/chin-width-incr": 0.25,
+   "chin/chin-height-incr": 0.15,
+   "nose/nose-scale-vert-incr": 0.15,
+   "eyebrows/eyebrows-trans-down": 0.2,
+   "cheek/l-cheek-bones-incr": 0.2,
+   "cheek/r-cheek-bones-incr": 0.2
+  },
+  "clothes": [
+   [
+    "cortu_cargo_pants",
+    "#c8b48a",
+    [],
+    true
+   ],
+   [
+    "namuhekam_male_polo_shirt",
+    "#f4f6f8",
+    [
+     [
+      "front",
+      "art/prints/club-logo.png",
+      -0.385,
+      0.1
+     ],
+     [
+      "back",
+      "art/prints/club-back-dark.png",
+      -0.47,
+      0.25
+     ]
+    ],
+    true
+   ],
+   [
+    "culturalibre_sneakers",
+    null
+   ]
+  ]
+ },
+ "seydou": {
+  "sex": "male",
+  "age": 0.34,
+  "muscle": 0.45,
+  "weight": 0.4,
+  "height": 0.55,
+  "proportions": 0.65,
+  "skin": "young_african_male",
+  "hair": "afro01",
+  "hair_colour": "#1c1c1c",
+  "eyebrows": "eyebrow003",
+  "fade": {
+   "top": 0.095,
+   "low": 0.03,
+   "density": 0.9
+  },
+  "lips": 0.6,
+  "targets": {
+   "mouth/mouth-upperlip-volume-decr": 0.45,
+   "mouth/mouth-lowerlip-volume-decr": 0.4,
+   "mouth/mouth-scale-horiz-decr": 0.15,
+   "mouth/mouth-angles-up": 0.35,
+   "nose/nose-flaring-decr": 0.4,
+   "nose/nose-scale-horiz-decr": 0.2,
+   "nose/nose-point-width-decr": 0.25,
+   "head/head-oval": 0.6,
+   "head/head-age-decr": 0.3,
+   "nose/nose-scale-vert-decr": 0.15,
+   "chin/chin-width-decr": 0.1,
+   "eyebrows/eyebrows-angle-up": 0.3,
+   "eyes/l-eye-scale-incr": 0.15,
+   "eyes/r-eye-scale-incr": 0.15
+  },
+  "clothes": [
+   [
+    "mindfront_male_trousers_1",
+    "#1e2a4a"
+   ],
+   [
+    "namuhekam_male_polo_shirt",
+    "#1640b0",
+    [
+     [
+      "front",
+      "art/prints/club-logo.png",
+      -0.385,
+      0.1
+     ],
+     [
+      "back",
+      "art/prints/club-back.png",
+      -0.47,
+      0.25
+     ]
+    ],
+    true
+   ],
+   [
+    "punkduck_tennis_shoes",
+    null
+   ]
+  ]
+ },
+ "m-kabore": {
+  "sex": "male",
+  "age": 0.62,
+  "muscle": 0.5,
+  "weight": 0.6,
+  "height": 0.6,
+  "proportions": 0.6,
+  "skin": "middleage_african_male",
+  "hair": "afro01",
+  "hair_colour": "#262626",
+  "eyebrows": "eyebrow004",
+  "fade": {
+   "top": 0.06,
+   "low": 0.0,
+   "density": 0.85
+  },
+  "beard": 0.8,
+  "lips": 0.55,
+  "targets": {
+   "mouth/mouth-upperlip-volume-decr": 0.45,
+   "mouth/mouth-lowerlip-volume-decr": 0.4,
+   "mouth/mouth-scale-horiz-decr": 0.15,
+   "mouth/mouth-angles-up": 0.15,
+   "nose/nose-flaring-decr": 0.4,
+   "nose/nose-scale-horiz-decr": 0.1,
+   "nose/nose-point-width-decr": 0.25,
+   "head/head-square": 0.4,
+   "chin/chin-width-incr": 0.2,
+   "forehead/forehead-scale-vert-incr": 0.2
+  },
+  "clothes": [
+   [
+    "mindfront_male_trousers_2",
+    "#3b4250"
+   ],
+   [
+    "elvs_male_shirt_untucked_bd1",
+    "#cfe0f5",
+    [
+     [
+      "front",
+      "art/prints/club-logo.png",
+      -0.385,
+      0.08
+     ]
+    ],
+    true
+   ],
+   [
+    "mindfront_shoes_oxford_male",
+    null
+   ]
+  ]
+ },
+ "mme-ouedraogo": {
+  "sex": "female",
+  "age": 0.55,
+  "muscle": 0.4,
+  "weight": 0.55,
+  "height": 0.5,
+  "proportions": 0.6,
+  "skin": "middleage_african_female",
+  "hair": "ponytail01",
+  "hair_colour": "#1d1d1d",
+  "eyebrows": "eyebrow009",
+  "lips": 0.55,
+  "targets": {
+   "mouth/mouth-upperlip-volume-decr": 0.45,
+   "mouth/mouth-lowerlip-volume-decr": 0.4,
+   "mouth/mouth-scale-horiz-decr": 0.15,
+   "mouth/mouth-angles-up": 0.3,
+   "nose/nose-flaring-decr": 0.4,
+   "nose/nose-scale-horiz-decr": 0.2,
+   "nose/nose-point-width-decr": 0.25,
+   "head/head-oval": 0.5,
+   "chin/chin-width-decr": 0.15,
+   "cheek/l-cheek-bones-incr": 0.3,
+   "cheek/r-cheek-bones-incr": 0.3
+  },
+  "clothes": [
+   [
+    "female_elegantsuit01",
+    "#060f22",
+    [],
+    true
+   ],
+   [
+    "dressupdoc_maryjane1",
+    "#151515"
+   ]
+  ]
+ },
+ "fatim": {
+  "sex": "female",
+  "age": 0.4,
+  "muscle": 0.4,
+  "weight": 0.4,
+  "height": 0.6,
+  "proportions": 0.85,
+  "waist": 1.08,
+  "skin": "young_african_female",
+  "hair": "elvs_braided_rows",
+  "hair_colour": "#1b1b1b",
+  "eyebrows": "eyebrow012",
+  "lips": 0.5,
+  "targets": {
+   "mouth/mouth-upperlip-volume-decr": 0.45,
+   "mouth/mouth-lowerlip-volume-decr": 0.4,
+   "mouth/mouth-scale-horiz-decr": 0.15,
+   "mouth/mouth-angles-up": 0.45,
+   "nose/nose-flaring-decr": 0.4,
+   "nose/nose-scale-horiz-decr": 0.2,
+   "nose/nose-point-width-decr": 0.35,
+   "head/head-diamond": 0.3,
+   "chin/chin-prominent-incr": 0.1,
+   "cheek/l-cheek-bones-incr": 0.5,
+   "cheek/r-cheek-bones-incr": 0.5,
+   "eyes/l-eye-scale-incr": 0.1,
+   "eyes/r-eye-scale-incr": 0.1
+  },
+  "clothes": [
+   [
+    "mindfront_female_trousers_1",
+    "#0b1e3f",
+    [],
+    true
+   ],
+   [
+    "namuhekam_male_polo_shirt",
+    "#f4f6f8",
+    [
+     [
+      "front",
+      "art/prints/club-logo.png",
+      -0.385,
+      0.1
+     ],
+     [
+      "back",
+      "art/prints/club-back-dark.png",
+      -0.47,
+      0.25
+     ]
+    ],
+    true
+   ],
+   [
+    "dressupdoc_balletflat1",
+    null
+   ]
+  ]
+ },
+ "m-traore": {
+  "sex": "male",
+  "age": 0.72,
+  "muscle": 0.45,
+  "weight": 0.62,
+  "height": 0.65,
+  "proportions": 0.55,
+  "skin": "middleage_african_male",
+  "hair": "afro01",
+  "hair_colour": "#4a4744",
+  "eyebrows": "eyebrow005",
+  "fade": {
+   "top": 0.05,
+   "low": -0.005,
+   "density": 0.8
+  },
+  "beard": 0.9,
+  "lips": 0.55,
+  "targets": {
+   "mouth/mouth-upperlip-volume-decr": 0.45,
+   "mouth/mouth-lowerlip-volume-decr": 0.4,
+   "mouth/mouth-scale-horiz-decr": 0.15,
+   "mouth/mouth-angles-up": 0.1,
+   "nose/nose-flaring-decr": 0.4,
+   "nose/nose-scale-horiz-decr": 0.05,
+   "nose/nose-point-width-decr": 0.25,
+   "head/head-rectangular": 0.4,
+   "head/head-fat-incr": 0.2,
+   "chin/chin-width-incr": 0.3
+  },
+  "clothes": [
+   [
+    "male_elegantsuit01",
+    "#060f22",
+    [],
+    true
+   ],
+   [
+    "mindfront_shoes_oxford_male",
+    null
+   ]
+  ]
+ },
+ "adama": {
+  "sex": "male",
+  "age": 0.45,
+  "muscle": 0.7,
+  "weight": 0.5,
+  "height": 0.62,
+  "proportions": 0.7,
+  "skin": "young_african_male",
+  "hair": "afro01",
+  "hair_colour": "#202020",
+  "eyebrows": "eyebrow006",
+  "fade": {
+   "top": 0.07,
+   "low": 0.0
+  },
+  "beard": 0.4,
+  "lips": 0.6,
+  "targets": {
+   "mouth/mouth-upperlip-volume-decr": 0.45,
+   "mouth/mouth-lowerlip-volume-decr": 0.4,
+   "mouth/mouth-scale-horiz-decr": 0.15,
+   "mouth/mouth-angles-up": 0.25,
+   "nose/nose-flaring-decr": 0.4,
+   "nose/nose-scale-horiz-decr": 0.2,
+   "nose/nose-point-width-decr": 0.25,
+   "head/head-square": 0.3,
+   "chin/chin-prominent-incr": 0.25,
+   "nose/nose-volume-decr": 0.2,
+   "cheek/l-cheek-bones-incr": 0.3,
+   "cheek/r-cheek-bones-incr": 0.3
+  },
+  "clothes": [
+   [
+    "male_worksuit01",
+    "#0b1e3f",
+    [
+     [
+      "front",
+      "art/prints/club-logo.png",
+      -0.385,
+      0.09
+     ]
+    ],
+    true
+   ],
+   [
+    "punkduck_comfortable_sneakers",
+    null
+   ]
+  ]
+ },
+ "mariam": {
+  "sex": "female",
+  "age": 0.46,
+  "muscle": 0.45,
+  "weight": 0.45,
+  "height": 0.58,
+  "proportions": 0.75,
+  "waist": 1.08,
+  "skin": "young_african_female",
+  "hair": "elvs_island_princess_hair",
+  "hair_colour": "#141210",
+  "eyebrows": "eyebrow010",
+  "lips": 0.5,
+  "targets": {
+   "mouth/mouth-upperlip-volume-decr": 0.45,
+   "mouth/mouth-lowerlip-volume-decr": 0.4,
+   "mouth/mouth-scale-horiz-decr": 0.15,
+   "mouth/mouth-angles-up": 0.3,
+   "nose/nose-flaring-decr": 0.4,
+   "nose/nose-scale-horiz-decr": 0.2,
+   "nose/nose-point-width-decr": 0.25,
+   "head/head-invertedtriangular": 0.3,
+   "nose/nose-scale-vert-decr": 0.1,
+   "chin/chin-width-decr": 0.25,
+   "cheek/l-cheek-bones-incr": 0.35,
+   "cheek/r-cheek-bones-incr": 0.35
+  },
+  "clothes": [
+   [
+    "mindfront_female_trousers_1",
+    "#3b4250",
+    [],
+    true
+   ],
+   [
+    "namuhekam_male_polo_shirt",
+    "#f4f6f8",
+    [
+     [
+      "front",
+      "art/prints/club-logo.png",
+      -0.385,
+      0.1
+     ],
+     [
+      "back",
+      "art/prints/club-back-dark.png",
+      -0.47,
+      0.25
+     ]
+    ],
+    true
+   ],
+   [
+    "punkduck_running_shoes_01",
+    null
+   ]
+  ]
+ }
+}

@@ -22,6 +22,8 @@ async function open({ width = 1600, height = 900, soft = false, uncapped = false
     localStorage.clear();
     localStorage.setItem('patchbay.tutorial.done', 'l01-cablage-console');
   });
+  // QA_PEOPLE=0: the same check without the characters, to measure what they cost.
+  if (process.env.QA_PEOPLE === '0') await page.evaluate(() => localStorage.setItem('patchbay.people', '0'));
   await page.reload();
   await page.waitForSelector('.menu-item');
   await page.waitForFunction(() => !document.getElementById('boot'));

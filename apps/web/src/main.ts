@@ -180,6 +180,7 @@ if (import.meta.env.DEV) {
     stage,
     sound,
     mission: () => mission,
+    zones: async () => (await import('./scene/building.js')).ZONES,
     exportStatic: async () => {
       mission?.buildEverything();
       return (await import('./scene/lightmap-export.js')).exportStatic(stage.scene);

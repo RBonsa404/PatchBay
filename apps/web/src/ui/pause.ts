@@ -1,4 +1,4 @@
-import { BookOpen, Gauge, Keyboard, LogOut, Mouse, Music, Play, Settings, Volume2 } from 'lucide';
+import { BookOpen, Gauge, Keyboard, LogOut, Mouse, Music, Play, Settings, User, Volume2 } from 'lucide';
 import { sound } from '../audio.js';
 import type { Quality, Stage } from '../scene/stage.js';
 import { settings } from '../settings.js';
@@ -12,6 +12,15 @@ import { h, ui } from './dom.js';
  */
 
 let open: HTMLElement | null = null;
+
+/** The characters' options show only where the characters are switched on (see `Mission`). */
+function peopleOn(): boolean {
+  try {
+    return localStorage.getItem('patchbay.people') !== '0';
+  } catch {
+    return false;
+  }
+}
 
 export function pauseOpen(): boolean {
   return open !== null;
@@ -119,6 +128,18 @@ export function showSettings(stage: Stage, back: () => void): void {
       toggle(t('hud.sound'), Volume2, () => !sound.isMuted, () => sound.toggleMute()),
       toggle(t('settings.music'), Music, () => sound.musicPlaying, () => sound.toggleMusic()),
       h('div', { class: 'setting' }, icon(Mouse, 18), h('span', {}, t('settings.look')), speed, speedValue),
+      ...(peopleOn()
+        ? [
+            toggle(t('settings.thirdPerson'), User, () => settings.thirdPerson, () => {
+              settings.thirdPerson = !settings.thirdPerson;
+              settings.save();
+            }),
+            toggle(t('settings.student'), User, () => settings.character === 'student-f', () => {
+              settings.character = settings.character === 'student-f' ? 'student-m' : 'student-f';
+              settings.save();
+            }),
+          ]
+        : []),
       toggle(t('settings.invert'), Mouse, () => settings.invertY, () => {
         settings.invertY = !settings.invertY;
         settings.save();

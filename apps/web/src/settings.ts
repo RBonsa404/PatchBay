@@ -7,9 +7,13 @@ interface Settings {
   lookSpeed: number;
   /** Dragging up looks down, as with an aircraft's stick. */
   invertY: boolean;
+  /** Seen from behind the student the player walks as (else through their eyes). */
+  thirdPerson: boolean;
+  /** Which student: a young man or a young woman of the club. */
+  character: 'student-m' | 'student-f';
 }
 
-const DEFAULTS: Settings = { lookSpeed: 1, invertY: false };
+const DEFAULTS: Settings = { lookSpeed: 1, invertY: false, thirdPerson: true, character: 'student-m' };
 
 function load(): Settings {
   try {
@@ -23,7 +27,7 @@ export const settings: Settings & { save(): void } = {
   ...load(),
   save(): void {
     try {
-      localStorage.setItem(KEY, JSON.stringify({ lookSpeed: this.lookSpeed, invertY: this.invertY }));
+      localStorage.setItem(KEY, JSON.stringify({ lookSpeed: this.lookSpeed, invertY: this.invertY, thirdPerson: this.thirdPerson, character: this.character }));
     } catch {
       // storage unavailable: the choice lasts until the page closes
     }

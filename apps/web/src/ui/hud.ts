@@ -208,6 +208,22 @@ export class Hud {
     this.objectivesList.querySelector('.current')?.scrollIntoView({ block: 'nearest' });
   }
 
+  private talkHint: HTMLElement | null = null;
+
+  /** « E — parler à … » under the crosshair when a colleague is close enough to talk to. */
+  setTalkHint(text: string | null): void {
+    if (!text) {
+      this.talkHint?.remove();
+      this.talkHint = null;
+      return;
+    }
+    if (!this.talkHint) {
+      this.talkHint = h('div', { class: 'talk-hint' });
+      this.root.append(this.talkHint);
+    }
+    if (this.talkHint.textContent !== text) this.talkHint.textContent = text;
+  }
+
   /** The microphone glows while the game is listening. */
   setListening(on: boolean): void {
     this.micButton?.classList.toggle('listening', on);

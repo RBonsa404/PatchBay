@@ -40,6 +40,11 @@ export class Player {
     this.allowed = new Set<ZoneName>(['room', 'corridor', 'lab', 'classroom0', 'toilets', 'lounge', 'agence', 'datacenter', ...ZONES.filter((z) => z.name.includes('-')).map((z) => z.name), ...(stairs ? (['stairs', 'corridor1', 'office', 'classroom1', 'classroom2'] as ZoneName[]) : [])]);
   }
 
+  /** Whether the player can go into a zone in this mission (a door to anywhere else stays shut). */
+  canEnter(zone: ZoneName): boolean {
+    return this.allowed.has(zone);
+  }
+
   /** Height of the floor under the player. */
   get floorY(): number {
     return this.y;

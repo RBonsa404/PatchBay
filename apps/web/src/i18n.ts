@@ -192,6 +192,11 @@ const fr = {
   'settings.look': 'Sensibilité de la souris',
   'settings.invert': 'Inverser l’axe vertical',
   'settings.done': 'Terminé',
+  'settings.thirdPerson': 'Vue de dos (touche F)',
+  'settings.student': 'Jouer l’étudiante (sinon l’étudiant)',
+  'people.thirdPerson': 'Vue de dos',
+  'people.firstPerson': 'Vue à la première personne',
+  'people.talkHint': 'E — parler à {name}',
 } as const;
 
 export type Key = keyof typeof fr;
