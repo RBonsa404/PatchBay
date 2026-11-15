@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { bake, freeze } from './bake.js';
-import { DOORS, FLOOR_Y, LAB_DESK_ROWS, LAB_Z, ROOMS, STAIRS, WALL as WALL_T, type Door } from './building.js';
-import { contactShadow, keyboardTexture, outsideTexture, photo } from './materials.js';
+import { CLASS0_DESKS, CLASS_UP_DESKS, DOORS, FLOOR_Y, LAB_DESK_ROWS, LAB_Z, ROOMS, STAIRS, WALL as WALL_T, type Door, type Rect } from './building.js';
+import { contactShadow, keyboardTexture, outsideTexture, photo, type OutsideView } from './materials.js';
 import { placeProp } from './props.js';
 import { gearModel } from './gear.js';
 import { buildRoomParts } from './room.js';
@@ -70,7 +70,7 @@ function plate(w: number, h: number, background: string, colour: string, lines: 
 function corridorDecor(upper: boolean, stairs: boolean): THREE.Group {
   const g = new THREE.Group();
   const y = upper ? FLOOR_Y : 0;
-  const { corridor } = ROOMS;
+  const corridor = upper ? ROOMS.corridor1 : ROOMS.corridor;
   const roomFace = corridor.z1 - WALL_T / 2 - 0.004;
   const labFace = corridor.z0 + WALL_T / 2 + 0.004;
   const mid = (corridor.z0 + corridor.z1) / 2;
@@ -84,13 +84,8 @@ function corridorDecor(upper: boolean, stairs: boolean): THREE.Group {
     const toLab = lettering('SALLE DE TP', 0.8, 0.12, '#0b1e3f');
     toLab.position.set(labDoor.x, y + 2.42, labFace);
     g.add(toLab);
-  } else {
-    // Upstairs, the archive room's closed door opposite the offices.
-    g.add(box(1.0, 2.05, 0.04, lit('#8b9bb0', 0.6, 0.2), mainDoor.x, y + 1.025, labFace + 0.02), box(0.14, 0.02, 0.03, lit('#e2e8f0', 0.2, 1), mainDoor.x + 0.38, y + 1.02, labFace + 0.06, false));
-    const archive = plate(0.46, 0.12, '#0b1e3f', '#e2e8f0', ['ARCHIVES']);
-    archive.position.set(mainDoor.x, y + 1.62, labFace + 0.045);
-    g.add(archive);
   }
+  g.add(doorSigns(y, corridor), wayfinding(upper));
   // At the far end, the stairs (or, without them, a closed door).
   const end = corridor.x1 - WALL_T / 2 - 0.004;
   const stairsSign = plate(0.9, 0.16, '#14532d', '#ffffff', [upper ? 'ESCALIER · RDC' : 'ESCALIER · ÉTAGE 1']);
@@ -105,7 +100,7 @@ function corridorDecor(upper: boolean, stairs: boolean): THREE.Group {
   hoseSign.rotation.y = Math.PI;
   hoseSign.position.set(0.9, y + 1.25, roomFace - 0.125);
   g.add(hose, hoseSign);
-  g.add(box(14.8, 0.09, 0.22, lit('#e8ebef', 0.7), (corridor.x0 + corridor.x1) / 2, y + 2.93, roomFace - 0.14, false));
+  g.add(box(corridor.x1 - corridor.x0 - 0.2, 0.09, 0.22, lit('#e8ebef', 0.7), (corridor.x0 + corridor.x1) / 2, y + 2.93, roomFace - 0.14, false));
   if (!upper) {
     g.add(box(1.6, 0.95, 0.02, lit('#2b3442', 0.8), -2.6, y + 1.5, labFace + 0.012));
     for (const [i, lines] of [['RÉSEAU', 'DE L’IST'], ['SÉCURITÉ', 'ÉVACUATION'], ['HORAIRES', 'DES TP']].entries()) {
@@ -124,7 +119,7 @@ function stairDecor(): THREE.Group {
   const l = STAIRS.landing;
   const wall = ROOMS.stairs.x1 - WALL_T / 2 - 0.006;
   const mid = (l.z0 + l.z1) / 2;
-  const glass = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 2.2), new THREE.MeshBasicMaterial({ map: outsideTexture(), color: '#c4c8cc' }));
+  const glass = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 2.2), new THREE.MeshBasicMaterial({ map: outsideTexture('quad'), color: '#d6d9dc' }));
   glass.rotation.y = -Math.PI / 2;
   glass.position.set(wall - 0.014, half + 1.6, mid);
   g.add(box(0.006, 2.32, 1.52, FRAME, wall + 0.002, half + 1.6, mid, false), glass);
@@ -233,12 +228,7 @@ function labFurniture(): THREE.Group {
   netPlan.position.set(left + 0.006, 1.6, 3.4);
   g.add(rules, netPlan);
   // Windows onto the campus on the outside wall.
-  for (const z of [1.0, 3.2, 5.0]) {
-    const sky = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.2), new THREE.MeshBasicMaterial({ map: outsideTexture() }));
-    sky.rotation.y = -Math.PI / 2;
-    sky.position.set(right - 0.012, 1.8, z);
-    g.add(box(0.006, 1.3, 1.6, FRAME, right - 0.002, 1.8, z, false), sky);
-  }
+  for (const z of [1.0, 3.2, 5.0]) g.add(windowOn(right - 0.006, 1.75, z, -Math.PI / 2, 'garden'));
   return g;
 }
 
@@ -250,12 +240,7 @@ function officeFurniture(): THREE.Group {
   for (const cx of [-3.1, 3.1]) {
     for (const dx of [-1.0, 0, 1.0]) g.add(deskAt(cx + dx, 3.1, -1), deskAt(cx + dx, 3.9, 1));
   }
-  for (const x of [-3.0, 0, 3.0]) {
-    const sky = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.15), new THREE.MeshBasicMaterial({ map: outsideTexture() }));
-    sky.rotation.y = Math.PI;
-    sky.position.set(x, 1.75, front - 0.012);
-    g.add(box(1.9, 1.25, 0.006, FRAME, x, 1.75, front - 0.002, false), sky);
-  }
+  for (const x of [-3.0, 0, 3.0]) g.add(windowOn(x, 1.7, front - 0.006, Math.PI, 'city', 1.8, 1.2));
   g.add(box(0.5, 0.85, 2.6, GREY, left + 0.27, 0.425, 1.3), box(0.52, 0.03, 2.65, WOOD, left + 0.28, 0.865, 1.3));
   const colours = ['#1d4ed8', '#fbbf24', '#0b1e3f', '#94a3b8'];
   for (let i = 0; i < 24; i++) g.add(box(0.22, 0.28, 0.05, lit(colours[i % 4] as string, 0.7), left + 0.27, 1.02, 0.3 + i * 0.086));
@@ -265,6 +250,169 @@ function officeFurniture(): THREE.Group {
   name.position.set(0, 2.25, -1.59);
   g.add(cabinetShadow, name);
   return g;
+}
+
+/**
+ * A window in an outside wall, seen from inside: the photograph of the outside, an aluminium frame with a mullion and a
+ * transom, a sill. Built facing +z and turned by `turn` (the room is on the frame's +z side).
+ */
+function windowOn(x: number, y: number, z: number, turn: number, kind: OutsideView, w = 1.5, h = 1.25): THREE.Group {
+  const g = new THREE.Group();
+  const sky = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: outsideTexture(kind) }));
+  sky.position.z = 0.014;
+  const alu = lit('#cfd5dc', 0.35, 0.8);
+  g.add(box(w + 0.12, h + 0.12, 0.012, alu, 0, 0, 0.002, false), sky);
+  g.add(box(0.045, h, 0.03, alu, 0, 0, 0.022, false), box(w, 0.045, 0.03, alu, 0, h * 0.22, 0.022, false));
+  for (const s of [-1, 1]) g.add(box(0.05, h + 0.1, 0.04, alu, s * (w / 2 + 0.01), 0, 0.02, false), box(w + 0.1, 0.05, 0.04, alu, 0, s * (h / 2 + 0.01), 0.02, false));
+  g.add(box(w + 0.18, 0.035, 0.16, lit('#e5e7eb', 0.5), 0, -h / 2 - 0.05, 0.08));
+  g.rotation.y = turn;
+  g.position.set(x, y, z);
+  return g;
+}
+
+/** The sign over each doorway of this corridor, and a flag sign beside it seen from along the corridor. */
+function doorSigns(y: number, corridor: Rect): THREE.Group {
+  const g = new THREE.Group();
+  for (const d of DOORS) {
+    if (!d.label || Math.abs(d.y - y) > 0.01) continue;
+    const north = Math.abs(d.z - corridor.z0) < 0.01;
+    const face = north ? corridor.z0 + WALL_T / 2 + 0.006 : corridor.z1 - WALL_T / 2 - 0.006;
+    const over = plate(Math.max(0.9, d.label.length * 0.06), 0.14, '#0b1e3f', '#ffffff', [d.label]);
+    over.rotation.y = north ? 0 : Math.PI;
+    over.position.set(d.x, y + 2.36, face);
+    g.add(over);
+    // The flag: two faces back to back on a small bracket, across the corridor's length.
+    const out = north ? 1 : -1;
+    g.add(box(0.02, 0.02, 0.36, STEEL, d.x + d.width / 2 + 0.25, y + 2.62, face + out * 0.18, false));
+    for (const side of [-1, 1]) {
+      const flag = plate(0.62, 0.2, '#1d4ed8', '#ffffff', [d.label]);
+      flag.rotation.y = side > 0 ? Math.PI / 2 : -Math.PI / 2;
+      flag.position.set(d.x + d.width / 2 + 0.25 + side * 0.006, y + 2.48, face + out * 0.34);
+      g.add(flag);
+    }
+  }
+  return g;
+}
+
+/** Direction signs hanging from the ceiling, so that nobody gets lost: what lies each way along the corridor. */
+function wayfinding(upper: boolean): THREE.Group {
+  const g = new THREE.Group();
+  const y = upper ? FLOOR_Y : 0;
+  const mid = (ROOMS.corridor.z0 + ROOMS.corridor.z1) / 2;
+  const hang = (x: number, east: string[], west: string[]): void => {
+    g.add(box(0.012, 0.3, 0.012, STEEL, x, y + 2.85, mid - 0.5, false), box(0.012, 0.3, 0.012, STEEL, x, y + 2.85, mid + 0.5, false));
+    const towardEast = plate(1.4, 0.36, '#14532d', '#ffffff', east);
+    towardEast.rotation.y = -Math.PI / 2;
+    towardEast.position.set(x - 0.008, y + 2.52, mid);
+    const towardWest = plate(1.4, 0.36, '#14532d', '#ffffff', west);
+    towardWest.rotation.y = Math.PI / 2;
+    towardWest.position.set(x + 0.008, y + 2.52, mid);
+    g.add(box(0.012, 0.38, 1.42, lit('#0f3d22', 0.6), x, y + 2.52, mid), towardEast, towardWest);
+  };
+  if (upper) {
+    hang(5.2, ['ESCALIER  →'], ['←  ADMINISTRATION', '←  COURS 101 · 102']);
+    hang(-1.5, ['ESCALIER · COURS 102  →'], ['←  ADMINISTRATION · COURS 101']);
+  } else {
+    hang(5.2, ['ESCALIER  →'], ['←  SALLE DE TP · SALLE TECHNIQUE', '←  COURS · DÉTENTE · TOILETTES']);
+    hang(-6.4, ['SALLE TECHNIQUE · TP · ESCALIER  →'], ['←  COURS 001 · DÉTENTE · TOILETTES']);
+  }
+  return g;
+}
+
+/** A classroom's board, desks in rows facing it, the teacher's desk, windows. */
+function classroom(r: Rect, y: number, board: { x: number; z: number; turn: number }, desks: { x: number; z: number }[], chairTurn: number, chairOffset: [number, number], teacher: { x: number; z: number; turn: number }, windows: THREE.Object3D[], props: Placed[]): THREE.Group {
+  const g = new THREE.Group();
+  props.push({ name: 'whiteboard', at: { x: board.x, y, z: board.z, turn: board.turn } });
+  for (const d of desks) {
+    props.push({ name: 'SchoolDesk_01', at: { x: d.x, y, z: d.z, turn: chairTurn } });
+    props.push({ name: 'SchoolChair_01', at: { x: d.x + chairOffset[0], y, z: d.z + chairOffset[1], turn: chairTurn } });
+    const shadow = contactShadow(0.9, 1.3, 0.35);
+    shadow.position.set(d.x + chairOffset[0] / 2, y + 0.004, d.z + chairOffset[1] / 2);
+    g.add(shadow);
+  }
+  props.push({ name: 'SchoolDesk_01', at: { x: teacher.x, y, z: teacher.z, turn: teacher.turn, scale: 1.25 } });
+  props.push({ name: 'plastic_monobloc_chair_01', at: { x: teacher.x - Math.sin(teacher.turn) * 0.7, y, z: teacher.z - Math.cos(teacher.turn) * 0.7, turn: teacher.turn } });
+  g.add(...windows);
+  void r;
+  return g;
+}
+
+interface Placed {
+  name: string;
+  at: { x: number; y: number; z: number; turn?: number; scale?: number; only?: string[] };
+}
+
+/** The ground floor's west wing: classroom 001, the toilets and the lounge. */
+function westWing(props: Placed[]): THREE.Group {
+  const g = new THREE.Group();
+  const c = ROOMS.classroom0;
+  const desks: { x: number; z: number }[] = [];
+  for (const x of [-11.3, -10.0, -8.7, -7.4]) for (const z of [-0.2, 0.9, 2.0, 3.1, 4.2]) desks.push({ x, z });
+  void CLASS0_DESKS;
+  const south = c.z1 - WALL_T / 2;
+  g.add(
+    classroom(c, 0, { x: c.x0 + WALL_T / 2 + 0.01, z: 2.1, turn: Math.PI / 2 }, desks, -Math.PI / 2, [0.55, 0], { x: -12.9, z: 2.0, turn: Math.PI / 2 }, [-12.4, -9.9, -7.4].map((x) => windowOn(x, 1.65, south - 0.006, Math.PI, 'garden')), props),
+  );
+  // Toilets: three cubicles along the back wall, the washbasins on the east wall, a floor of light tiles.
+  const t = ROOMS.toilets;
+  for (const x of [-13.45, -12.5, -11.55]) props.push({ name: 'wc', at: { x, y: 0, z: t.z0 + WALL_T / 2 + 0.76, turn: 0 } });
+  props.push({ name: 'washbasin', at: { x: t.x1 - WALL_T / 2 - 0.26, y: 0, z: -6.0, turn: -Math.PI / 2 } });
+  const tiles = new THREE.Mesh(new THREE.PlaneGeometry(t.x1 - t.x0 - WALL_T, t.z1 - t.z0 - WALL_T), new THREE.MeshStandardMaterial({ map: tileTexture(), roughness: 0.35 }));
+  tiles.rotation.x = -Math.PI / 2;
+  tiles.position.set((t.x0 + t.x1) / 2, 0.004, (t.z0 + t.z1) / 2);
+  g.add(tiles);
+  // Lounge: a sofa under the windows, a low table and two armchairs, the drinks machine, coffee on a cart.
+  const l = ROOMS.lounge;
+  const back = l.z0 + WALL_T / 2;
+  props.push({ name: 'Sofa_01', at: { x: -8.75, y: 0, z: back + 0.38, turn: 0 } });
+  props.push({ name: 'modern_coffee_table_01', at: { x: -8.75, y: 0, z: -7.65, turn: Math.PI / 2 } });
+  props.push({ name: 'modern_arm_chair_01', at: { x: -9.85, y: 0, z: -6.95, turn: Math.PI / 2 + 0.35 } });
+  props.push({ name: 'modern_arm_chair_01', at: { x: -7.65, y: 0, z: -6.95, turn: -Math.PI / 2 - 0.35 } });
+  props.push({ name: 'vending', at: { x: l.x0 + WALL_T / 2 + 0.41, y: 0, z: -5.2, turn: Math.PI / 2 } });
+  props.push({ name: 'CoffeeCart_01', at: { x: l.x1 - WALL_T / 2 - 0.55, y: 0, z: -5.45, turn: -Math.PI / 2, only: ['CoffeeCart_01_cart'] } });
+  props.push({ name: 'metal_trash_can', at: { x: -7.4, y: 0, z: -4.45, scale: 0.8, only: ['metal_trash_can'] } });
+  g.add(windowOn(-9.6, 1.7, back + 0.006, 0, 'garden', 1.2, 1.1), windowOn(-7.9, 1.7, back + 0.006, 0, 'garden', 1.2, 1.1));
+  const lounge = lettering('SALLE DE DÉTENTE', 1.6, 0.16, '#0b1e3f');
+  lounge.rotation.y = Math.PI / 2;
+  lounge.position.set(l.x0 + WALL_T / 2 + 0.004, 2.45, -7.0);
+  g.add(lounge);
+  return g;
+}
+
+/** Upstairs over the lab: classrooms 101 and 102. */
+function upperClasses(props: Placed[]): THREE.Group {
+  const g = new THREE.Group();
+  for (const [r, side] of [[ROOMS.classroom1, -1], [ROOMS.classroom2, 1]] as const) {
+    const desks: { x: number; z: number }[] = [];
+    for (let i = 0; i < 4; i++) for (const z of [-9.6, -8.4, -7.2, -6.0]) desks.push({ x: r.x0 + 1.55 + i * 1.3, z });
+    const wallX = side < 0 ? r.x0 + WALL_T / 2 + 0.006 : r.x1 - WALL_T / 2 - 0.006;
+    const windows = [-9.8, -7.8, -5.8].map((z) => windowOn(wallX, FLOOR_Y + 1.65, z, side < 0 ? Math.PI / 2 : -Math.PI / 2, 'city'));
+    const middle = (r.x0 + r.x1) / 2;
+    g.add(classroom(r, FLOOR_Y, { x: middle, z: r.z0 + WALL_T / 2 + 0.01, turn: 0 }, desks, Math.PI, [0, 0.55], { x: middle + side * 2.2, z: -10.75, turn: 0 }, windows, props));
+  }
+  void CLASS_UP_DESKS;
+  return g;
+}
+
+/** Light, square floor tiles with grey joints, for the toilets. */
+function tileTexture(): THREE.Texture {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 512;
+  const c = canvas.getContext('2d') as CanvasRenderingContext2D;
+  c.fillStyle = '#9aa3ad';
+  c.fillRect(0, 0, 512, 512);
+  for (let i = 0; i < 4; i++) {
+    for (let k = 0; k < 4; k++) {
+      const v = 226 + ((i * 7 + k * 13) % 9);
+      c.fillStyle = `rgb(${v}, ${v + 2}, ${v + 4})`;
+      c.fillRect(i * 128 + 3, k * 128 + 3, 122, 122);
+    }
+  }
+  const t = new THREE.CanvasTexture(canvas);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(7, 10);
+  return t;
 }
 
 /** Each part of the building is merged on its own, so that what cannot be seen need not be drawn. */
@@ -302,9 +450,16 @@ export function buildAnnex(floors: boolean): THREE.Group {
       }
     }
     const left = ROOMS.room.x0 + WALL_T / 2;
-    placeProp(officePart, 'pachira_aquatica_01', { x: left + 0.5, y: FLOOR_Y, z: 5.4, only: ['pachira_aquatica_01_bark_a', 'pachira_aquatica_01_leaves_a'] });
     placeProp(officePart, 'binder_notebook', { x: left + 0.27, y: FLOOR_Y + 0.88, z: 2.45, turn: Math.PI / 2 });
     g.add(part('part-stairs', zoneShell('stairs', { lights: true }), stairDecor()), officePart, part('part-upper', zoneShell('corridor1', { lights: true }), corridorDecor(true, true)));
+    const upperProps: Placed[] = [];
+    const classes = part('part-classes', zoneShell('classroom1', { lights: true }), zoneShell('classroom2', { lights: true }), upperClasses(upperProps));
+    for (const p of upperProps) placeProp(classes, p.name, p.at);
+    g.add(classes);
   }
+  const westProps: Placed[] = [];
+  const west = part('part-west', zoneShell('classroom0', { lights: true }), zoneShell('toilets', { lights: true }), zoneShell('lounge', { lights: true }), westWing(westProps));
+  for (const p of westProps) placeProp(west, p.name, p.at);
+  g.add(west);
   return g;
 }

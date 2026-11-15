@@ -124,6 +124,10 @@ export class Hud {
     );
     this.root = root;
     this.objectivesBox = root.querySelector('.objectives') as HTMLElement;
+    // A long list folds to the one task in progress (O or a click unfolds it): less to read at once.
+    if (!exam && level.objectives.length > 6) this.objectivesBox.classList.add('collapsed');
+    // The controls reminder goes once the player has had time to read it.
+    setTimeout(() => this.root.classList.add('hint-read'), 45000);
     ui().append(this.root);
   }
 

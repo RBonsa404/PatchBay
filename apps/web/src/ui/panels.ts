@@ -293,6 +293,7 @@ const CONTROLS: [string, string][] = [
   ['Clic / clic droit', 'brancher / débrancher, ouvrir un appareil'],
   ['B', 'ordre de travail'],
   ['O', 'replier les objectifs'],
+  ['C', 'afficher ou masquer le plan du bâtiment'],
   ['T', 'schéma au tableau'],
   ['H', 'demander à Aïcha'],
   ['P', 'liste des ports, pour tout faire au clavier'],

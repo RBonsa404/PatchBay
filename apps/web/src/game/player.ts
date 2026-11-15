@@ -37,7 +37,7 @@ export class Player {
 
   /** Open the building to the player (otherwise, the technical room only); `stairs` adds the first floor. */
   enterBuilding(stairs: boolean): void {
-    this.allowed = new Set<ZoneName>(['room', 'corridor', 'lab', ...(stairs ? (['stairs', 'corridor1', 'office'] as ZoneName[]) : [])]);
+    this.allowed = new Set<ZoneName>(['room', 'corridor', 'lab', 'classroom0', 'toilets', 'lounge', ...(stairs ? (['stairs', 'corridor1', 'office', 'classroom1', 'classroom2'] as ZoneName[]) : [])]);
   }
 
   /** Height of the floor under the player. */

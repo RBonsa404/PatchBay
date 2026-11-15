@@ -42,13 +42,22 @@ const REST_AFTER = 1000;
 /** How much a generic reflection counts, without the picture of the real room that only the high quality takes. */
 const PLAIN_REFLECTIONS = 0.45;
 
-function softwareRenderer(): boolean {
+function rendererName(): string {
   const gl = document.createElement('canvas').getContext('webgl2');
-  if (!gl) return false;
+  if (!gl) return '';
   const info = gl.getExtension('WEBGL_debug_renderer_info');
   const name = String(info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : '');
   gl.getExtension('WEBGL_lose_context')?.loseContext();
-  return /swiftshader|llvmpipe|basic render|software/i.test(name);
+  return name;
+}
+
+function softwareRenderer(): boolean {
+  return /swiftshader|llvmpipe|basic render|software/i.test(rendererName());
+}
+
+/** A graphics card of its own (not the chip shared with the processor): it can afford every effect. */
+function dedicatedGpu(): boolean {
+  return /RTX|GTX|Radeon RX|Radeon Pro|Arc A\d/i.test(rendererName());
 }
 
 /** A guess good enough to start with; the game lowers it if the machine struggles, and the player can change it from the HUD. */
@@ -63,7 +72,7 @@ export function detectQuality(): Quality {
     // storage unavailable: detect each time
   }
   if (cores <= 2 || memory <= 2 || /Android|iPhone|iPad/.test(navigator.userAgent) || softwareRenderer()) return 'low';
-  return 'medium';
+  return dedicatedGpu() ? 'high' : 'medium';
 }
 
 /**
@@ -231,19 +240,25 @@ export class Stage {
     this.vignette.uniforms.offset!.value = 0.95;
     this.vignette.uniforms.darkness!.value = 0.75;
     this.composer.addPass(this.vignette);
-    // A light grade: a little more contrast and colour than the raw render.
+    // The grade of a film camera: a little more contrast and colour, warm highlights and cool shadows (daylight from the
+    // windows, LED panels overhead), a fine moving grain. Subtle on purpose: it should be felt, not seen.
     this.grade = new ShaderPass({
-      uniforms: { tDiffuse: { value: null } },
+      uniforms: { tDiffuse: { value: null }, time: { value: 0 } },
       vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-      fragmentShader: `uniform sampler2D tDiffuse; varying vec2 vUv;
+      fragmentShader: `uniform sampler2D tDiffuse; uniform float time; varying vec2 vUv;
+        float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
         void main() {
           vec4 c = texture2D(tDiffuse, vUv);
           float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
-          vec3 v = mix(vec3(l), c.rgb, 1.06);
-          v = mix(v, v * v * (3.0 - 2.0 * v), 0.14);
-          // Dither: no banding in the walls' soft gradients.
-          float n = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
-          gl_FragColor = vec4(v + (n - 0.5) / 255.0, c.a);
+          vec3 v = mix(vec3(l), c.rgb, 1.1);
+          v = mix(v, v * v * (3.0 - 2.0 * v), 0.18);
+          vec3 shadows = vec3(0.97, 0.99, 1.04);
+          vec3 highlights = vec3(1.035, 1.0, 0.955);
+          v *= mix(shadows, highlights, smoothstep(0.15, 0.85, l));
+          // Grain, finer in the light, and the dither that keeps the walls' soft gradients from banding.
+          float g = hash(gl_FragCoord.xy + fract(time) * 517.0) - 0.5;
+          v += g * mix(0.022, 0.008, l);
+          gl_FragColor = vec4(v, c.a);
         }`,
     });
     this.composer.addPass(this.grade);
@@ -278,11 +293,13 @@ export class Stage {
       light.shadow.map?.dispose();
       light.shadow.map = null;
     }
-    this.bloom.enabled = full;
+    // Medium keeps the cheap filters (glow, vignette, grade); only the ambient occlusion is for high.
+    const post = q !== 'low';
+    this.bloom.enabled = post;
     this.ao.enabled = full;
-    this.vignette.enabled = full;
-    this.grade.enabled = full;
-    if (!full) {
+    this.vignette.enabled = post;
+    this.grade.enabled = post;
+    if (!post) {
       this.composer.renderTarget1.dispose();
       this.composer.renderTarget2.dispose();
     }
@@ -607,7 +624,9 @@ export class Stage {
         if ((o as THREE.Mesh).isMesh && !(o as THREE.Mesh).userData.fullMaterial) this.simplify(o as THREE.Mesh);
       });
     }
-    if (this.quality === 'high') this.composer.render(dt);
-    else this.renderer.render(this.scene, this.camera);
+    if (this.quality !== 'low') {
+      (this.grade.uniforms.time as { value: number }).value = now / 1000;
+      this.composer.render(dt);
+    } else this.renderer.render(this.scene, this.camera);
   }
 }

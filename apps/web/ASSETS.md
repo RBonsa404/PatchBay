@@ -52,6 +52,13 @@ Convertis en GLB, textures réduites à 512 px en WebP.
 | desk_lamp_arm_01 | https://polyhaven.com/a/desk_lamp_arm_01 |
 | clipboard | https://polyhaven.com/a/clipboard |
 | binder_notebook | https://polyhaven.com/a/binder_notebook |
-| pachira_aquatica_01 | https://polyhaven.com/a/pachira_aquatica_01 |
+
+## Vues des fenêtres (Poly Haven, CC0)
+
+Recadrages de panoramas photographiés, dans `public/textures/outside/` : `garden-*` d'après https://polyhaven.com/a/suburban_garden, `city-*` d'après https://polyhaven.com/a/homecoming_center_rooftop, `quad-*` d'après https://polyhaven.com/a/quadrangle_sunny.
+
+## Modèles faits pour le jeu
+
+Dans Blender, par scripts (`art/blender/`) : switch Catalyst 2960, routeurs 2911 et 1841, panneau de brassage 24 ports, poste de TP (bureau, écran, clavier, souris, tour).
 
 Les modèles, les textures photo et les musiques sont allégés pour le jeu (moins de triangles, images de 256 à 512 px, MP3 à 96 kbit/s). Le socle de l'extincteur porte « EXTINCTEUR ».

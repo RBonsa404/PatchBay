@@ -116,41 +116,25 @@ export function ceilingTexture(): THREE.CanvasTexture {
   return texture(c, 1, 1);
 }
 
-/** The outside, seen from a window: a pale sky over the campus, in late-afternoon light. */
-export function outsideTexture(): THREE.CanvasTexture {
-  const [c, g] = canvas(1024, 640);
-  const sky = g.createLinearGradient(0, 0, 0, 640);
-  sky.addColorStop(0, '#9fc7ee');
-  sky.addColorStop(0.62, '#e8f0f4');
-  sky.addColorStop(0.7, '#f7ead6');
-  g.fillStyle = sky;
-  g.fillRect(0, 0, 1024, 640);
-  const sun = g.createRadialGradient(780, 330, 10, 780, 330, 340);
-  sun.addColorStop(0, 'rgba(255, 244, 214, 0.95)');
-  sun.addColorStop(1, 'rgba(255, 244, 214, 0)');
-  g.fillStyle = sun;
-  g.fillRect(0, 0, 1024, 640);
-  const rnd = seeded(51);
-  // Out of focus, as seen from inside: buildings far away in the haze, then the nearer trees.
-  g.filter = 'blur(5px)';
-  for (let x = -20; x < 1024; ) {
-    const w = 50 + rnd() * 120;
-    const h = 40 + rnd() * 130;
-    g.fillStyle = `rgba(${150 + rnd() * 30}, ${160 + rnd() * 25}, ${170 + rnd() * 20}, 0.85)`;
-    g.fillRect(x, 470 - h, w, h + 40);
-    x += w + rnd() * 24;
+/**
+ * What a window shows: real photographs of the outside (Poly Haven panoramas, CC0, cropped in
+ * `public/textures/outside/`), a garden or the campus quad from the ground floor, the city from upstairs. Each call takes
+ * the next view of its kind, so that neighbouring windows do not repeat the same picture.
+ */
+const OUTSIDE = { garden: ['garden-1', 'garden-2', 'garden-3', 'quad-1'], city: ['city-1', 'city-3'], quad: ['quad-2', 'quad-1'] } as const;
+export type OutsideView = keyof typeof OUTSIDE;
+const outsideTurn: Record<OutsideView, number> = { garden: 0, city: 0, quad: 0 };
+const outsideLoaded = new Map<string, THREE.Texture>();
+export function outsideTexture(kind: OutsideView = 'garden'): THREE.Texture {
+  const views = OUTSIDE[kind];
+  const name = views[outsideTurn[kind]++ % views.length] as string;
+  let t = outsideLoaded.get(name);
+  if (!t) {
+    t = photoLoader.load(`${import.meta.env.BASE_URL}textures/outside/${name}.jpg`);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 4;
+    outsideLoaded.set(name, t);
   }
-  for (let i = 0; i < 70; i++) {
-    g.fillStyle = `rgba(${70 + rnd() * 40}, ${100 + rnd() * 40}, ${60 + rnd() * 30}, 0.9)`;
-    g.beginPath();
-    g.arc(rnd() * 1024, 500 + rnd() * 50, 22 + rnd() * 40, 0, Math.PI * 2);
-    g.fill();
-  }
-  g.fillStyle = '#c9b48f';
-  g.fillRect(-20, 556, 1064, 110);
-  g.filter = 'none';
-  const t = texture(c, 1, 1);
-  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
   return t;
 }
 

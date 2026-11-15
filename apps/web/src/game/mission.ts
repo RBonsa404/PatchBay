@@ -13,7 +13,7 @@ import { buildWhiteboard } from '../scene/details.js';
 import { buildAnnex } from '../scene/annex.js';
 import { applyLightmap } from '../scene/lightmaps.js';
 import { BUILDING, rackFillers, setMainDoorOpen } from '../scene/room.js';
-import { blockedAt, DOORS, groundAt, zoneOf, type ZoneName as Zone } from '../scene/building.js';
+import { blockedAt, DOORS, groundAt, ZONES, zoneOf, type ZoneName as Zone } from '../scene/building.js';
 import type { Quality, Stage } from '../scene/stage.js';
 import { AskAicha } from '../ui/askAicha.js';
 import { h } from '../ui/dom.js';
@@ -23,6 +23,7 @@ import { extraCables, tidiness, type Tidiness } from './cabling.js';
 import { clock, grade, type Grade } from './scoring.js';
 import { canListen, listenOnce } from '../voice.js';
 import { settings } from '../settings.js';
+import { Minimap } from '../ui/minimap.js';
 import { pauseOpen, showPause } from '../ui/pause.js';
 import { understand, type VoiceCommand } from '../voice-commands.js';
 
@@ -135,6 +136,8 @@ export class Mission {
   private cords: { type: CableType; end: PortView; panel: PortView }[] = [];
   private building = false;
   private lastZone: string | null = null;
+  /** The plan of the floor, in a corner: only in missions across the building. */
+  private minimap: Minimap | null = null;
   private boardView: THREE.Vector3 | null = null;
   private readonly limit: number;
   private remaining: number;
@@ -225,10 +228,11 @@ export class Mission {
     stage.setRig(0, 0);
     if (this.building) {
       this.player.enterBuilding(floors);
+      if (!this.tour) this.minimap = new Minimap(floors);
       const annex = buildAnnex(floors);
       for (const part of annex.children) applyLightmap(part);
       stage.level.add(annex);
-      for (const [key, name] of [['lab', 'part-lab'], ['lower', 'part-lower'], ['stairs', 'part-stairs'], ['office', 'part-office'], ['upper', 'part-upper']] as const) {
+      for (const [key, name] of [['lab', 'part-lab'], ['lower', 'part-lower'], ['stairs', 'part-stairs'], ['office', 'part-office'], ['upper', 'part-upper'], ['west', 'part-west'], ['classes', 'part-classes']] as const) {
         const object = annex.getObjectByName(name);
         if (object) this.parts.set(key, [...(this.parts.get(key) ?? []), object]);
       }
@@ -395,6 +399,7 @@ export class Mission {
     this.fade?.remove();
     this.cables.showPreview('straight', null, null);
     this.hud.destroy();
+    this.minimap?.destroy();
     closePanel();
     this.stage.manualCamera = false;
     this.stage.zoom = 1;
@@ -537,6 +542,7 @@ export class Mission {
       if (e.code === 'KeyP' && !typing) this.showPorts();
       if (e.code === 'KeyB' && !typing) this.showBrief();
       if (e.code === 'KeyO' && !typing) this.hud.toggleObjectives();
+      if (e.code === 'KeyC' && !typing) this.minimap?.toggle();
       if (e.key === 'F1') {
         e.preventDefault();
         showHelp();
@@ -1019,11 +1025,16 @@ export class Mission {
     const nearDoors = this.player.x < (DOORS[0] as { x: number }).x + 1.4;
     const seen: Record<Zone, string[]> = {
       room: ['room', 'lower', ...(nearDoors ? ['lab'] : [])],
-      corridor: ['room', 'lower', 'lab', 'stairs'],
+      corridor: ['room', 'lower', 'lab', 'stairs', 'west'],
       lab: ['lab', 'lower', ...(nearDoors ? ['room'] : [])],
       stairs: ['lower', 'upper', 'stairs'],
-      corridor1: ['upper', 'office', 'stairs'],
+      corridor1: ['upper', 'office', 'stairs', 'classes'],
       office: ['office', 'upper'],
+      classroom0: ['west', 'lower'],
+      toilets: ['west', 'lower'],
+      lounge: ['west', 'lower'],
+      classroom1: ['classes', 'upper'],
+      classroom2: ['classes', 'upper'],
     };
     const key = seen[zone].join();
     if (key === this.shown) return;
@@ -1051,7 +1062,7 @@ export class Mission {
     if (zone === this.lastZone) return;
     if (this.lastZone !== null) this.hud.toast(t(`zone.${zone}`));
     this.lastZone = zone;
-    const floor = zone === 'corridor1' || zone === 'office' ? BUILDING.floorY : 0;
+    const floor = this.player.floorY > BUILDING.floorY - 0.5 ? BUILDING.floorY : 0;
     const hall = (BUILDING.corridor.back + BUILDING.corridor.front) / 2;
     const hallLamp = (x: number, y = floor): [number, number, number, number] => [x, y + 2.25, hall, 3.2];
     // Over the room the player is in, and over the corridor they can see through its door.
@@ -1059,6 +1070,11 @@ export class Mission {
     if (zone === 'room' || zone === 'office') this.stage.placeLamps([0.4, floor + 2.9, 1.2, 4], hallLamp(door));
     else if (zone === 'lab') this.stage.placeLamps([0.4, 2.9, BUILDING.annexZ + 1.2, 4], hallLamp(door));
     else if (zone === 'stairs') this.stage.placeLamps([10.2, 4.4, -2.45, 4], [8.6, 1.9, -1.7, 3.2]);
+    else if (zone !== 'corridor' && zone !== 'corridor1') {
+      // The building's other rooms: a lamp over the middle of the room, another at its door.
+      const r = (ZONES.find((z) => z.name === zone) as { rect: { x0: number; x1: number; z0: number; z1: number } }).rect;
+      this.stage.placeLamps([(r.x0 + r.x1) / 2, floor + 2.6, (r.z0 + r.z1) / 2, 5], hallLamp((r.x0 + r.x1) / 2));
+    }
     else this.stage.placeLamps(hallLamp(door), hallLamp(2.0));
     if (zone === 'room') this.stage.setRig(0, 0);
     if (zone === 'lab') this.stage.setRig(0, BUILDING.annexZ);
@@ -1069,6 +1085,7 @@ export class Mission {
   private walk(dt: number): void {
     this.tickClock(dt);
     if (this.paused) return;
+    this.minimap?.update(this.player.x, this.player.z, this.player.yaw, this.player.floorY, zoneOf(this.player.x, this.player.floorY + 0.1, this.player.z));
     const camera = this.stage.camera;
     for (const code of this.held) {
       const turn = TURN_KEYS[code];

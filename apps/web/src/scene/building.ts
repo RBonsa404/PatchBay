@@ -22,7 +22,19 @@ export const ROOM_HEIGHT = 3;
 export const WALL = 0.16;
 export const DOOR_HEIGHT = 2.1;
 
-export type ZoneName = 'room' | 'corridor' | 'lab' | 'stairs' | 'corridor1' | 'office';
+export type ZoneName =
+  | 'room'
+  | 'corridor'
+  | 'lab'
+  | 'stairs'
+  | 'corridor1'
+  | 'office'
+  // Rooms of an ordinary university building, there to make it real: nothing to cable in them.
+  | 'classroom0'
+  | 'toilets'
+  | 'lounge'
+  | 'classroom1'
+  | 'classroom2';
 
 export interface Zone {
   name: ZoneName;
@@ -39,8 +51,16 @@ export const ROOMS = {
   room: { x0: -6, x1: 6, z0: -1.68, z1: 6.0 },
   /** The lab room, across the corridor. Its origin is at z = LAB_Z. */
   lab: { x0: -7, x1: 7, z0: -11.68, z1: -4.0 },
-  corridor: { x0: -8, x1: 7, z0: -4.0, z1: -1.68 },
+  /** The ground floor's corridor runs on west to the classroom, the toilets and the lounge. */
+  corridor: { x0: -14, x1: 7, z0: -4.0, z1: -1.68 },
+  corridor1: { x0: -8, x1: 7, z0: -4.0, z1: -1.68 },
   stairs: { x0: 7, x1: 12.6, z0: -4.0, z1: -0.9 },
+  classroom0: { x0: -14, x1: -6, z0: -1.68, z1: 6.0 },
+  toilets: { x0: -14, x1: -10.5, z0: -9.2, z1: -4.0 },
+  lounge: { x0: -10.5, x1: -7, z0: -9.2, z1: -4.0 },
+  /** Upstairs, over the lab: two classrooms. */
+  classroom1: { x0: -7, x1: 0, z0: -11.68, z1: -4.0 },
+  classroom2: { x0: 0, x1: 7, z0: -11.68, z1: -4.0 },
 } as const;
 
 /** Where the lab's furniture is centred: its bench and rack stand as the technical room's do around z = 0. */
@@ -51,22 +71,37 @@ export function roomOrigin(y: number, z: number): { y: number; z: number } {
   return { y: y > FLOOR_Y - 0.1 ? FLOOR_Y : 0, z: z < ROOMS.corridor.z0 ? LAB_Z : 0 };
 }
 
+// The corridors first: a point on a doorway's line belongs to the corridor it opens onto.
 export const ZONES: Zone[] = [
+  { name: 'corridor', rect: ROOMS.corridor, y: 0 },
+  { name: 'corridor1', rect: ROOMS.corridor1, y: FLOOR_Y },
   { name: 'room', rect: ROOMS.room, y: 0 },
   { name: 'lab', rect: ROOMS.lab, y: 0 },
-  { name: 'corridor', rect: ROOMS.corridor, y: 0 },
   { name: 'stairs', rect: ROOMS.stairs, y: 0 },
   { name: 'office', rect: ROOMS.room, y: FLOOR_Y },
-  { name: 'corridor1', rect: ROOMS.corridor, y: FLOOR_Y },
+  { name: 'classroom0', rect: ROOMS.classroom0, y: 0 },
+  { name: 'toilets', rect: ROOMS.toilets, y: 0 },
+  { name: 'lounge', rect: ROOMS.lounge, y: 0 },
+  { name: 'classroom1', rect: ROOMS.classroom1, y: FLOOR_Y },
+  { name: 'classroom2', rect: ROOMS.classroom2, y: FLOOR_Y },
 ];
 
-/** Which zone a point is in: the stair hall first (it spans both floors), then by floor. */
+/** Which zone a point is in: the stair hall first (it spans both floors), then the nearest room of its floor. */
 export function zoneOf(x: number, y: number, z: number): ZoneName {
   if (inside(x, z, ROOMS.stairs, -0.05)) return 'stairs';
-  const upper = y > FLOOR_Y - 0.5;
-  if (z > ROOMS.corridor.z1) return upper ? 'office' : 'room';
-  if (z < ROOMS.corridor.z0) return 'lab';
-  return upper ? 'corridor1' : 'corridor';
+  const floor = y > FLOOR_Y - 0.5 ? FLOOR_Y : 0;
+  let best: ZoneName = floor ? 'corridor1' : 'corridor';
+  let distance = Infinity;
+  for (const zone of ZONES) {
+    if (zone.name === 'stairs' || zone.y !== floor) continue;
+    const r = zone.rect;
+    const d = Math.hypot(Math.max(r.x0 - x, 0, x - r.x1), Math.max(r.z0 - z, 0, z - r.z1));
+    if (d < distance - 1e-6) {
+      distance = d;
+      best = zone.name;
+    }
+  }
+  return best;
 }
 
 export function inside(x: number, z: number, r: Rect, margin = 0): boolean {
@@ -84,6 +119,8 @@ export interface Door {
   y: number;
   /** Which way the wall runs: 'x' for a wall along x (at fixed z). */
   along: 'x' | 'z';
+  /** The sign over it, on the corridor's side. */
+  label?: string;
 }
 
 const CORRIDOR_DOOR_X = -4.6;
@@ -97,6 +134,12 @@ export const DOORS: Door[] = [
   // Corridor to the stair hall, both floors: wide openings.
   { x: ROOMS.corridor.x1, z: (ROOMS.corridor.z0 + ROOMS.corridor.z1) / 2, width: 2.0, y: 0, along: 'z' },
   { x: ROOMS.corridor.x1, z: (ROOMS.corridor.z0 + ROOMS.corridor.z1) / 2, width: 2.0, y: FLOOR_Y, along: 'z' },
+  // The building's other rooms.
+  { x: -10, z: ROOMS.corridor.z1, width: 1.0, y: 0, along: 'x', label: 'SALLE DE COURS 001' },
+  { x: -12.25, z: ROOMS.corridor.z0, width: 0.9, y: 0, along: 'x', label: 'TOILETTES' },
+  { x: -8.75, z: ROOMS.corridor.z0, width: 1.0, y: 0, along: 'x', label: 'SALLE DE DÉTENTE' },
+  { x: -4.6, z: ROOMS.corridor.z0, width: 1.0, y: FLOOR_Y, along: 'x', label: 'SALLE DE COURS 101' },
+  { x: 3.5, z: ROOMS.corridor.z0, width: 1.0, y: FLOOR_Y, along: 'x', label: 'SALLE DE COURS 102' },
 ];
 
 export interface WallSegment {
@@ -112,9 +155,10 @@ export interface WallSegment {
 
 /** The walls, each a straight line; doorways are cut out of them by `wallPieces`. */
 export const WALLS: WallSegment[] = (() => {
-  const { room, lab, corridor, stairs } = ROOMS;
+  const { room, lab, stairs, classroom0, toilets, lounge, classroom1 } = ROOMS;
   const out: WallSegment[] = [];
   const level = (y: number): void => {
+    const corridor = y > 0 ? ROOMS.corridor1 : ROOMS.corridor;
     const h = y + ROOM_HEIGHT;
     // Around the technical room (or the administration above it).
     out.push({ x0: room.x0, z0: room.z0, x1: room.x1, z1: room.z0, y0: y, y1: h });
@@ -134,6 +178,18 @@ export const WALLS: WallSegment[] = (() => {
   out.push({ x0: lab.x0, z0: lab.z0, x1: lab.x1, z1: lab.z0, y0: 0, y1: ROOM_HEIGHT });
   out.push({ x0: lab.x0, z0: lab.z0, x1: lab.x0, z1: lab.z1, y0: 0, y1: ROOM_HEIGHT });
   out.push({ x0: lab.x1, z0: lab.z0, x1: lab.x1, z1: lab.z1, y0: 0, y1: ROOM_HEIGHT });
+  // West wing, ground floor: the classroom south of the corridor, the toilets and the lounge north of it.
+  out.push({ x0: classroom0.x0, z0: classroom0.z0, x1: classroom0.x0, z1: classroom0.z1, y0: 0, y1: ROOM_HEIGHT });
+  out.push({ x0: classroom0.x0, z0: classroom0.z1, x1: classroom0.x1, z1: classroom0.z1, y0: 0, y1: ROOM_HEIGHT });
+  out.push({ x0: toilets.x0, z0: toilets.z0, x1: lounge.x1, z1: toilets.z0, y0: 0, y1: ROOM_HEIGHT });
+  out.push({ x0: toilets.x0, z0: toilets.z0, x1: toilets.x0, z1: toilets.z1, y0: 0, y1: ROOM_HEIGHT });
+  out.push({ x0: toilets.x1, z0: toilets.z0, x1: toilets.x1, z1: toilets.z1, y0: 0, y1: ROOM_HEIGHT });
+  // Upstairs over the lab: two classrooms side by side.
+  const up = FLOOR_Y + ROOM_HEIGHT;
+  out.push({ x0: classroom1.x0, z0: classroom1.z0, x1: ROOMS.classroom2.x1, z1: classroom1.z0, y0: FLOOR_Y, y1: up });
+  out.push({ x0: classroom1.x0, z0: classroom1.z0, x1: classroom1.x0, z1: classroom1.z1, y0: FLOOR_Y, y1: up });
+  out.push({ x0: classroom1.x1, z0: classroom1.z0, x1: classroom1.x1, z1: classroom1.z1, y0: FLOOR_Y, y1: up });
+  out.push({ x0: ROOMS.classroom2.x1, z0: classroom1.z0, x1: ROOMS.classroom2.x1, z1: classroom1.z1, y0: FLOOR_Y, y1: up });
   // The stair hall: one shell from the ground to the roof, with the corridors' openings.
   const top = FLOOR_Y + ROOM_HEIGHT;
   out.push({ x0: stairs.x0, z0: stairs.z0, x1: stairs.x1, z1: stairs.z0, y0: 0, y1: top });
@@ -225,7 +281,12 @@ const SURFACES: Surface[] = [
   { flight: STAIRS.down },
   { rect: STAIRS.gallery, y: FLOOR_Y },
   { rect: ROOMS.room, y: FLOOR_Y },
-  { rect: ROOMS.corridor, y: FLOOR_Y },
+  { rect: ROOMS.corridor1, y: FLOOR_Y },
+  { rect: ROOMS.classroom0, y: 0 },
+  { rect: ROOMS.toilets, y: 0 },
+  { rect: ROOMS.lounge, y: 0 },
+  { rect: ROOMS.classroom1, y: FLOOR_Y },
+  { rect: ROOMS.classroom2, y: FLOOR_Y },
 ];
 
 /** Furniture and anything else standing on a floor that the player walks around. */
@@ -254,6 +315,9 @@ function roomFurniture(z: number, y: number): Obstacle[] {
   return [at(rect(-1.6, 1.6, -0.3, 0.8), 1), at(rect(-0.36, 0.36, -0.96, -0.33))];
 }
 const LAB_ROWS = [2.0, 3.45, 4.9];
+/** Where the classrooms' student desks stand (`annex.ts` lays them out in these blocks). */
+export const CLASS0_DESKS = { x0: -11.75, x1: -6.75, z0: -0.6, z1: 4.6 } as const;
+export const CLASS_UP_DESKS = { z0: -9.95, z1: -5.1 } as const;
 const FURNITURE: Obstacle[] = [
   // Technical room: bench and rack, server cabinet, extinguisher, shelving, cabinet row, cupboard, desk, chair, bin,
   // the second row of racks.
@@ -276,6 +340,23 @@ const FURNITURE: Obstacle[] = [
   { rect: rect(-4.6, -1.6, 2.6, 4.4), y0: FLOOR_Y, y1: FLOOR_Y + 1 },
   { rect: rect(1.6, 4.6, 2.6, 4.4), y0: FLOOR_Y, y1: FLOOR_Y + 1 },
   { rect: rect(FACE.left, FACE.left + 0.55, 0.0, 2.6), y0: FLOOR_Y, y1: FLOOR_Y + 1 },
+  // The classroom downstairs: its block of desks facing the board on the west wall, the teacher's desk.
+  { rect: rect(CLASS0_DESKS.x0, CLASS0_DESKS.x1, CLASS0_DESKS.z0, CLASS0_DESKS.z1), y0: 0, y1: 1 },
+  { rect: rect(-13.3, -12.5, 1.3, 2.7), y0: 0, y1: 1 },
+  // Toilets: the cubicles along the back wall, the washbasins on the east wall.
+  { rect: rect(-13.95, -11.0, -9.12, -7.55), y0: 0, y1: 2.1 },
+  { rect: rect(-11.12, -10.58, -6.85, -5.15), y0: 0, y1: 1.2 },
+  // Lounge: the sofa, its low table and armchairs, the vending machine, the coffee cart.
+  { rect: rect(-9.75, -7.75, -9.12, -8.25), y0: 0, y1: 1 },
+  { rect: rect(-9.3, -8.2, -7.95, -7.35), y0: 0, y1: 0.6 },
+  { rect: rect(-10.42, -9.55, -5.65, -4.75), y0: 0, y1: 2 },
+  { rect: rect(-8.16, -7.08, -6.2, -4.7), y0: 0, y1: 1.2 },
+  { rect: rect(-10.3, -9.4, -7.45, -6.45), y0: 0, y1: 1 },
+  { rect: rect(-8.1, -7.2, -7.45, -6.45), y0: 0, y1: 1 },
+  // Upstairs classrooms: desks facing the board on the back wall.
+  ...[ROOMS.classroom1, ROOMS.classroom2].map((r) => ({ rect: rect(r.x0 + 1.1, r.x1 - 1.1, CLASS_UP_DESKS.z0, CLASS_UP_DESKS.z1), y0: FLOOR_Y, y1: FLOOR_Y + 1 })),
+  { rect: rect(-6.35, -5.05, -11.6, -10.15), y0: FLOOR_Y, y1: FLOOR_Y + 1 },
+  { rect: rect(5.05, 6.35, -11.6, -10.15), y0: FLOOR_Y, y1: FLOOR_Y + 1 },
 ];
 
 /** The lab's rows of desks (their depth along z, from the lab's origin): `annex.ts` lays them out here. */

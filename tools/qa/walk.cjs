@@ -15,6 +15,12 @@ const ROUTE = [
   ['across the landing', 11.6, -3.2, 1.65],
   ['top of the second flight', 7.6, -3.2, 3.3],
   ['upper corridor', 5.5, -2.84, 3.3],
+  ['in front of classroom 102', 3.5, -2.84, 3.3],
+  ['into classroom 102', 3.5, -4.8, 3.3],
+  ['out of classroom 102', 3.5, -2.84, 3.3],
+  ['in front of classroom 101', -4.6, -2.84, 3.3],
+  ['into classroom 101', -4.6, -4.8, 3.3],
+  ['out of classroom 101', -4.6, -2.84, 3.3],
   ['administration door', -4.6, -2.84, 3.3],
   ['into the administration', -4.6, 0.5, 3.3],
   ['out of the administration', -4.6, -2.84, 3.3],
@@ -27,6 +33,15 @@ const ROUTE = [
   ['back into the corridor', 6.4, -2.84, 0],
   ['in front of the lab door', 0, -3.2, 0],
   ['into the lab', 0, -5.6, 0],
+  ['back to the corridor', 0, -2.84, 0],
+  ['west along the corridor', -10, -2.84, 0],
+  ['into classroom 001', -10, -0.9, 0],
+  ['out of classroom 001', -10, -2.84, 0],
+  ['in front of the lounge', -8.75, -2.84, 0],
+  ['into the lounge', -8.75, -5.5, 0],
+  ['out of the lounge', -8.75, -2.84, 0],
+  ['in front of the toilets', -12.25, -2.84, 0],
+  ['into the toilets', -12.25, -5.2, 0],
 ];
 
 (async () => {
