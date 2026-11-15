@@ -65,4 +65,17 @@ describe('PC command prompt (French Windows)', () => {
     expect(run(net, 'show ip route')).toContain("'show' n’est pas reconnu en tant que commande interne");
     expect(run(net, 'ping serveur')).toContain('n’a pas pu trouver l’hôte serveur');
   });
+
+  it('tests services with curl, telnet and ssh, as from a real client', () => {
+    const net = staticLab();
+    run(net, 'ping 172.16.3.1');
+    expect(run(net, 'curl http://172.16.3.1')).toBe('curl: (7) Failed to connect to 172.16.3.1 port 80 after 0 ms: Connection refused');
+    expect(run(net, 'telnet 172.16.3.1')).toContain('Impossible d’ouvrir une connexion à l’hôte, sur le port 23');
+    for (const c of ['configure terminal', 'line vty 0 4', 'password cisco', 'login', 'end']) net.device('R1').cli!.execute(c);
+    expect(run(net, 'telnet 172.16.3.1')).toContain('User Access Verification');
+    expect(run(net, 'ssh admin@172.16.3.1')).toBe('ssh: connect to host 172.16.3.1 port 22: Connection refused');
+    expect(run(net, 'curl 10.9.9.9')).toContain('Could not connect to server');
+    expect(run(net, 'curl site.example')).toBe('curl: (6) Could not resolve host: site.example');
+    expect(run(net, 'telnet')).toBe('Usage : telnet adresse [port]');
+  });
 });

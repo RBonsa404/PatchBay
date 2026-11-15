@@ -21,7 +21,11 @@ export type ConfigCheck =
   /** The OSPF process runs with this router ID. */
   | { kind: 'router-id'; equals: string }
   /** `ip nat inside` or `ip nat outside` on the interface. */
-  | { kind: 'nat-role'; interface: string; role: 'inside' | 'outside' };
+  | { kind: 'nat-role'; interface: string; role: 'inside' | 'outside' }
+  /** An access list that exists and has entries filters the interface in that direction (`ip access-group`). */
+  | { kind: 'acl-applied'; interface: string; direction: 'in' | 'out' }
+  /** Every VTY line that accepts a login is restricted by `access-class ... in` to an existing access list. */
+  | { kind: 'vty-access-class' };
 
 interface Base {
   id: string;
@@ -132,6 +136,15 @@ function check(net: Network, o: Objective): Omit<ObjectiveResult, 'id' | 'points
             return net.ospf.activeRouterId(o.device) === c.equals;
           case 'nat-role':
             return config.interfaces.find((i) => i.name === c.interface)?.natRole === c.role;
+          case 'acl-applied': {
+            const ifc = config.interfaces.find((i) => i.name === c.interface);
+            const name = c.direction === 'in' ? ifc?.aclIn : ifc?.aclOut;
+            return config.acls.some((a) => a.name === name && a.entries.some((e) => e.remark === undefined));
+          }
+          case 'vty-access-class': {
+            const vty = config.lines.filter((l) => l.id.startsWith('vty') && l.login && l.password !== undefined);
+            return vty.length > 0 && vty.every((l) => config.acls.some((a) => a.name === l.accessClassIn && a.entries.length > 0));
+          }
         }
       })();
       return has ? ok : fail('missing-config');

@@ -1,0 +1,240 @@
+{
+  "id": "l07-securite",
+  "version": 1,
+  "title": {
+    "fr": "Sécuriser le réseau",
+    "en": "Securing the network"
+  },
+  "story": {
+    "fr": "Mauvaise surprise ce matin : depuis la salle de TP, un étudiant a ouvert une session sur le serveur des notes, et un autre est entré sur le routeur en Telnet avec le mot de passe « cisco » laissé par l'ancien administrateur. Rien de cassé, mais la direction veut des garanties. Les étudiants doivent toujours consulter le portail web du serveur, et rien d'autre côté administration. Seul le PC du professeur peut encore administrer le routeur à distance.",
+    "en": "Nasty surprise this morning: from the lab room, a student logged into the grades server, and another got into the router over Telnet with the « cisco » password left by the former administrator. Nothing broken, but management wants guarantees. Students must still reach the server's web portal, and nothing else on the administration side. Only the teacher's PC may still manage the router remotely."
+  },
+  "brief": {
+    "fr": "Salle technique (administration, 192.168.10.0/24) : R1, S1, le serveur des notes SRV (192.168.10.10 : web sur le port 80, administration SSH sur le port 22), le PC du professeur PROF (192.168.10.11) et le portable ADMIN. Salle de TP (étudiants, 192.168.20.0/24) : S2, PC1 et PC2. Tout est câblé et joignable ; le mot de passe actuel de R1 est cisco.\n1. Branche le câble console d'ADMIN sur R1.\n2. Mots de passe : enable secret à la place d'enable password, mot de passe et login sur la console.\n3. ACL étendue nommée ETUDIANTS, appliquée en entrée sur Gi0/1 (côté étudiants) : web vers le serveur autorisé, tout le reste vers 192.168.10.0/24 refusé, le reste permis.\n4. Telnet : liste standard 10 qui n'autorise que PROF, access-class 10 in sur line vty 0 4.\n5. Vérifie depuis PC1 (curl http://192.168.10.10, ssh 192.168.10.10, telnet 192.168.20.1) et depuis PROF (telnet 192.168.10.1), show access-lists. Sauvegarde R1.",
+    "en": "Technical room (administration, 192.168.10.0/24): R1, S1, the grades server SRV (192.168.10.10: web on port 80, SSH administration on port 22), the teacher's PC PROF (192.168.10.11) and the ADMIN laptop. Lab room (students, 192.168.20.0/24): S2, PC1 and PC2. Everything is cabled and reachable; R1's current password is cisco.\n1. Plug ADMIN's console cable into R1.\n2. Passwords: enable secret instead of enable password, a password and login on the console.\n3. A named extended ACL ETUDIANTS, applied inbound on Gi0/1 (students' side): web to the server allowed, everything else to 192.168.10.0/24 denied, the rest permitted.\n4. Telnet: a standard list 10 that only allows PROF, access-class 10 in on line vty 0 4.\n5. Check from PC1 (curl http://192.168.10.10, ssh 192.168.10.10, telnet 192.168.20.1) and from PROF (telnet 192.168.10.1), show access-lists. Save R1."
+  },
+  "difficulty": 4,
+  "timeLimit": 1800,
+  "settings": {
+    "strictMdix": true
+  },
+  "devices": [
+    { "id": "ADMIN", "model": "pc", "label": { "fr": "Portable d'administration", "en": "Admin laptop" }, "position": [0, 0.76, 0.5] },
+    { "id": "R1", "model": "cisco-2911", "label": { "fr": "Routeur", "en": "Router" }, "position": [0, 0.9, -0.4] },
+    { "id": "S1", "model": "catalyst-2960", "label": { "fr": "Switch de l'administration", "en": "Administration switch" }, "position": [0, 1.2, -0.4] },
+    { "id": "SRV", "model": "server", "label": { "fr": "Serveur des notes (web et SSH)", "en": "Grades server (web and SSH)" }, "position": [-0.62, 0.76, -0.05] },
+    { "id": "PROF", "model": "pc", "label": { "fr": "PC du professeur", "en": "Teacher's PC" }, "position": [-1.25, 0.76, 0.42] },
+    { "id": "S2", "model": "catalyst-2960", "label": { "fr": "Switch de la salle de TP", "en": "Lab room switch" }, "position": [0, 1.05, -0.4], "room": "annexe" },
+    { "id": "PC1", "model": "pc", "label": { "fr": "PC étudiant", "en": "Student PC" }, "position": [-1.15, 0.76, 0.25], "room": "annexe" },
+    { "id": "PC2", "model": "pc", "label": { "fr": "PC étudiant", "en": "Student PC" }, "position": [0.95, 0.76, 0.25], "room": "annexe" }
+  ],
+  "inventory": {
+    "cables": {
+      "straight": 2,
+      "crossover": 1,
+      "console": 1
+    }
+  },
+  "initial": {
+    "cables": [
+      { "type": "straight", "a": "S1:GigabitEthernet0/1", "b": "R1:GigabitEthernet0/0" },
+      { "type": "straight", "a": "SRV:FastEthernet0", "b": "S1:FastEthernet0/1" },
+      { "type": "straight", "a": "PROF:FastEthernet0", "b": "S1:FastEthernet0/2" },
+      { "type": "straight", "a": "R1:GigabitEthernet0/1", "b": "S2:GigabitEthernet0/1" },
+      { "type": "straight", "a": "PC1:FastEthernet0", "b": "S2:FastEthernet0/1" },
+      { "type": "straight", "a": "PC2:FastEthernet0", "b": "S2:FastEthernet0/2" }
+    ],
+    "hosts": {
+      "SRV": { "ip": "192.168.10.10", "mask": "255.255.255.0", "gateway": "192.168.10.1", "services": { "tcp": [80, 22] } },
+      "PROF": { "ip": "192.168.10.11", "mask": "255.255.255.0", "gateway": "192.168.10.1" },
+      "PC1": { "ip": "192.168.20.21", "mask": "255.255.255.0", "gateway": "192.168.20.1" },
+      "PC2": { "ip": "192.168.20.22", "mask": "255.255.255.0", "gateway": "192.168.20.1" }
+    },
+    "commands": {
+      "R1": [
+        "enable",
+        "configure terminal",
+        "hostname R1",
+        "enable password cisco",
+        "interface g0/0",
+        "ip address 192.168.10.1 255.255.255.0",
+        "no shutdown",
+        "interface g0/1",
+        "ip address 192.168.20.1 255.255.255.0",
+        "no shutdown",
+        "line vty 0 4",
+        "password cisco",
+        "login",
+        "end"
+      ],
+      "S1": ["enable", "configure terminal", "hostname S1", "end"],
+      "S2": ["enable", "configure terminal", "hostname S2", "end"]
+    }
+  },
+  "objectives": [
+    {
+      "id": "console",
+      "type": "console",
+      "from": "ADMIN",
+      "to": "R1",
+      "points": 5,
+      "label": { "fr": "Câble console entre ADMIN et R1", "en": "Console cable between ADMIN and R1" },
+      "hint": { "fr": "Le câble cyan : port RS232 du portable, port Console du routeur.", "en": "The cyan cable: the laptop's RS232 port, the router's Console port." }
+    },
+    {
+      "id": "enable-secret",
+      "type": "config",
+      "device": "R1",
+      "check": { "kind": "enable-secret" },
+      "points": 8,
+      "label": { "fr": "enable secret configuré sur R1", "en": "enable secret set on R1" },
+      "hint": { "fr": "enable secret garde une empreinte MD5 ; enable password est lisible dans show running-config. Une fois le secret posé, c'est lui qui compte.", "en": "enable secret keeps an MD5 hash; enable password is readable in show running-config. Once the secret is set, it is the one that counts." }
+    },
+    {
+      "id": "console-login",
+      "type": "config",
+      "device": "R1",
+      "check": { "kind": "console-login" },
+      "points": 7,
+      "label": { "fr": "Console protégée par mot de passe", "en": "Console protected by a password" },
+      "hint": { "fr": "line console 0, password ..., login.", "en": "line console 0, password ..., login." }
+    },
+    {
+      "id": "acl-applied",
+      "type": "config",
+      "device": "R1",
+      "check": { "kind": "acl-applied", "interface": "GigabitEthernet0/1", "direction": "in" },
+      "points": 8,
+      "label": { "fr": "ACL appliquée en entrée sur Gi0/1 (côté étudiants)", "en": "ACL applied inbound on Gi0/1 (students' side)" },
+      "hint": { "fr": "Une ACL étendue se place au plus près de la source : interface g0/1, ip access-group ETUDIANTS in.", "en": "An extended ACL goes as close to the source as possible: interface g0/1, ip access-group ETUDIANTS in." }
+    },
+    {
+      "id": "web-ok",
+      "type": "tcp",
+      "from": "PC1",
+      "to": "192.168.10.10",
+      "port": 80,
+      "expect": "open",
+      "points": 12,
+      "label": { "fr": "Les étudiants consultent toujours le portail web (port 80)", "en": "Students still reach the web portal (port 80)" },
+      "hint": { "fr": "L'ordre compte : la ligne permit tcp ... host 192.168.10.10 eq 80 doit venir avant le deny. Une ACL s'arrête à la première ligne qui correspond.", "en": "Order matters: the permit tcp ... host 192.168.10.10 eq 80 line must come before the deny. An ACL stops at the first matching line." }
+    },
+    {
+      "id": "ssh-blocked",
+      "type": "tcp",
+      "from": "PC1",
+      "to": "192.168.10.10",
+      "port": 22,
+      "expect": "unreachable",
+      "points": 14,
+      "label": { "fr": "SSH vers le serveur refusé aux étudiants", "en": "SSH to the server denied to students" },
+      "hint": { "fr": "deny ip 192.168.20.0 0.0.0.255 192.168.10.0 0.0.0.255 après la ligne du web. ssh 192.168.10.10 depuis PC1 doit échouer.", "en": "deny ip 192.168.20.0 0.0.0.255 192.168.10.0 0.0.0.255 after the web line. ssh 192.168.10.10 from PC1 must fail." }
+    },
+    {
+      "id": "ping-blocked",
+      "type": "ping",
+      "from": "PC2",
+      "to": "192.168.10.10",
+      "expect": "fail",
+      "points": 8,
+      "label": { "fr": "Le ping vers l'administration est bloqué", "en": "Pings to the administration are blocked" },
+      "hint": { "fr": "Le deny ip couvre aussi ICMP : le routeur répond « Impossible de joindre l'hôte de destination ».", "en": "The deny ip line covers ICMP too: the router answers « Destination host unreachable »." }
+    },
+    {
+      "id": "gateway-ok",
+      "type": "ping",
+      "from": "PC2",
+      "to": "192.168.20.1",
+      "expect": "success",
+      "points": 5,
+      "label": { "fr": "Les étudiants joignent toujours leur passerelle", "en": "Students still reach their gateway" },
+      "hint": { "fr": "N'oublie pas permit ip any any en dernière ligne : sans elle, le deny implicite bloque tout.", "en": "Don't forget permit ip any any as the last line: without it, the implicit deny blocks everything." }
+    },
+    {
+      "id": "vty-acl",
+      "type": "config",
+      "device": "R1",
+      "check": { "kind": "vty-access-class" },
+      "points": 6,
+      "label": { "fr": "Lignes vty filtrées par access-class", "en": "VTY lines filtered by access-class" },
+      "hint": { "fr": "access-list 10 permit host 192.168.10.11, puis line vty 0 4, access-class 10 in.", "en": "access-list 10 permit host 192.168.10.11, then line vty 0 4, access-class 10 in." }
+    },
+    {
+      "id": "telnet-students",
+      "type": "tcp",
+      "from": "PC1",
+      "to": "192.168.20.1",
+      "port": 23,
+      "expect": "refused",
+      "points": 12,
+      "label": { "fr": "Telnet vers R1 refusé aux étudiants", "en": "Telnet to R1 refused to students" },
+      "hint": { "fr": "access-class filtre les connexions vers le routeur lui-même, quelle que soit l'interface d'arrivée. telnet 192.168.20.1 depuis PC1 doit échouer.", "en": "access-class filters connections to the router itself, whatever interface they arrive on. telnet 192.168.20.1 from PC1 must fail." }
+    },
+    {
+      "id": "telnet-prof",
+      "type": "tcp",
+      "from": "PROF",
+      "to": "192.168.10.1",
+      "port": 23,
+      "expect": "open",
+      "points": 10,
+      "label": { "fr": "Le professeur administre toujours R1 en Telnet", "en": "The teacher can still manage R1 over Telnet" },
+      "hint": { "fr": "La liste 10 doit autoriser l'adresse de PROF, 192.168.10.11, et les lignes vty garder password et login.", "en": "List 10 must allow PROF's address, 192.168.10.11, and the vty lines keep their password and login." }
+    },
+    {
+      "id": "saved-r1",
+      "type": "saved",
+      "device": "R1",
+      "points": 5,
+      "label": { "fr": "Configuration de R1 sauvegardée", "en": "R1's configuration saved" },
+      "hint": { "fr": "copy running-config startup-config", "en": "copy running-config startup-config" }
+    }
+  ],
+  "hints": [
+    {
+      "afterSeconds": 180,
+      "text": {
+        "fr": "Une ACL se lit de haut en bas et s'arrête à la première ligne qui correspond. Après la dernière ligne, tout est refusé (deny implicite).",
+        "en": "An ACL is read top to bottom and stops at the first matching line. After the last line, everything is denied (implicit deny)."
+      }
+    },
+    {
+      "afterSeconds": 720,
+      "text": {
+        "fr": "show access-lists affiche chaque ligne avec son nombre de correspondances (matches) : lance un test depuis PC1, puis regarde quelle ligne a compté.",
+        "en": "show access-lists prints each line with its match count: run a test from PC1, then see which line counted."
+      }
+    }
+  ],
+  "solution": {
+    "cables": [
+      { "type": "console", "a": "ADMIN:RS232", "b": "R1:Console" }
+    ],
+    "commands": {
+      "R1": [
+        "configure terminal",
+        "enable secret Ist@2026",
+        "line console 0",
+        "password Cons0le!",
+        "login",
+        "exit",
+        "access-list 10 permit host 192.168.10.11",
+        "line vty 0 4",
+        "password Telnet!7",
+        "login",
+        "access-class 10 in",
+        "exit",
+        "ip access-list extended ETUDIANTS",
+        "permit tcp 192.168.20.0 0.0.0.255 host 192.168.10.10 eq 80",
+        "deny ip 192.168.20.0 0.0.0.255 192.168.10.0 0.0.0.255",
+        "permit ip any any",
+        "exit",
+        "interface g0/1",
+        "ip access-group ETUDIANTS in",
+        "end",
+        "copy running-config startup-config",
+        ""
+      ]
+    }
+  }
+}

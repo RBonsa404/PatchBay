@@ -31,6 +31,8 @@ const configCheck = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('ospf-passive'), interface: z.string() }).strict(),
   z.object({ kind: z.literal('router-id'), equals: ipv4 }).strict(),
   z.object({ kind: z.literal('nat-role'), interface: z.string(), role: z.enum(['inside', 'outside']) }).strict(),
+  z.object({ kind: z.literal('acl-applied'), interface: z.string(), direction: z.enum(['in', 'out']) }).strict(),
+  z.object({ kind: z.literal('vty-access-class') }).strict(),
 ]);
 
 const base = { id: z.string().min(1), label: text, hint: text.optional(), points: z.number().int().min(0) };

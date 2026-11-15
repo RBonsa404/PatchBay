@@ -6,7 +6,7 @@ const resultOf = (net: Network, level: Level, id: string) => evaluate(net, level
 
 describe('MVP campaign', () => {
   it('has its levels in order', () => {
-    expect(campaign.map((l) => l.id)).toEqual(['l01-cablage-console', 'l02-relier-deux-reseaux', 'l03-deux-salles-vlan', 'l04-reseau-du-batiment', 'l05-routage-ospf', 'l06-acces-internet']);
+    expect(campaign.map((l) => l.id)).toEqual(['l01-cablage-console', 'l02-relier-deux-reseaux', 'l03-deux-salles-vlan', 'l04-reseau-du-batiment', 'l05-routage-ospf', 'l06-acces-internet', 'l07-securite']);
   });
 
   for (const level of campaign) {
@@ -226,5 +226,50 @@ describe('level 6: reaching the Internet', () => {
     net.connect('serial', { device: 'R1', port: 'Serial0/0/0' }, { device: 'FAI', port: 'Serial0/0/0' });
     expect(resultOf(net, level, 'cable-serial')).toMatchObject({ passed: false, reason: 'serial-reversed' });
     expect(resultOf(net, level, 'serial-up').passed).toBe(false);
+  });
+});
+
+describe('level 7: securing the network', () => {
+  const level = campaign[6]!;
+  const r1 = level.solution.commands.R1!;
+  const withR1 = (commands: string[]): Level => ({ ...level, solution: { ...level.solution, commands: { R1: commands } } });
+
+  it('starts wide open: students reach the server over SSH and the router over Telnet', () => {
+    const net = buildLevel(level);
+    expect(net.tcpConnect('PC1', '192.168.10.10', 22)).toBe('open');
+    expect(net.tcpConnect('PC1', '192.168.20.1', 23)).toBe('open');
+    expect(resultOf(net, level, 'ssh-blocked').passed).toBe(false);
+    expect(resultOf(net, level, 'telnet-students').passed).toBe(false);
+  });
+
+  it('blocks the web too when the deny comes before the permit', () => {
+    const net = buildLevel(level);
+    const permit = r1.indexOf('permit tcp 192.168.20.0 0.0.0.255 host 192.168.10.10 eq 80');
+    const swapped = [...r1];
+    [swapped[permit], swapped[permit + 1]] = [swapped[permit + 1]!, swapped[permit]!];
+    applySolution(net, withR1(swapped));
+    expect(resultOf(net, level, 'web-ok').passed).toBe(false);
+    expect(resultOf(net, level, 'ssh-blocked').passed).toBe(true);
+  });
+
+  it('cuts the students off their gateway without the final permit (implicit deny)', () => {
+    const net = buildLevel(level);
+    applySolution(net, withR1(r1.filter((c) => c !== 'permit ip any any')));
+    expect(resultOf(net, level, 'gateway-ok').passed).toBe(false);
+    expect(resultOf(net, level, 'web-ok').passed).toBe(true);
+  });
+
+  it('locks the teacher out when list 10 names the wrong host', () => {
+    const net = buildLevel(level);
+    applySolution(net, withR1(r1.map((c) => (c.startsWith('access-list 10') ? 'access-list 10 permit host 192.168.10.12' : c))));
+    expect(resultOf(net, level, 'telnet-prof').passed).toBe(false);
+    expect(resultOf(net, level, 'vty-acl').passed).toBe(true);
+  });
+
+  it('filters nothing when the ACL is applied outbound instead', () => {
+    const net = buildLevel(level);
+    applySolution(net, withR1(r1.map((c) => (c === 'ip access-group ETUDIANTS in' ? 'ip access-group ETUDIANTS out' : c))));
+    expect(resultOf(net, level, 'acl-applied').passed).toBe(false);
+    expect(resultOf(net, level, 'ssh-blocked').passed).toBe(false);
   });
 });

@@ -23,6 +23,9 @@ const HELP = [
   '  ping [-n N] <IP>     Teste la connectivité vers une adresse',
   '  tracert <IP>         Affiche les routeurs traversés jusqu’à une adresse',
   '  arp -a               Affiche la table ARP (adresses IP et MAC connues)',
+  '  curl http://<IP>     Ouvre une page web (port 80, ou :port)',
+  '  telnet <IP> [port]   Ouvre une session Telnet (port 23 par défaut)',
+  '  ssh [nom@]<IP>       Ouvre une session SSH (port 22)',
   '  hostname             Affiche le nom de l’ordinateur',
   '  cls                  Efface l’écran',
 ].join('\n');
@@ -97,6 +100,54 @@ function arp(net: Network, deviceId: string): string {
   ].join('\n');
 }
 
+/** `curl http://10.0.0.1:8080/page` → address and port; undefined when the URL is not an IPv4 web address. */
+function parseUrl(raw: string | undefined): { ip: string; port: number } | undefined {
+  const m = raw?.match(/^(?:http:\/\/)?(\d{1,3}(?:\.\d{1,3}){3})(?::(\d{1,5}))?(?:\/.*)?$/);
+  if (!m || !isIp(m[1])) return undefined;
+  const port = m[2] === undefined ? 80 : Number(m[2]);
+  return port >= 1 && port <= 65535 ? { ip: m[1], port } : undefined;
+}
+
+function curl(net: Network, deviceId: string, target: string | undefined): string {
+  const url = parseUrl(target);
+  if (!url) return target ? `curl: (6) Could not resolve host: ${target}` : 'Usage : curl http://adresse[:port]';
+  const r = net.tcpConnect(deviceId, url.ip, url.port);
+  if (r === 'open') return `<html><head><title>${url.ip}</title></head><body>Site web de ${url.ip} : page reçue (HTTP 200 OK).</body></html>`;
+  if (r === 'refused') return `curl: (7) Failed to connect to ${url.ip} port ${url.port} after 0 ms: Connection refused`;
+  if (r === 'unreachable') return `curl: (7) Failed to connect to ${url.ip} port ${url.port} after 0 ms: Could not connect to server`;
+  return `curl: (28) Failed to connect to ${url.ip} port ${url.port} after 21000 ms: Timed out`;
+}
+
+function telnet(net: Network, deviceId: string, target: string | undefined, rawPort: string | undefined): string {
+  const port = rawPort === undefined ? 23 : Number(rawPort);
+  if (!isIp(target) || !Number.isInteger(port) || port < 1 || port > 65535) return 'Usage : telnet adresse [port]';
+  const r = net.tcpConnect(deviceId, target, port);
+  if (r !== 'open') return `Connexion à ${target}...Impossible d’ouvrir une connexion à l’hôte, sur le port ${port}: Échec lors de la connexion`;
+  const router = [...net.devices.values()].find((d) => !d.host && d.cli && net.l3.interfaces(d.id).some((i) => i.ip === target));
+  if (router && port === 23) return `Connexion à ${target}...
+
+User Access Verification
+
+Password:
+
+Connexion perdue avec l’hôte (session de démonstration fermée).`;
+  return `Connexion à ${target}... connecté au port ${port}.
+
+Connexion perdue avec l’hôte.`;
+}
+
+function ssh(net: Network, deviceId: string, target: string | undefined): string {
+  const host = target?.includes('@') ? target.slice(target.indexOf('@') + 1) : target;
+  if (!isIp(host)) return 'usage: ssh [utilisateur@]adresse';
+  const r = net.tcpConnect(deviceId, host, 22);
+  if (r === 'open') return `${target}'s password:
+
+Connexion fermée par ${host} port 22 (session de démonstration).`;
+  if (r === 'refused') return `ssh: connect to host ${host} port 22: Connection refused`;
+  if (r === 'unreachable') return `ssh: connect to host ${host} port 22: No route to host`;
+  return `ssh: connect to host ${host} port 22: Connection timed out`;
+}
+
 /** Run one command line typed in the prompt of host `deviceId`. */
 export function runHostCommand(net: Network, deviceId: string, line: string): ShellResult {
   const words = line.trim().split(/\s+/).filter(Boolean);
@@ -140,6 +191,12 @@ export function runHostCommand(net: Network, deviceId: string, line: string): Sh
       return { output: tracert(net, deviceId, args[0]) };
     case 'arp':
       return args[0] === '-a' ? { output: arp(net, deviceId) } : { output: 'Usage : arp -a' };
+    case 'curl':
+      return { output: curl(net, deviceId, args.find((a) => !a.startsWith('-'))) };
+    case 'telnet':
+      return { output: telnet(net, deviceId, args[0], args[1]) };
+    case 'ssh':
+      return { output: ssh(net, deviceId, args.find((a) => !a.startsWith('-'))) };
     default:
       return { output: NOT_RECOGNISED(words[0] as string) };
   }
