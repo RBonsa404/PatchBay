@@ -71,3 +71,50 @@ export function placeProp(parent: THREE.Object3D, name: string, at: Placement): 
     })
     .catch(() => undefined);
 }
+
+/**
+ * Many copies of one model (the chairs of a classroom, its desks): one instanced mesh per part of the model, so the
+ * whole set costs a single draw call per material however many there are.
+ */
+export function placeMany(parent: THREE.Object3D, name: string, list: Placement[]): void {
+  if (list.length === 0) return;
+  if (list.length === 1 || list.some((at) => at.only)) {
+    for (const at of list) placeProp(parent, name, at);
+    return;
+  }
+  void loadProp(name)
+    .then((model) => {
+      model.updateMatrixWorld(true);
+      const holder = new THREE.Group();
+      holder.userData.dynamic = true;
+      const place = new THREE.Matrix4();
+      const turn = new THREE.Euler();
+      const scale = new THREE.Vector3();
+      const where = new THREE.Vector3();
+      const q = new THREE.Quaternion();
+      model.traverse((o) => {
+        const mesh = o as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        const many = new THREE.InstancedMesh(mesh.geometry, mesh.material, list.length);
+        list.forEach((at, i) => {
+          turn.set(at.tiltX ?? 0, at.turn ?? 0, at.tiltZ ?? 0);
+          place.compose(where.set(at.x, at.y, at.z), q.setFromEuler(turn), scale.setScalar(at.scale ?? 1));
+          many.setMatrixAt(i, place.clone().multiply(mesh.matrixWorld));
+        });
+        many.castShadow = true;
+        many.receiveShadow = true;
+        many.computeBoundingSphere();
+        holder.add(many);
+      });
+      parent.add(holder);
+      appeared();
+    })
+    .catch(() => undefined);
+}
+
+/** A list of models to place, grouped by model so that repeated ones are instanced. */
+export function placeAll(parent: THREE.Object3D, props: { name: string; at: Placement }[]): void {
+  const byName = new Map<string, Placement[]>();
+  for (const p of props) byName.set(p.name, [...(byName.get(p.name) ?? []), p.at]);
+  for (const [name, list] of byName) placeMany(parent, name, list);
+}

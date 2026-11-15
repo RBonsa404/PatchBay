@@ -12,7 +12,7 @@ const manifest = JSON.parse(readFileSync(`${dir}manifest.json`, 'utf8')) as {
 
 describe('baked light', () => {
   it('covers every part of the building', () => {
-    expect(Object.keys(manifest.parts).sort()).toEqual(['part-classes', 'part-lab', 'part-lower', 'part-office', 'part-stairs', 'part-upper', 'part-west', 'technical-room']);
+    expect(Object.keys(manifest.parts).sort()).toEqual(['part-agence', 'part-agence-wing', 'part-classes', 'part-datacenter', 'part-datacenter-wing', 'part-lab', 'part-lower', 'part-office', 'part-stairs', 'part-upper', 'part-west', 'technical-room']);
     expect(manifest.intensity).toBeGreaterThan(0);
   });
 

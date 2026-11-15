@@ -11,7 +11,7 @@ import * as THREE from 'three';
  */
 
 /** The parts of the building that have their own baked light. */
-export const LIGHTMAPPED_PARTS = ['technical-room', 'part-lab', 'part-lower', 'part-stairs', 'part-office', 'part-upper', 'part-west', 'part-classes'] as const;
+export const LIGHTMAPPED_PARTS = ['technical-room', 'part-lab', 'part-lower', 'part-stairs', 'part-office', 'part-upper', 'part-west', 'part-classes', 'part-agence', 'part-datacenter', 'part-agence-wing', 'part-datacenter-wing'] as const;
 
 interface BakedMesh {
   name: string;

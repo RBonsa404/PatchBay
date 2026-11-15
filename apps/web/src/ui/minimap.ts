@@ -1,4 +1,4 @@
-import { DOORS, FLOOR_Y, ROOMS, ZONES, type ZoneName } from '../scene/building.js';
+import { DOORS, FLOOR_Y, ROOMS, SITE_Z, siteOf, ZONES, type ZoneName } from '../scene/building.js';
 import { h, ui } from './dom.js';
 
 /**
@@ -18,10 +18,22 @@ const SHORT: Record<ZoneName, string> = {
   lounge: 'Détente',
   classroom1: 'Cours 101',
   classroom2: 'Cours 102',
+  agence: 'Salle informatique',
+  datacenter: 'Salle des serveurs',
+  'agence-corridor': '',
+  'agence-hall': 'Accueil',
+  'agence-office': 'Direction',
+  'agence-meeting': 'Réunion',
+  'agence-toilets': 'WC',
+  'datacenter-corridor': '',
+  'datacenter-hall': 'Accueil',
+  'datacenter-office': 'Exploitation',
+  'datacenter-meeting': 'Réunion',
+  'datacenter-toilets': 'WC',
 };
 
 /** Rooms where the work is: drawn brighter than the rest. */
-const WORK = new Set<ZoneName>(['room', 'lab', 'office']);
+const WORK = new Set<ZoneName>(['room', 'lab', 'office', 'agence', 'datacenter']);
 
 const X0 = -14.4;
 const X1 = 13.0;
@@ -52,18 +64,22 @@ export class Minimap {
     if (key === this.last || this.root.classList.contains('hidden')) return;
     this.last = key;
     const upper = floorY > FLOOR_Y - 0.5;
-    this.title.textContent = upper ? 'Étage 1' : 'Rez-de-chaussée';
+    this.title.textContent = siteOf(z) === 'agence' ? 'Bobo-Dioulasso' : siteOf(z) === 'datacenter' ? 'Opérateur' : upper ? 'Étage 1' : 'Rez-de-chaussée';
     const c = this.canvas.getContext('2d') as CanvasRenderingContext2D;
     const k = SCALE * 2;
+    const site = siteOf(z);
+    const shift = site === 'campus' ? 0 : SITE_Z[site];
     const px = (v: number): number => (v - X0) * k;
-    const pz = (v: number): number => (v - Z0) * k;
+    const pz = (v: number): number => (v - shift - Z0) * k;
     c.clearRect(0, 0, this.canvas.width, this.canvas.height);
     const floor = upper ? FLOOR_Y : 0;
-    const zones = ZONES.filter((zn) => zn.name === 'stairs' || zn.y === floor).filter((zn) => this.upstairs || zn.name !== 'stairs');
+    const zones = ZONES.filter((zn) => zn.name === 'stairs' || zn.y === floor)
+      .filter((zn) => this.upstairs || zn.name !== 'stairs')
+      .filter((zn) => siteOf(zn.rect.z0) === site);
     for (const zn of zones) {
       const r = zn.rect;
       const here = zn.name === zone;
-      const corridor = zn.name === 'corridor' || zn.name === 'corridor1';
+      const corridor = zn.name === 'corridor' || zn.name === 'corridor1' || zn.name.endsWith('-corridor');
       c.fillStyle = here ? 'rgba(251, 191, 36, 0.28)' : corridor ? 'rgba(148, 163, 184, 0.16)' : WORK.has(zn.name) ? 'rgba(59, 130, 246, 0.3)' : 'rgba(148, 163, 184, 0.24)';
       c.fillRect(px(r.x0), pz(r.z0), (r.x1 - r.x0) * k, (r.z1 - r.z0) * k);
       c.strokeStyle = 'rgba(226, 232, 240, 0.75)';

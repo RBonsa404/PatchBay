@@ -4,7 +4,8 @@
 
 Kinds: `wc` (a toilet cubicle: laminate partitions, a door, the bowl and its cistern, a paper holder), `washbasin` (a
 two-basin counter with taps, the mirror above, a hand dryer), `vending` (a drinks and snacks machine, lit front),
-`whiteboard` (a classroom whiteboard on the wall, its tray and markers). Front at -Y (+Z in the game), base on the floor.
+`whiteboard` (a classroom whiteboard on the wall, its tray and markers), `reception` (a counter), `meeting` (a table
+for eight). Front at -Y (+Z in the game), base on the floor.
 """
 import math
 import os
@@ -75,8 +76,8 @@ elif kind == 'washbasin':
     parts.append(c.box('counter', (W, 0.5, 0.04), (0, 0.0, 0.84), stone, bevel=4 * mm))
     parts.append(c.box('apron', (W, 0.02, 0.14), (0, -0.24, 0.76), stone, bevel=2 * mm))
     for x in (-0.4, 0.4):
-        parts.append(cylinder(f'basin{x}', 0.2, 0.12, (x, -0.02, 0.8), porcelain, 40, scale=(1, 0.8, 1)))
-        parts.append(cylinder(f'water{x}', 0.17, 0.01, (x, -0.02, 0.86), c.material('basin-in', '#d8dde2', 0.08), 40, scale=(1, 0.8, 1)))
+        parts.append(cylinder(f'basin{x}', 0.2, 0.128, (x, -0.02, 0.804), porcelain, 40, scale=(1, 0.8, 1)))
+        parts.append(cylinder(f'water{x}', 0.17, 0.004, (x, -0.02, 0.8705), c.material('basin-in', '#d8dde2', 0.08), 40, scale=(1, 0.8, 1)))
         parts.append(cylinder(f'tap{x}', 0.018, 0.2, (x, 0.19, 0.96), steel, 16))
         parts.append(cylinder(f'spout{x}', 0.014, 0.14, (x, 0.13, 1.05), steel, 16, rot=(math.pi / 2, 0, 0)))
     parts.append(c.box('mirror', (W - 0.1, 0.01, 0.8), (0, 0.24, 1.55), glass))
@@ -126,6 +127,28 @@ elif kind == 'whiteboard':
     ink = c.material('ink', '#3b5bdb', 0.6)
     parts.append(c.text('lesson', '192.168.10.0 /24', 0.09, (-0.55, -0.0065, 1.75), ink))
     parts.append(c.text('lesson2', 'masque 255.255.255.0', 0.07, (-0.45, -0.0065, 1.6), ink))
+elif kind == 'reception':
+    # A reception counter: a high front in two tones, its raised shelf for visitors, the low desk behind.
+    front = c.material('front', '#0b1e3f', 0.45)
+    top = c.material('top', '#e8e2d6', 0.35)
+    stripe = c.material('stripe', '#fbbf24', 0.4, emission='#fbbf24', strength=0.6)
+    W = 2.0
+    parts.append(c.box('front', (W, 0.05, 1.1), (0, -0.33, 0.55), front, bevel=6 * mm))
+    for s in (-1, 1):
+        parts.append(c.box(f'side{s}', (0.05, 0.7, 1.1), (s * (W / 2 - 0.025), 0, 0.55), front, bevel=6 * mm))
+    parts.append(c.box('shelf', (W + 0.06, 0.3, 0.035), (0, -0.28, 1.12), top, bevel=4 * mm))
+    parts.append(c.box('desk', (W - 0.1, 0.6, 0.03), (0, 0.05, 0.74), top, bevel=3 * mm))
+    parts.append(c.box('stripe', (W - 0.1, 0.006, 0.03), (0, -0.358, 0.85), stripe))
+elif kind == 'meeting':
+    # A meeting table for eight: a light oak top on two steel frames, a cable box in the middle.
+    oak = c.material('oak', '#b08a5a', 0.45)
+    steel = c.material('steel', '#2f3640', 0.35, 0.8)
+    W, D = 2.4, 1.1
+    parts.append(c.box('top', (W, D, 0.03), (0, 0, 0.735), oak, bevel=8 * mm, segments=3))
+    for s in (-1, 1):
+        parts.append(c.box(f'leg{s}', (0.06, D - 0.2, 0.7), (s * (W / 2 - 0.25), 0, 0.37), steel, bevel=4 * mm))
+        parts.append(c.box(f'foot{s}', (0.08, D - 0.1, 0.03), (s * (W / 2 - 0.25), 0, 0.015), steel, bevel=4 * mm))
+    parts.append(c.box('box', (0.3, 0.12, 0.012), (0, 0, 0.756), steel, bevel=2 * mm))
 else:
     raise SystemExit(f'unknown kind {kind}')
 

@@ -26,8 +26,8 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(__file__))
 from common import args, reset  # noqa: E402
 
-PARTS = ['technical-room', 'part-lab', 'part-lower', 'part-stairs', 'part-office', 'part-upper', 'part-west', 'part-classes']
-SIZES = {'technical-room': 2048, 'part-lab': 2048, 'part-office': 2048, 'part-lower': 1024, 'part-stairs': 1024, 'part-upper': 1024, 'part-west': 2048, 'part-classes': 2048}
+PARTS = ['technical-room', 'part-lab', 'part-lower', 'part-stairs', 'part-office', 'part-upper', 'part-west', 'part-classes', 'part-agence', 'part-datacenter', 'part-agence-wing', 'part-datacenter-wing']
+SIZES = {'technical-room': 2048, 'part-lab': 2048, 'part-office': 2048, 'part-lower': 1024, 'part-stairs': 1024, 'part-upper': 1024, 'part-west': 2048, 'part-classes': 2048, 'part-agence': 2048, 'part-datacenter': 2048, 'part-agence-wing': 2048, 'part-datacenter-wing': 2048}
 # Radiance of a ceiling panel: chosen so that the panel over the bench lights it as the game's key light does.
 PANEL = 53.0
 # Daylight through a window, times the colour of the picture outside.

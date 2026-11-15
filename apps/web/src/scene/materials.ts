@@ -121,11 +121,11 @@ export function ceilingTexture(): THREE.CanvasTexture {
  * `public/textures/outside/`), a garden or the campus quad from the ground floor, the city from upstairs. Each call takes
  * the next view of its kind, so that neighbouring windows do not repeat the same picture.
  */
-const OUTSIDE = { garden: ['garden-1', 'garden-2', 'garden-3', 'quad-1'], city: ['city-1', 'city-3'], quad: ['quad-2', 'quad-1'] } as const;
+const OUTSIDE = { quad: ['quad-1'] } as const;
 export type OutsideView = keyof typeof OUTSIDE;
-const outsideTurn: Record<OutsideView, number> = { garden: 0, city: 0, quad: 0 };
+const outsideTurn: Record<OutsideView, number> = { quad: 0 };
 const outsideLoaded = new Map<string, THREE.Texture>();
-export function outsideTexture(kind: OutsideView = 'garden'): THREE.Texture {
+export function outsideTexture(kind: OutsideView = 'quad'): THREE.Texture {
   const views = OUTSIDE[kind];
   const name = views[outsideTurn[kind]++ % views.length] as string;
   let t = outsideLoaded.get(name);

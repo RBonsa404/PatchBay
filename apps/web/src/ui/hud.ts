@@ -1,4 +1,4 @@
-import { BookOpen, Check, CircleCheckBig, CircleHelp, Gauge, Keyboard, Lightbulb, Menu, MessageCircleQuestion, Mic, Scan, Timer, Volume2, VolumeX, type IconNode } from 'lucide';
+import { BookOpen, Check, CircleCheckBig, CircleHelp, Gauge, Keyboard, Lightbulb, Menu, MessageCircleQuestion, Mic, Route, Scan, Timer, Volume2, VolumeX, type IconNode } from 'lucide';
 import type { CableType, Level, ObjectiveResult } from '@patchbay/sim-core';
 import { t, tx, type Key } from '../i18n.js';
 import { CABLE_STYLE } from '../scene/cables.js';
@@ -21,6 +21,8 @@ export interface HudActions {
   cycleQuality(): Quality;
   listen(): void;
   selectCable(type: CableType | null): void;
+  /** Go to another site (missions across several sites only). */
+  travel?(): void;
 }
 
 export const CABLE_ORDER: CableType[] = ['straight', 'crossover', 'console', 'serial'];
@@ -64,6 +66,7 @@ export class Hud {
   private readonly micButton: HTMLButtonElement | null;
 
   constructor(private readonly level: Level, private readonly actions: HudActions, quality: Quality, index = 0, private readonly exam = false, tour = false) {
+    const multiSite = level.devices.some((d) => d.room === 'agence' || d.room === 'datacenter');
     this.objectivesList = h('ol', { class: 'objective-list' });
     this.scoreLabel = h('span', { class: 'score' }, '0');
     this.scoreBar = h('span', { class: 'fill' });
@@ -97,6 +100,7 @@ export class Hud {
           { class: 'toolbar panel-solid' },
           toolButton(t('brief.tool'), BookOpen, () => actions.brief()),
           toolButton(t('hud.view'), Scan, () => actions.overview()),
+          multiSite ? toolButton('Changer de site (G)', Route, () => actions.travel?.()) : null,
           h('i', { class: 'tool-sep' }),
           exam || tour ? null : toolButton(t('hud.hint'), Lightbulb, () => actions.hint()),
           exam ? null : toolButton(t('assistant.tool'), MessageCircleQuestion, () => actions.ask()),

@@ -34,7 +34,25 @@ export type ZoneName =
   | 'toilets'
   | 'lounge'
   | 'classroom1'
-  | 'classroom2';
+  | 'classroom2'
+  // The other sites, far from the campus: the agency in Bobo-Dioulasso, the operator's data centre.
+  | 'agence'
+  | 'datacenter'
+  | SiteRoom;
+
+/** The other rooms of each far site's building, around its technical room. */
+export const SITE_ROOMS = ['corridor', 'hall', 'office', 'meeting', 'toilets'] as const;
+export type SiteRoom = `${'agence' | 'datacenter'}-${(typeof SITE_ROOMS)[number]}`;
+
+/**
+ * Where each other site stands, along z: far enough that nothing of one is ever seen from another. Each is laid out
+ * like the technical room around its own origin (bench and rack at the same place).
+ */
+export const SITE_Z = { agence: 400, datacenter: 800 } as const;
+export type SiteName = 'campus' | keyof typeof SITE_Z;
+export function siteOf(z: number): SiteName {
+  return z > SITE_Z.datacenter - 200 ? 'datacenter' : z > SITE_Z.agence - 200 ? 'agence' : 'campus';
+}
 
 export interface Zone {
   name: ZoneName;
@@ -61,6 +79,8 @@ export const ROOMS = {
   /** Upstairs, over the lab: two classrooms. */
   classroom1: { x0: -7, x1: 0, z0: -11.68, z1: -4.0 },
   classroom2: { x0: 0, x1: 7, z0: -11.68, z1: -4.0 },
+  agence: { x0: -6, x1: 6, z0: -1.68 + 400, z1: 6.0 + 400 },
+  datacenter: { x0: -6, x1: 6, z0: -1.68 + 800, z1: 6.0 + 800 },
 } as const;
 
 /** Where the lab's furniture is centred: its bench and rack stand as the technical room's do around z = 0. */
@@ -68,10 +88,30 @@ export const LAB_Z = -10;
 
 /** Where a room's own layout starts, for a world position: rooms are built as copies of the technical room. */
 export function roomOrigin(y: number, z: number): { y: number; z: number } {
+  const site = siteOf(z);
+  if (site !== 'campus') return { y: 0, z: SITE_Z[site] };
   return { y: y > FLOOR_Y - 0.1 ? FLOOR_Y : 0, z: z < ROOMS.corridor.z0 ? LAB_Z : 0 };
 }
 
 // The corridors first: a point on a doorway's line belongs to the corridor it opens onto.
+/**
+ * Each far site is a real building: its technical room (laid out like the campus's), a corridor along it, and across
+ * the corridor the entrance hall with the door to the street, an office, a meeting room and the toilets.
+ */
+function siteWing(site: 'agence' | 'datacenter'): Record<(typeof SITE_ROOMS)[number], Rect> {
+  const z = SITE_Z[site];
+  return {
+    corridor: { x0: -8, x1: 7, z0: -4 + z, z1: -1.68 + z },
+    hall: { x0: -8, x1: -3, z0: -9.2 + z, z1: -4 + z },
+    office: { x0: -3, x1: 1, z0: -9.2 + z, z1: -4 + z },
+    meeting: { x0: 1, x1: 4.5, z0: -9.2 + z, z1: -4 + z },
+    toilets: { x0: 4.5, x1: 7, z0: -9.2 + z, z1: -4 + z },
+  };
+}
+export const SITE_WINGS = { agence: siteWing('agence'), datacenter: siteWing('datacenter') } as const;
+/** Where the street door of each far site's hall stands, in its outside wall. */
+export const SITE_EXIT_X = -4.75;
+
 export const ZONES: Zone[] = [
   { name: 'corridor', rect: ROOMS.corridor, y: 0 },
   { name: 'corridor1', rect: ROOMS.corridor1, y: FLOOR_Y },
@@ -84,6 +124,9 @@ export const ZONES: Zone[] = [
   { name: 'lounge', rect: ROOMS.lounge, y: 0 },
   { name: 'classroom1', rect: ROOMS.classroom1, y: FLOOR_Y },
   { name: 'classroom2', rect: ROOMS.classroom2, y: FLOOR_Y },
+  { name: 'agence', rect: ROOMS.agence, y: 0 },
+  { name: 'datacenter', rect: ROOMS.datacenter, y: 0 },
+  ...(['agence', 'datacenter'] as const).flatMap((site) => SITE_ROOMS.map((room) => ({ name: `${site}-${room}` as SiteRoom, rect: SITE_WINGS[site][room], y: 0 }))),
 ];
 
 /** Which zone a point is in: the stair hall first (it spans both floors), then the nearest room of its floor. */
@@ -140,6 +183,17 @@ export const DOORS: Door[] = [
   { x: -8.75, z: ROOMS.corridor.z0, width: 1.0, y: 0, along: 'x', label: 'SALLE DE DÉTENTE' },
   { x: -4.6, z: ROOMS.corridor.z0, width: 1.0, y: FLOOR_Y, along: 'x', label: 'SALLE DE COURS 101' },
   { x: 3.5, z: ROOMS.corridor.z0, width: 1.0, y: FLOOR_Y, along: 'x', label: 'SALLE DE COURS 102' },
+  ...(['agence', 'datacenter'] as const).flatMap((site): Door[] => {
+    const z = SITE_Z[site];
+    const dc = site === 'datacenter';
+    return [
+      { x: -4.6, z: -1.68 + z, width: 1.4, y: 0, along: 'x', label: dc ? 'SALLE DES SERVEURS' : 'SALLE INFORMATIQUE' },
+      { x: -5.5, z: -4 + z, width: 1.6, y: 0, along: 'x', label: 'ACCUEIL' },
+      { x: -1, z: -4 + z, width: 0.9, y: 0, along: 'x', label: dc ? 'EXPLOITATION' : 'DIRECTION' },
+      { x: 2.75, z: -4 + z, width: 0.9, y: 0, along: 'x', label: 'SALLE DE RÉUNION' },
+      { x: 5.75, z: -4 + z, width: 0.9, y: 0, along: 'x', label: 'TOILETTES' },
+    ];
+  }),
 ];
 
 export interface WallSegment {
@@ -184,6 +238,28 @@ export const WALLS: WallSegment[] = (() => {
   out.push({ x0: toilets.x0, z0: toilets.z0, x1: lounge.x1, z1: toilets.z0, y0: 0, y1: ROOM_HEIGHT });
   out.push({ x0: toilets.x0, z0: toilets.z0, x1: toilets.x0, z1: toilets.z1, y0: 0, y1: ROOM_HEIGHT });
   out.push({ x0: toilets.x1, z0: toilets.z0, x1: toilets.x1, z1: toilets.z1, y0: 0, y1: ROOM_HEIGHT });
+  // The far sites: the technical room, closed all round but for its door onto the corridor; the corridor and the rooms
+  // across it, the hall's street door drawn shut in its outside wall.
+  for (const site of ['agence', 'datacenter'] as const) {
+    const w = SITE_WINGS[site];
+    const [c, back] = [w.corridor, w.hall.z0];
+    const H = ROOM_HEIGHT;
+    out.push({ x0: c.x0, z0: c.z0, x1: c.x0, z1: c.z1, y0: 0, y1: H });
+    out.push({ x0: c.x1, z0: c.z0, x1: c.x1, z1: c.z1, y0: 0, y1: H });
+    out.push({ x0: c.x0, z0: c.z0, x1: c.x1, z1: c.z0, y0: 0, y1: H });
+    out.push({ x0: c.x0, z0: c.z1, x1: ROOMS.agence.x0, z1: c.z1, y0: 0, y1: H });
+    out.push({ x0: ROOMS.agence.x1, z0: c.z1, x1: c.x1, z1: c.z1, y0: 0, y1: H });
+    out.push({ x0: c.x0, z0: back, x1: c.x1, z1: back, y0: 0, y1: H });
+    out.push({ x0: c.x0, z0: back, x1: c.x0, z1: c.z0, y0: 0, y1: H });
+    out.push({ x0: c.x1, z0: back, x1: c.x1, z1: c.z0, y0: 0, y1: H });
+    for (const x of [w.hall.x1, w.office.x1, w.meeting.x1]) out.push({ x0: x, z0: back, x1: x, z1: c.z0, y0: 0, y1: H });
+  }
+  for (const r of [ROOMS.agence, ROOMS.datacenter]) {
+    out.push({ x0: r.x0, z0: r.z0, x1: r.x1, z1: r.z0, y0: 0, y1: ROOM_HEIGHT });
+    out.push({ x0: r.x0, z0: r.z1, x1: r.x1, z1: r.z1, y0: 0, y1: ROOM_HEIGHT });
+    out.push({ x0: r.x0, z0: r.z0, x1: r.x0, z1: r.z1, y0: 0, y1: ROOM_HEIGHT });
+    out.push({ x0: r.x1, z0: r.z0, x1: r.x1, z1: r.z1, y0: 0, y1: ROOM_HEIGHT });
+  }
   // Upstairs over the lab: two classrooms side by side.
   const up = FLOOR_Y + ROOM_HEIGHT;
   out.push({ x0: classroom1.x0, z0: classroom1.z0, x1: ROOMS.classroom2.x1, z1: classroom1.z0, y0: FLOOR_Y, y1: up });
@@ -231,6 +307,52 @@ export function wallPieces(w: WallSegment): { from: number; to: number; y0: numb
   if (at < end) out.push({ from: at, to: end, y0: w.y0, y1: w.y1 });
   return out;
 }
+
+const STAIRS_LANDING = { z0: -4.0, z1: -0.9 };
+
+// ---- windows ---------------------------------------------------------------------------------------------------
+
+/**
+ * A window: a real opening in an outside wall, its centre (x, z) on the wall's line, its width, the height of its sill
+ * above the floor `y` and its own height. `inside` is the side of the wall the room is on (+1 or -1 along the
+ * wall's normal). `sun` lets a shaft of sunlight in.
+ */
+export interface Window {
+  x: number;
+  z: number;
+  along: 'x' | 'z';
+  width: number;
+  sill: number;
+  height: number;
+  y: number;
+  inside: 1 | -1;
+  sun?: boolean;
+}
+
+const win = (x: number, z: number, along: 'x' | 'z', inside: 1 | -1, y = 0, width = 1.5, sun = false): Window => ({ x, z, along, width, sill: 1.2, height: 1.3, y, inside, sun });
+export const WINDOWS: Window[] = [
+  // The lab's outside wall, east, in the morning sun.
+  ...[1.0, 3.2, 5.0].map((z) => win(ROOMS.lab.x1, LAB_Z + z, 'z', -1, 0, 1.5, true)),
+  // The technical room, over its desk; the administration above it, three windows.
+  win(1.85, ROOMS.room.z1, 'x', -1, 0, 1.4),
+  ...[-3.0, 0, 3.0].map((x) => win(x, ROOMS.room.z1, 'x', -1, FLOOR_Y, 1.8)),
+  // Classroom 001, south; the lounge, north.
+  ...[-12.4, -9.9, -7.4].map((x) => win(x, ROOMS.classroom0.z1, 'x', -1, 0, 1.5)),
+  ...[-9.6, -7.9].map((x) => win(x, ROOMS.lounge.z0, 'x', 1, 0, 1.2, true)),
+  // Classrooms 101 (west wall) and 102 (east wall).
+  ...[-9.8, -7.8, -5.8].map((z) => win(ROOMS.classroom1.x0, z, 'z', 1, FLOOR_Y, 1.5)),
+  ...[-9.8, -7.8, -5.8].map((z) => win(ROOMS.classroom2.x1, z, 'z', -1, FLOOR_Y, 1.5, true)),
+  // The agency in Bobo-Dioulasso, its street front.
+  ...[-3.0, 0, 3.0].map((x) => win(x, ROOMS.agence.z1, 'x', -1, 0, 1.6, true)),
+  // The far sites' wings, onto the street.
+  ...(['agence', 'datacenter'] as const).flatMap((site) => {
+    const back = SITE_WINGS[site].hall.z0;
+    // The hall's window keeps a good metre of wall between it and the street door (at x = SITE_EXIT_X).
+    return [win(-7.05, back, 'x', 1, 0, 1.1), win(-1, back, 'x', 1, 0, 1.6, true), win(2.75, back, 'x', 1, 0, 1.6, true)];
+  }),
+  // The stair hall's tall window on the landing.
+  { x: ROOMS.stairs.x1, z: (STAIRS_LANDING.z0 + STAIRS_LANDING.z1) / 2, along: 'z', width: 1.4, sill: FLOOR_Y / 2 + 0.5, height: 2.2, y: 0, inside: -1 },
+];
 
 // ---- stairs ----------------------------------------------------------------------------------------------------
 
@@ -287,6 +409,9 @@ const SURFACES: Surface[] = [
   { rect: ROOMS.lounge, y: 0 },
   { rect: ROOMS.classroom1, y: FLOOR_Y },
   { rect: ROOMS.classroom2, y: FLOOR_Y },
+  { rect: ROOMS.agence, y: 0 },
+  { rect: ROOMS.datacenter, y: 0 },
+  ...(['agence', 'datacenter'] as const).flatMap((site) => SITE_ROOMS.map((room) => ({ rect: SITE_WINGS[site][room], y: 0 }))),
 ];
 
 /** Furniture and anything else standing on a floor that the player walks around. */
@@ -340,6 +465,23 @@ const FURNITURE: Obstacle[] = [
   { rect: rect(-4.6, -1.6, 2.6, 4.4), y0: FLOOR_Y, y1: FLOOR_Y + 1 },
   { rect: rect(1.6, 4.6, 2.6, 4.4), y0: FLOOR_Y, y1: FLOOR_Y + 1 },
   { rect: rect(FACE.left, FACE.left + 0.55, 0.0, 2.6), y0: FLOOR_Y, y1: FLOOR_Y + 1 },
+  // The other sites: the bench and rack of each, the data centre's rows of servers.
+  ...roomFurniture(SITE_Z.agence, 0),
+  ...roomFurniture(SITE_Z.datacenter, 0),
+  { rect: rect(-5.2, 5.2, SITE_Z.datacenter + 3.3, SITE_Z.datacenter + 4.4), y0: 0, y1: 2.2 },
+  ...(['agence', 'datacenter'] as const).flatMap((site): Obstacle[] => {
+    const z = SITE_Z[site];
+    // The hall's counter along its east wall and the waiting sofa on the west; the office's two desks under the window;
+    // the meeting table and its chairs; the toilets' cubicles and washbasins.
+    return [
+      { rect: rect(-4.0, -3.08, -8.65 + z, -6.55 + z), y0: 0, y1: 1.2 },
+      { rect: rect(-7.92, -7.2, -7.6 + z, -6.0 + z), y0: 0, y1: 1 },
+      { rect: rect(-2.55, 0.55, -9.12 + z, -8.15 + z), y0: 0, y1: 1 },
+      { rect: rect(1.85, 3.65, -7.75 + z, -5.45 + z), y0: 0, y1: 1 },
+      { rect: rect(4.58, 6.6, -9.12 + z, -7.55 + z), y0: 0, y1: 2.1 },
+      { rect: rect(4.58, 5.12, -6.45 + z, -4.75 + z), y0: 0, y1: 1.2 },
+    ];
+  }),
   // The classroom downstairs: its block of desks facing the board on the west wall, the teacher's desk.
   { rect: rect(CLASS0_DESKS.x0, CLASS0_DESKS.x1, CLASS0_DESKS.z0, CLASS0_DESKS.z1), y0: 0, y1: 1 },
   { rect: rect(-13.3, -12.5, 1.3, 2.7), y0: 0, y1: 1 },

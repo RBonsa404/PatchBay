@@ -18,6 +18,13 @@ export const BENCH_TOP = 0.76;
  */
 export const RACK = { x: 0, frontZ: -0.36, depth: 0.6, height: 1.5, railX: 0.236 } as const;
 
+/** The overhead ladder tray along the back wall (its rungs' height and its centre line), and the ladder that drops
+ * from it to the top of the rack: what carries cables from the rack to the walls. */
+export const TRAY = { y: 2.55, z: -1.6 + 0.3 } as const;
+export const LADDER = { x: 0.24, z: -1.06 } as const;
+/** The wall trunking beside a box on the back wall (x from the box's centre), down from the tray to under the box. */
+export const WALL_TRUNK = { dx: 0.17, z: -1.575, bottom: 0.8 } as const;
+
 /** The vertical cable managers beside the rack's rails (centre, from the rack's axis, and width). */
 export const MANAGER = { x: 0.325, width: 0.06 } as const;
 
@@ -386,6 +393,19 @@ function cableTray(): THREE.Group {
     const rod = box(0.012, ROOM.height - y, 0.012, steel('#94a3b8'), false);
     rod.position.set(x, (ROOM.height + y) / 2, z + z2);
     g.add(rod);
+  }
+  // The drop: a short vertical ladder from the tray down to the top of the rack, so that no cable crosses the air.
+  const dropTop = y;
+  const dropBottom = RACK.height + 0.02;
+  for (const dx of [-0.1, 0.1]) {
+    const rail = box(0.008, dropTop - dropBottom, 0.05, yellow);
+    rail.position.set(LADDER.x + dx, (dropTop + dropBottom) / 2, LADDER.z);
+    g.add(rail);
+  }
+  for (let ry = dropBottom + 0.12; ry < dropTop - 0.05; ry += 0.25) {
+    const rung = box(0.2, 0.012, 0.025, yellow, false);
+    rung.position.set(LADDER.x, ry, LADDER.z - 0.012);
+    g.add(rung);
   }
   const blue = new THREE.MeshStandardMaterial({ color: '#2563eb', roughness: 0.5 });
   for (let i = 0; i < 9; i++) {

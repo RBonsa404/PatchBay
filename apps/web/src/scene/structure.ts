@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { DOOR_HEIGHT, DOORS, FLOOR_Y, inside, ROOM_HEIGHT, STAIRS, WALL, WALLS, wallPieces, ZONES, type Flight, type Rect, type ZoneName } from './building.js';
-import { ceilingTexture, paintTexture, photo, photoRelief, raisedFloorNormal, raisedFloorTexture } from './materials.js';
+import { DOOR_HEIGHT, DOORS, FLOOR_Y, inside, ROOM_HEIGHT, STAIRS, WALL, WALLS, wallPieces, WINDOWS, ZONES, type Flight, type Rect, type Window, type ZoneName } from './building.js';
+import { ceilingTexture, outsideTexture, paintTexture, photo, photoRelief, raisedFloorNormal, raisedFloorTexture, sunPatchTexture } from './materials.js';
 
 /**
  * The building's shell drawn from its plan (`building.ts`): for each zone, its floor, its ceiling, the faces of the
@@ -25,6 +25,9 @@ function M(): Record<string, THREE.Material> {
     rail: lit('#475569', 0.45, 0.75),
     panelLight: new THREE.MeshBasicMaterial({ color: '#f8fbff', toneMapped: false }),
     panelFrame: lit('#cbd5e1', 0.5, 0.3),
+    alu: lit('#cfd5dc', 0.32, 0.85),
+    sill: lit('#eef0f2', 0.45),
+    glass: new THREE.MeshStandardMaterial({ color: '#dbe7f2', transparent: true, opacity: 0.09, roughness: 0.04, metalness: 0, depthWrite: false }),
   };
   return materials;
 }
@@ -63,50 +66,183 @@ function floorsOf(zone: ZoneName): number[] {
   return [(ZONES.find((z) => z.name === zone) as { y: number }).y];
 }
 
-/** The faces of every wall that look into `zone`. */
+/** Where along a wall the rooms change: the edges of every room's rectangle that fall within [from, to]. */
+function cutsAlong(alongX: boolean, from: number, to: number): number[] {
+  const edges = ZONES.flatMap((z) => (alongX ? [z.rect.x0, z.rect.x1] : [z.rect.z0, z.rect.z1])).filter((v) => v > from + 1e-3 && v < to - 1e-3);
+  return [from, ...[...new Set(edges)].sort((a, b) => a - b), to];
+}
+
+/** The windows cut in the wall on this line, as rectangles along the wall: [from, to] × [y0, y1]. */
+function holesIn(alongX: boolean, line: number): { from: number; to: number; y0: number; y1: number }[] {
+  return WINDOWS.filter((w) => (w.along === 'x') === alongX && Math.abs((alongX ? w.z : w.x) - line) < 0.01).map((w) => {
+    const c = alongX ? w.x : w.z;
+    return { from: c - w.width / 2, to: c + w.width / 2, y0: w.y + w.sill, y1: w.y + w.sill + w.height };
+  });
+}
+
+/** The solid parts of the rectangle [from, to] × [y0, y1] once the holes are taken out of it. */
+function solidRects(from: number, to: number, y0: number, y1: number, holes: { from: number; to: number; y0: number; y1: number }[]): { from: number; to: number; y0: number; y1: number }[] {
+  const inside = holes.filter((h) => h.to > from && h.from < to && h.y1 > y0 && h.y0 < y1);
+  if (!inside.length) return [{ from, to, y0, y1 }];
+  const xs = [...new Set([from, to, ...inside.flatMap((h) => [Math.max(from, h.from), Math.min(to, h.to)])])].sort((a, b) => a - b);
+  const out: { from: number; to: number; y0: number; y1: number }[] = [];
+  for (let i = 0; i < xs.length - 1; i++) {
+    const [a, b] = [xs[i] as number, xs[i + 1] as number];
+    if (b - a < 1e-4) continue;
+    const mid = (a + b) / 2;
+    const cutting = inside.filter((h) => h.from <= mid && h.to >= mid).sort((p, q) => p.y0 - q.y0);
+    let bottom = y0;
+    for (const h of cutting) {
+      if (h.y0 > bottom + 1e-4) out.push({ from: a, to: b, y0: bottom, y1: Math.min(h.y0, y1) });
+      bottom = Math.max(bottom, h.y1);
+    }
+    if (bottom < y1 - 1e-4) out.push({ from: a, to: b, y0: bottom, y1 });
+  }
+  return out;
+}
+
+/**
+ * The faces of every wall that look into `zone`. A wall shared by several rooms (a partition meeting an outside
+ * wall, say) is cut where the rooms change, so that each room gets exactly its own stretch of it.
+ */
 function walls(zone: ZoneName): THREE.Group {
   const g = new THREE.Group();
   const m = M();
   for (const w of WALLS) {
     const alongX = w.z0 === w.z1;
     const line = alongX ? w.z0 : w.x0;
+    const holes = holesIn(alongX, line);
     for (const p of wallPieces(w)) {
-      const length = p.to - p.from;
-      const mid = (p.from + p.to) / 2;
-      for (const side of [-1, 1]) {
-        const offset = line + side * (WALL / 2);
-        // Which zone this face looks into: just in front of it, at the foot of the piece.
-        const probe = alongX ? [mid, p.y0 + 0.5, offset + side * 0.05] : [offset + side * 0.05, p.y0 + 0.5, mid];
-        if (zoneAt(probe[0] as number, probe[1] as number, probe[2] as number) !== zone) continue;
-        const ry = alongX ? (side > 0 ? 0 : Math.PI) : side > 0 ? Math.PI / 2 : -Math.PI / 2;
-        const place = (obj: THREE.Object3D, y: number, out: number): void => {
-          if (alongX) obj.position.set(mid, y, offset + side * out);
-          else obj.position.set(offset + side * out, y, mid);
-          obj.rotation.y = ry;
-          g.add(obj);
-        };
-        place(face(length, p.y1 - p.y0, m.paint as THREE.Material), (p.y0 + p.y1) / 2, 0);
-        // The harder-wearing lower part, the skirting board and the club's bands, on each floor the face covers.
-        for (const f of floorsOf(zone)) {
-          if (p.y0 > f + 0.01 || p.y1 < f + 1.2) continue;
-          place(face(length, 1.1, m.dado as THREE.Material), f + 0.55, 0.0015);
-          const skirting = box(length, 0.1, 0.015, m.skirting as THREE.Material, 0, 0, 0, false);
-          place(skirting, f + 0.05, 0.008);
-          place(face(length, 0.05, m.blue as THREE.Material), f + 1.12, 0.002);
-          place(face(length, 0.012, m.amber as THREE.Material), f + 1.165, 0.002);
+      const cuts = cutsAlong(alongX, p.from, p.to);
+      for (let c = 0; c < cuts.length - 1; c++) {
+        const [from, to] = [cuts[c] as number, cuts[c + 1] as number];
+        const length = to - from;
+        const mid = (from + to) / 2;
+        for (const side of [-1, 1]) {
+          const offset = line + side * (WALL / 2);
+          // Which zone this face looks into: just in front of it, at the foot of the stretch.
+          const probe = alongX ? [mid, p.y0 + 0.5, offset + side * 0.05] : [offset + side * 0.05, p.y0 + 0.5, mid];
+          if (zoneAt(probe[0] as number, probe[1] as number, probe[2] as number) !== zone) continue;
+          const ry = alongX ? (side > 0 ? 0 : Math.PI) : side > 0 ? Math.PI / 2 : -Math.PI / 2;
+          const place = (obj: THREE.Object3D, y: number, out: number, at = mid): void => {
+            if (alongX) obj.position.set(at, y, offset + side * out);
+            else obj.position.set(offset + side * out, y, at);
+            obj.rotation.y = ry;
+            g.add(obj);
+          };
+          for (const r of solidRects(from, to, p.y0, p.y1, holes)) place(face(r.to - r.from, r.y1 - r.y0, m.paint as THREE.Material), (r.y0 + r.y1) / 2, 0, (r.from + r.to) / 2);
+          // The harder-wearing lower part, the skirting board and the club's bands, on each floor the face covers.
+          for (const f of floorsOf(zone)) {
+            if (p.y0 > f + 0.01 || p.y1 < f + 1.2) continue;
+            place(face(length, 1.1, m.dado as THREE.Material), f + 0.55, 0.0015);
+            const skirting = box(length, 0.1, 0.015, m.skirting as THREE.Material, 0, 0, 0, false);
+            place(skirting, f + 0.05, 0.008);
+            place(face(length, 0.05, m.blue as THREE.Material), f + 1.12, 0.002);
+            place(face(length, 0.012, m.amber as THREE.Material), f + 1.165, 0.002);
+          }
         }
       }
     }
   }
+  for (const w of WINDOWS) {
+    const probe = w.along === 'x' ? [w.x, w.y + 0.5, w.z + w.inside * (WALL / 2 + 0.05)] : [w.x + w.inside * (WALL / 2 + 0.05), w.y + 0.5, w.z];
+    if (zoneAt(probe[0] as number, probe[1] as number, probe[2] as number) === zone) g.add(windowAssembly(w));
+  }
+  return g;
+}
+
+/** The way the sun comes in: towards the room, downwards, a little sideways (local frame of a window). */
+const SUN = new THREE.Vector3(0.28, -0.62, 0.73).normalize();
+
+/**
+ * A window in its opening: the reveals through the wall, the aluminium frame with its mullion and transom, the glass,
+ * the inside sill; the daylight it gives to the light bake; a shaft of sun and its patch on the floor when `sun`.
+ */
+function windowAssembly(w: Window): THREE.Group {
+  const g = new THREE.Group();
+  const m = M();
+  const [W, H, T] = [w.width, w.height, WALL];
+  // Reveals: the wall's thickness, seen inside the opening.
+  const reveal = (pw: number, ph: number, x: number, y: number, rx: number, ry: number): void => {
+    const f = face(pw, ph, m.paint as THREE.Material, 1.6);
+    f.position.set(x, y, 0);
+    f.rotation.set(rx, ry, 0);
+    g.add(f);
+  };
+  reveal(T, H, -W / 2, H / 2, 0, Math.PI / 2);
+  reveal(T, H, W / 2, H / 2, 0, -Math.PI / 2);
+  reveal(W, T, 0, H, Math.PI / 2, 0);
+  reveal(W, T, 0, 0, -Math.PI / 2, 0);
+  // The frame, set back towards the outside of the wall.
+  const alu = m.alu as THREE.Material;
+  const fz = -T / 2 + 0.035;
+  for (const s of [-1, 1]) {
+    g.add(box(0.055, H, 0.06, alu, s * (W / 2 - 0.0275), H / 2, fz, false));
+    g.add(box(W, 0.055, 0.06, alu, 0, s < 0 ? 0.0275 : H - 0.0275, fz, false));
+  }
+  g.add(box(0.045, H, 0.05, alu, 0, H / 2, fz, false), box(W, 0.045, 0.05, alu, 0, H * 0.72, fz, false));
+  const glass = new THREE.Mesh(new THREE.PlaneGeometry(W, H), m.glass as THREE.Material);
+  glass.position.set(0, H / 2, fz);
+  glass.userData.dynamic = true;
+  g.add(glass);
+  // The inside sill: a white board proud of the wall.
+  g.add(box(W + 0.12, 0.03, T / 2 + 0.07, m.sill as THREE.Material, 0, -0.015, T / 4 + 0.035));
+  // The daylight for the light bake: an emitter in the opening, never drawn in the game.
+  const light = new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshBasicMaterial({ map: outsideTexture('quad'), color: '#ffffff' }));
+  light.position.set(0, H / 2, -T / 2 - 0.02);
+  light.visible = false;
+  light.userData.dynamic = true;
+  light.userData.windowLight = true;
+  g.add(light);
+  if (w.sun) g.add(sunlight(W, H, w.sill));
+  g.rotation.y = w.along === 'x' ? (w.inside > 0 ? 0 : Math.PI) : w.inside > 0 ? Math.PI / 2 : -Math.PI / 2;
+  g.position.set(w.x, w.y + w.sill, w.z);
+  return g;
+}
+
+/** The shaft of sunlight through an opening W × H whose sill is `sill` above the floor, and the patch it makes there. */
+function sunlight(W: number, H: number, sill: number): THREE.Group {
+  const g = new THREE.Group();
+  const corners = [new THREE.Vector3(-W / 2, 0, 0), new THREE.Vector3(W / 2, 0, 0), new THREE.Vector3(W / 2, H, 0), new THREE.Vector3(-W / 2, H, 0)];
+  // Where each corner's ray meets the floor (local y = -sill).
+  const floor = corners.map((c) => c.clone().addScaledVector(SUN, (c.y + sill) / -SUN.y));
+  const positions: number[] = [];
+  const colours: number[] = [];
+  const warm = new THREE.Color('#ffe2b0');
+  for (let i = 0; i < 4; i++) {
+    const [a, b] = [corners[i] as THREE.Vector3, corners[(i + 1) % 4] as THREE.Vector3];
+    const [fa, fb] = [floor[i] as THREE.Vector3, floor[(i + 1) % 4] as THREE.Vector3];
+    for (const v of [a, b, fb, a, fb, fa]) {
+      positions.push(v.x, v.y, v.z);
+      const fade = v === a || v === b ? 1 : 0.15;
+      colours.push(warm.r * fade, warm.g * fade, warm.b * fade);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colours, 3));
+  const shaft = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.06, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false, fog: false }));
+  shaft.userData.dynamic = true;
+  shaft.renderOrder = 5;
+  const patchGeometry = new THREE.BufferGeometry();
+  const f = floor.map((v) => [v.x, -sill + 0.006, v.z]);
+  patchGeometry.setAttribute('position', new THREE.Float32BufferAttribute([...f[0]!, ...f[1]!, ...f[2]!, ...f[0]!, ...f[2]!, ...f[3]!], 3));
+  patchGeometry.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1], 2));
+  const patch = new THREE.Mesh(patchGeometry, new THREE.MeshBasicMaterial({ map: sunPatchTexture(), transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }));
+  patch.userData.dynamic = true;
+  patch.renderOrder = -1;
+  g.add(shaft, patch);
   return g;
 }
 
 /** The frame of each doorway on the floor of `zone` (both faces of the wall, and its reveals). */
-function doorFrames(y: number): THREE.Group {
+function doorFrames(y: number, r: Rect): THREE.Group {
   const g = new THREE.Group();
   const m = M();
   for (const d of DOORS) {
     if (Math.abs(d.y - y) > 0.01) continue;
+    // Only the doors on this corridor's own walls.
+    if (d.along === 'x' ? d.x < r.x0 || d.x > r.x1 || (Math.abs(d.z - r.z0) > 0.01 && Math.abs(d.z - r.z1) > 0.01) : d.z < r.z0 || d.z > r.z1 || (Math.abs(d.x - r.x0) > 0.01 && Math.abs(d.x - r.x1) > 0.01)) continue;
     const depth = WALL + 0.05;
     for (const s of [-1, 1]) {
       const jamb = d.along === 'x' ? box(0.05, DOOR_HEIGHT + 0.05, depth, m.frame as THREE.Material, d.x + s * (d.width / 2 + 0.025), d.y + (DOOR_HEIGHT + 0.05) / 2, d.z) : box(depth, DOOR_HEIGHT + 0.05, 0.05, m.frame as THREE.Material, d.x, d.y + (DOOR_HEIGHT + 0.05) / 2, d.z + s * (d.width / 2 + 0.025));
@@ -222,7 +358,7 @@ export function zoneShell(zone: ZoneName, options: ShellOptions = {}): THREE.Gro
   g.add(slab(r, ceiling, ceilingMaterial, true, 0.6));
   g.add(walls(zone));
   // Door frames belong to the corridors, which every room off them can see.
-  if (zone === 'corridor' || zone === 'corridor1') g.add(doorFrames(z.y));
+  if (zone === 'corridor' || zone === 'corridor1' || zone.endsWith('-corridor')) g.add(doorFrames(z.y, r));
   if (zone === 'stairs') g.add(stairs());
   if (options.lights) g.add(panels(r, ceiling));
   return g;

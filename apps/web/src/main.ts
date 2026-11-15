@@ -18,6 +18,7 @@ import { buildRoom, rackFillers } from './scene/room.js';
 import { detectQuality, Stage } from './scene/stage.js';
 import { tx } from './i18n.js';
 import { h } from './ui/dom.js';
+import { panorama } from './scene/outside.js';
 import { showSettings } from './ui/pause.js';
 import { randomTip } from './ui/tips.js';
 import { progress, showBriefing, showMissions, showResults, showTitle } from './ui/screens.js';
@@ -37,6 +38,8 @@ if (!document.createElement('canvas').getContext('webgl2')) {
 const stage = new Stage(document.getElementById('stage') as HTMLElement, detectQuality());
 const room = buildRoom();
 stage.scene.add(room);
+// The town seen through the windows: around the campus, the agency in Bobo-Dioulasso and the operator's data centre.
+stage.scene.add(panorama('campus', -0.7, -2.8, 45), panorama('agence', 0, 398, 32, 1.6, 2.1), panorama('datacenter', 0, 797, 32));
 // The room's baked light, fetched while the equipment loads.
 const lightmaps = preloadLightmaps().then((found) => {
   if (found && applyLightmap(room) > 0) stage.useBakedLight();
@@ -161,7 +164,10 @@ if (import.meta.env.DEV) {
     stage,
     sound,
     mission: () => mission,
-    exportStatic: async () => (await import('./scene/lightmap-export.js')).exportStatic(stage.scene),
+    exportStatic: async () => {
+      mission?.buildEverything();
+      return (await import('./scene/lightmap-export.js')).exportStatic(stage.scene);
+    },
     portOnScreen(device: string, port: string): [number, number] | null {
       let found: THREE.Object3D | undefined;
       stage.level.traverse((o) => {

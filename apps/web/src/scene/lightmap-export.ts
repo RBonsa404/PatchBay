@@ -81,6 +81,13 @@ export function exportStatic(scene: THREE.Scene): { meshes: ExportedMesh[]; ligh
       if (!kind) continue;
       const m = material as THREE.MeshStandardMaterial;
       const colour = (m.color ?? new THREE.Color(1, 1, 1)).clone().multiply(mean(m.map ?? null));
+      // Painted surfaces carry their colours in their vertices: their mean is what light bounces off.
+      const painted = mesh.geometry.attributes.color as THREE.BufferAttribute | undefined;
+      if (m.vertexColors && painted) {
+        const sum = [0, 0, 0];
+        for (let i = 0; i < painted.count; i++) for (let c = 0; c < 3; c++) sum[c]! += painted.getComponent(i, c);
+        colour.setRGB(sum[0]! / painted.count, sum[1]! / painted.count, sum[2]! / painted.count);
+      }
       if (kind === 'target') colour.multiplyScalar(1 - 0.6 * (m.metalness ?? 0));
       mesh.geometry.computeBoundingBox();
       meshes.push({
@@ -94,6 +101,26 @@ export function exportStatic(scene: THREE.Scene): { meshes: ExportedMesh[]; ligh
         normal: base64((mesh.geometry.attributes.normal as THREE.BufferAttribute).array as Float32Array),
       });
     }
+  }
+  // Daylight: the emitters set in the windows' openings (never drawn in the game, never merged).
+  for (const part of LIGHTMAPPED_PARTS) {
+    scene.getObjectByName(part)?.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh || !mesh.userData.windowLight) return;
+      const material = mesh.material as THREE.MeshBasicMaterial;
+      const colour = material.color.clone().multiply(mean(material.map ?? null));
+      const geometry = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry;
+      meshes.push({
+        name: `${part}-window-${meshes.length}`,
+        part,
+        signature: '',
+        role: 'window',
+        albedo: [colour.r, colour.g, colour.b],
+        matrix: mesh.matrixWorld.toArray(),
+        position: base64((geometry.attributes.position as THREE.BufferAttribute).array as Float32Array),
+        normal: base64((geometry.attributes.normal as THREE.BufferAttribute).array as Float32Array),
+      });
+    });
   }
   const lights: { position: number[]; color: number[]; intensity: number; distance: number }[] = [];
   scene.traverse((o) => {

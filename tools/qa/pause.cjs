@@ -3,7 +3,7 @@ const { open, startMission, wait } = require('./lib.cjs');
 
 (async () => {
   const { browser, page, errors } = await open();
-  await page.click('.menu-item:nth-child(3)');
+  await page.click('.menu-item:has-text("Paramètres")');
   await page.waitForSelector('.settings-card');
   await page.screenshot({ path: 'art/qa/settings.png' });
   await page.click('.settings-card .btn.primary');

@@ -9,23 +9,36 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 export function bake(group: THREE.Group): void {
   group.updateMatrixWorld(true);
   const toLocal = group.matrixWorld.clone().invert();
-  const buckets = new Map<string, { material: THREE.Material; mesh: THREE.Mesh; geometries: THREE.BufferGeometry[] }>();
+  const buckets = new Map<string, { material: THREE.Material; mesh: THREE.Mesh; geometries: THREE.BufferGeometry[]; painted: boolean }>();
   const baked: THREE.Mesh[] = [];
   const visit = (o: THREE.Object3D): void => {
     if (o.userData.dynamic) return;
     const mesh = o as THREE.Mesh;
     if (mesh.isMesh && !Array.isArray(mesh.material)) {
       const m = mesh.material as THREE.MeshStandardMaterial;
-      const key = [m.type, m.color?.getHexString(), m.roughness, m.metalness, m.map?.uuid, m.normalMap?.uuid, m.roughnessMap?.uuid, m.transparent, m.opacity, m.toneMapped, m.depthWrite, m.side, m.emissive?.getHexString(), m.emissiveIntensity, m.envMapIntensity, mesh.renderOrder, mesh.castShadow, mesh.receiveShadow].join('|');
+      // Plain painted surfaces (one colour, no picture, no glow) share a mesh whatever their colour: the colour goes
+      // into the vertices. A room of a hundred colours is then a handful of draw calls.
+      const painted =
+        m.type === 'MeshStandardMaterial' && !m.map && !m.normalMap && !m.roughnessMap && !m.transparent && m.opacity === 1 && m.toneMapped && m.depthWrite && !m.vertexColors && (m.emissive?.getHex() ?? 0) === 0;
+      const key = painted
+        ? ['painted', m.roughness.toFixed(2), m.metalness.toFixed(2), m.envMapIntensity, m.side, mesh.renderOrder, mesh.castShadow, mesh.receiveShadow].join('|')
+        : [m.type, m.color?.getHexString(), m.roughness, m.metalness, m.map?.uuid, m.normalMap?.uuid, m.roughnessMap?.uuid, m.transparent, m.opacity, m.toneMapped, m.depthWrite, m.side, m.emissive?.getHexString(), m.emissiveIntensity, m.envMapIntensity, mesh.renderOrder, mesh.castShadow, mesh.receiveShadow].join('|');
       const source = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry.clone();
       for (const name of Object.keys(source.attributes)) {
         if (name !== 'position' && name !== 'normal' && name !== 'uv') source.deleteAttribute(name);
       }
       if (!source.attributes.uv) source.setAttribute('uv', new THREE.BufferAttribute(new Float32Array((source.attributes.position as THREE.BufferAttribute).count * 2), 2));
+      if (painted) {
+        const n = (source.attributes.position as THREE.BufferAttribute).count;
+        const colours = new Float32Array(n * 3);
+        for (let i = 0; i < n; i++) colours.set([m.color.r, m.color.g, m.color.b], i * 3);
+        source.setAttribute('color', new THREE.BufferAttribute(colours, 3));
+      }
       source.applyMatrix4(toLocal.clone().multiply(mesh.matrixWorld));
       let bucket = buckets.get(key);
       if (!bucket) {
-        bucket = { material: m, mesh, geometries: [] };
+        const material = painted ? new THREE.MeshStandardMaterial({ vertexColors: true, roughness: m.roughness, metalness: m.metalness, envMapIntensity: m.envMapIntensity, side: m.side }) : m;
+        bucket = { material, mesh, geometries: [], painted };
         buckets.set(key, bucket);
       }
       bucket.geometries.push(source);
@@ -40,6 +53,7 @@ export function bake(group: THREE.Group): void {
   }
   let index = 0;
   for (const { material, mesh, geometries } of buckets.values()) {
+    // (Painted buckets carry their colours in a `color` attribute: every geometry of a bucket has the same attributes.)
     const merged = mergeGeometries(geometries, false);
     for (const g of geometries) g.dispose();
     if (!merged) continue;

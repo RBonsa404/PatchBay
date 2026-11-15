@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { DeviceModel, PortSpec } from '@patchbay/sim-core';
 import { bake, freeze } from './bake.js';
 import { brushedTexture, contactShadow, keyboardTexture, rj45Texture } from './materials.js';
-import { BENCH_TOP, RACK } from './room.js';
+import { BENCH_TOP, RACK, TRAY, WALL_TRUNK } from './room.js';
 import { addFeet, addRackEars, addVents, powerButton, roundedChassis } from './details.js';
 import { gearModel, type GearName } from './gear.js';
 import { atlasLabel, screenTexture } from './textures.js';
@@ -443,7 +443,8 @@ function buildDesktop(id: string, model: DeviceModel, m: Materials, view: Device
   const screenFrame = roundedChassis(0.45, 0.275, 0.016, m.plastic);
   screenFrame.position.set(-0.12, 0.275, -0.02);
   const screen = plane(0.44, 0.262, screenTexture([caption, '', '> ipconfig']), true);
-  screen.position.set(-0.12, 0.275, -0.0115);
+  // A few millimetres in front of the bezel: closer, the two would flicker in and out at a distance.
+  screen.position.set(-0.12, 0.275, -0.0085);
   const stand = roundedChassis(0.034, 0.14, 0.02, m.chassis);
   stand.position.set(-0.12, 0.07, -0.04);
   const base = roundedChassis(0.17, 0.008, 0.12, m.chassis);
@@ -452,7 +453,7 @@ function buildDesktop(id: string, model: DeviceModel, m: Materials, view: Device
   keyboard.position.set(-0.12, 0.006, 0.16);
   const caps = new THREE.Mesh(new THREE.PlaneGeometry(0.33, 0.106), new THREE.MeshStandardMaterial({ map: keys(), roughness: 0.55 }));
   caps.rotation.x = -Math.PI / 2;
-  caps.position.set(-0.12, 0.0125, 0.16);
+  caps.position.set(-0.12, 0.0145, 0.16);
   const mouse = roundedChassis(0.055, 0.02, 0.09, m.plastic);
   mouse.position.set(0.1, 0.01, 0.17);
   const bay = mesh(new THREE.BoxGeometry(0.12, 0.004, 0.002), m.chassis, false);
@@ -482,12 +483,12 @@ function buildLaptop(id: string, model: DeviceModel, m: Materials, view: DeviceV
   base.position.y = 0.01;
   const deck = new THREE.Mesh(new THREE.PlaneGeometry(0.29, 0.105), new THREE.MeshStandardMaterial({ map: keys(), roughness: 0.55 }));
   deck.rotation.x = -Math.PI / 2;
-  deck.position.set(0, 0.0185, -0.02);
+  deck.position.set(0, 0.0205, -0.02);
   const lid = new THREE.Group();
   const lidShell = roundedChassis(0.33, 0.22, 0.008, m.chassis);
   lidShell.position.y = 0.11;
   const screen = plane(0.3, 0.19, screenTexture([caption, '', 'Console série prête', '> _']), true);
-  screen.position.set(0, 0.11, 0.0055);
+  screen.position.set(0, 0.11, 0.0072);
   lid.add(lidShell, screen);
   lid.position.set(0, 0.02, -0.115);
   lid.rotation.x = -0.28;
@@ -602,6 +603,45 @@ export function buildPatchPanel(id: string, ports: { name: string; label: string
   }
   bake(view.root);
   freeze(view.root);
+  return view;
+}
+
+/**
+ * The operator's box (NTU) on the back wall of a site, right of the rack: where a leased line comes in. Its one serial
+ * socket takes the router's V.35 cable; the line to the other site is the operator's.
+ */
+export function buildNtu(id: string, ports: { name: string; label: string }[], roomZ = 0, roomY = 0): DeviceView {
+  const m = materials();
+  const view: DeviceView = { id, shape: 'switch', root: new THREE.Group(), ports: new Map(), body: [], height: 0.17, width: 0.24, depth: 0.055, inRack: false, roomZ, roomY };
+  view.root.name = id;
+  const spec = { ports: ports.map((p) => ({ name: p.name, kind: 'serial' as const })) } as unknown as DeviceModel;
+  if (!buildFromGear('ntu', id, spec, m, view, ports[0]?.label ? `${id} · ${ports[0].label}` : id, '#1d4ed8')) {
+    const chassis = mesh(new THREE.BoxGeometry(0.24, 0.17, 0.055), m.panel);
+    chassis.position.y = 0.085;
+    view.root.add(chassis);
+    view.body.push(chassis);
+    ports.forEach((p, i) => view.ports.set(p.name, addSocket(view.root, m, id, { name: p.name, kind: 'serial' }, -0.05 + i * 0.1, 0.045, 0.03, 'none')));
+  }
+  // On the wall behind the bench, just right of the rack, at hand height (clear of the posters above).
+  view.root.position.set(0.8, 0.95 + roomY, -1.6 + 0.034 + roomZ);
+  // The wall trunking beside it, white PVC with its lid, from the overhead tray down to just under the box: the
+  // operator's line and the router's cable both run inside it.
+  const pvc = new THREE.MeshStandardMaterial({ color: '#eef0f2', roughness: 0.5 });
+  const [bottom, top] = [WALL_TRUNK.bottom - 0.95, TRAY.y + 0.03 - 0.95];
+  const trunk = mesh(new THREE.BoxGeometry(0.06, top - bottom, 0.05), pvc);
+  trunk.position.set(WALL_TRUNK.dx, (top + bottom) / 2, WALL_TRUNK.z - view.root.position.z + roomZ);
+  const lid = mesh(new THREE.BoxGeometry(0.064, top - bottom, 0.006), pvc, false);
+  lid.position.set(WALL_TRUNK.dx, (top + bottom) / 2, trunk.position.z + 0.026);
+  const cap = mesh(new THREE.BoxGeometry(0.066, 0.012, 0.056), pvc, false);
+  cap.position.set(WALL_TRUNK.dx, bottom - 0.006, trunk.position.z);
+  view.root.add(trunk, lid, cap);
+  pickCopies(view, m);
+  for (const b of view.body) b.userData.device = id;
+  for (const port of view.ports.values()) {
+    port.hit.visible = false;
+    port.hit.userData.dynamic = true;
+    port.socket.userData.dynamic = true;
+  }
   return view;
 }
 

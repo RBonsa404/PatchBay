@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { blockedAt, DOORS, groundAt, zoneOf, type ZoneName } from '../scene/building.js';
+import { blockedAt, DOORS, groundAt, ZONES, zoneOf, type ZoneName } from '../scene/building.js';
 
 /**
  * The player, seen from inside: eyes at 1.62 m, walking on the building's floors, steps and landings, and stopped by
@@ -37,7 +37,7 @@ export class Player {
 
   /** Open the building to the player (otherwise, the technical room only); `stairs` adds the first floor. */
   enterBuilding(stairs: boolean): void {
-    this.allowed = new Set<ZoneName>(['room', 'corridor', 'lab', 'classroom0', 'toilets', 'lounge', ...(stairs ? (['stairs', 'corridor1', 'office', 'classroom1', 'classroom2'] as ZoneName[]) : [])]);
+    this.allowed = new Set<ZoneName>(['room', 'corridor', 'lab', 'classroom0', 'toilets', 'lounge', 'agence', 'datacenter', ...ZONES.filter((z) => z.name.includes('-')).map((z) => z.name), ...(stairs ? (['stairs', 'corridor1', 'office', 'classroom1', 'classroom2'] as ZoneName[]) : [])]);
   }
 
   /** Height of the floor under the player. */

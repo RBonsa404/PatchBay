@@ -21,6 +21,11 @@ export interface Cable {
   type: CableType;
   a: CableEnd;
   b: CableEnd;
+  /**
+   * A serial line rented from an operator between two sites: each router plugs into the operator's box (NTU) and the
+   * operator's network gives the clock, so both routers are DTE and neither sets a clock rate.
+   */
+  leased?: boolean;
 }
 
 export interface NetworkOptions {
@@ -229,7 +234,7 @@ export class Network {
   }
 
   /** Plug a cable. For `serial`, `a` is the DCE end. A wrong copper cable still plugs in; its link just stays down. */
-  connect(type: CableType, a: CableEnd, b: CableEnd): ConnectResult {
+  connect(type: CableType, a: CableEnd, b: CableEnd, options: { leased?: boolean } = {}): ConnectResult {
     const pa = this.portSpec(a);
     const pb = this.portSpec(b);
     if (!this.devices.has(a.device) || !this.devices.has(b.device)) return { ok: false, error: 'unknown-device' };
@@ -238,7 +243,7 @@ export class Network {
     if (this.cableAt(a) || this.cableAt(b)) return { ok: false, error: 'port-busy' };
     if (!canPlug(type, pa, pb)) return { ok: false, error: 'incompatible-ports' };
 
-    const cable: Cable = { type, a, b };
+    const cable: Cable = { type, a, b, ...(options.leased && type === 'serial' ? { leased: true } : {}) };
     this.cables.push(cable);
     this.settle();
     return { ok: true, cable };
@@ -289,7 +294,9 @@ export class Network {
     const pa = this.portSpec(cable.a) as PortSpec;
     const pb = this.portSpec(cable.b) as PortSpec;
     if (cable.type === 'serial') {
-      // The DCE end must provide a clock; without it the line is up but the protocol stays down.
+      // The DCE end must provide a clock; without it the line is up but the protocol stays down. On a leased line the
+      // operator's network clocks it.
+      if (cable.leased) return { status: 'up', protocol: 'up' };
       const dce = this.devices.get(cable.a.device)?.cli?.config.interfaces.find((i) => i.name === cable.a.port);
       return { status: 'up', protocol: dce?.clockRate !== undefined ? 'up' : 'down' };
     }
@@ -315,7 +322,7 @@ export class Network {
         ...(d.cli ? { running: cloneConfig(d.cli.config), startup: d.cli.startup ? cloneConfig(d.cli.startup) : null } : {}),
         ...(d.host ? { host: { ...d.host } } : {}),
       })),
-      cables: this.cables.map((c) => ({ type: c.type, a: { ...c.a }, b: { ...c.b } })),
+      cables: this.cables.map((c) => ({ type: c.type, a: { ...c.a }, b: { ...c.b }, ...(c.leased ? { leased: true } : {}) })),
     };
   }
 
@@ -327,7 +334,7 @@ export class Network {
       if (device.cli) device.cli.startup = d.startup ? cloneConfig(d.startup) : null;
       if (d.host) device.host = { ...d.host };
     }
-    net.cables = snapshot.cables.map((c) => ({ type: c.type, a: { ...c.a }, b: { ...c.b } }));
+    net.cables = snapshot.cables.map((c) => ({ type: c.type, a: { ...c.a }, b: { ...c.b }, ...(c.leased ? { leased: true } : {}) }));
     net.lastLinks.clear();
     net.reconcile();
     net.changes++;
@@ -347,6 +354,7 @@ export class Network {
       serialEnd: (name) => {
         const cable = this.cableAt({ device: device.id, port: name });
         if (cable?.type !== 'serial') return null;
+        if (cable.leased) return 'dte';
         return sameEnd(cable.a, { device: device.id, port: name }) ? 'dce' : 'dte';
       },
       macAddress: (name) => this.macOf(device.id, name),

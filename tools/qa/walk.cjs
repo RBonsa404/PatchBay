@@ -48,6 +48,7 @@ const ROUTE = [
   if (OUT) fs.mkdirSync(OUT, { recursive: true });
   const { browser, page, errors } = await open();
   await startMission(page, 4);
+  await page.evaluate(() => window.__patchbay.mission().buildEverything());
   await hideHud(page);
   await page.evaluate(() => window.__patchbay.mission().player.place(-1.0, 1.75, 0));
   let failed = 0;

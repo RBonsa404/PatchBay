@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { Cable, CableEnd, CableType, DeviceKind } from '@patchbay/sim-core';
 import { cableRole, cordLength, cordText, ROLE_COLOUR } from '../game/cabling.js';
 import type { PortView } from './devices.js';
-import { BENCH_TOP, MANAGER, RACK, roomOrigin } from './room.js';
+import { BENCH_TOP, LADDER, MANAGER, RACK, roomOrigin, TRAY, WALL_TRUNK } from './room.js';
 import { fillet, Rope } from './rope.js';
 import type { Stage } from './stage.js';
 import { atlasLabel } from './textures.js';
@@ -45,6 +45,47 @@ function routeBetween(a: THREE.Vector3, na: THREE.Vector3, b: THREE.Vector3, nb:
   const highA = a.y - BENCH_TOP > 0.1;
   const highB = b.y - BENCH_TOP > 0.1;
   const offset = lane * LANE;
+
+  // A box on the wall behind the rack (the operator's NTU): the cord never crosses the air. Up the rack's cable
+  // manager, over the top of the rack, up the vertical ladder to the overhead tray, along it, down the wall trunking
+  // beside the box, and only the last few centimetres free, curving up into the socket.
+  const onWall = (p: THREE.Vector3): boolean => p.z < frontZ - RACK.depth - 0.25;
+  if (highA && highB && onWall(a) !== onWall(b)) {
+    const [r, w, nw] = onWall(a) ? [b, a, na] : [a, b, nb];
+    const nr = onWall(a) ? nb : na;
+    const r1 = r.clone().addScaledVector(nr, lead);
+    const w1 = w.clone().addScaledVector(nw, lead);
+    const side = RACK.x + MANAGER.x - 0.01;
+    const z = frontZ + 0.03;
+    const top = RACK.height + 0.03 + (lane % 3) * 0.006;
+    const trayY = TRAY.y + radius + 0.006 + (lane % 3) * 0.008;
+    const trayZ = TRAY.z - 0.06 + (lane % 4) * 0.025;
+    const trunkX = w.x + WALL_TRUNK.dx;
+    const trunkZ = WALL_TRUNK.z;
+    const path = [
+      r,
+      r1,
+      new THREE.Vector3(side, r1.y, z),
+      new THREE.Vector3(side, top, z),
+      new THREE.Vector3(LADDER.x, top + 0.02, frontZ - RACK.depth + 0.05),
+      // Laid against the ladder's rungs (on the rack's side of them), as a technician ties it there.
+      new THREE.Vector3(LADDER.x, top + 0.08, LADDER.z + 0.012),
+      new THREE.Vector3(LADDER.x, trayY - 0.06, LADDER.z + 0.012),
+      new THREE.Vector3(LADDER.x + 0.06, trayY, trayZ),
+      // To the tray's back edge, then straight into the top of the trunking against the wall.
+      new THREE.Vector3(trunkX - 0.08, trayY, trayZ),
+      new THREE.Vector3(trunkX, trayY, TRAY.z - 0.13),
+      new THREE.Vector3(trunkX, trayY - 0.03, trunkZ),
+      new THREE.Vector3(trunkX, trayY - 0.15, trunkZ),
+      new THREE.Vector3(trunkX, WALL_TRUNK.bottom + 0.02, trunkZ),
+      new THREE.Vector3(trunkX - 0.02, WALL_TRUNK.bottom - 0.05, trunkZ + 0.04),
+      new THREE.Vector3(w1.x + 0.03, w1.y - 0.07, w1.z + 0.03),
+      w1,
+      w,
+    ];
+    const ordered = onWall(a) ? path.reverse() : path;
+    return new THREE.CatmullRomCurve3(fillet(ordered, 0.05, 6), false, 'centripetal', 0.5);
+  }
 
   if (highA && highB) {
     // Patch cord, dressed as in an enterprise rack: straight out of the port, into the horizontal cable manager

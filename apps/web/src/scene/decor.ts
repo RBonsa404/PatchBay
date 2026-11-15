@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { FACE } from './building.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import { contactShadow, outsideTexture, photo, sunPatchTexture } from './materials.js';
+import { contactShadow, photo } from './materials.js';
 import { placeProp } from './props.js';
 import { textTexture } from './textures.js';
 
@@ -183,7 +183,8 @@ function cabinetRow(): THREE.Group {
 /** The technician's desk against the front wall: monitor, keyboard, binders, a chair, and a window onto the corridor. */
 function desk(): THREE.Group {
   const g = new THREE.Group();
-  const [x, z, top] = [-0.9, 3.2, 0.74];
+  // Against the front wall, under the window (as `building.ts` stops the player around it).
+  const [x, z, top] = [-0.9, 5.5, 0.74];
   g.add(box(1.5, 0.035, 0.7, M.wood, x, top, z));
   for (const dx of [-0.7, 0.7]) g.add(box(0.04, top, 0.62, M.steel, x + dx, top / 2, z));
   g.add(box(0.42, 0.56, 0.55, M.paintedGrey, x + 0.48, 0.3, z));
@@ -192,10 +193,10 @@ function desk(): THREE.Group {
   const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.52, 0.3), new THREE.MeshBasicMaterial({ map: textTexture('$ show running-config', { width: 512, height: 296, color: '#7dd3fc', font: '400 26px "JetBrains Mono", monospace' }), color: '#ffffff', transparent: true }));
   const back = soft(0.55, 0.33, 0.025, M.black, x - 0.1, top + 0.3, z + 0.14, 0.01);
   screen.rotation.y = Math.PI;
-  screen.position.set(x - 0.1, top + 0.3, z + 0.126);
+  screen.position.set(x - 0.1, top + 0.3, z + 0.121);
   const screenBase = new THREE.Mesh(new THREE.PlaneGeometry(0.52, 0.3), new THREE.MeshBasicMaterial({ color: '#07111f' }));
   screenBase.rotation.y = Math.PI;
-  screenBase.position.set(x - 0.1, top + 0.3, z + 0.1265);
+  screenBase.position.set(x - 0.1, top + 0.3, z + 0.124);
   g.add(back, screenBase, screen, box(0.05, 0.14, 0.05, M.black, x - 0.1, top + 0.08, z + 0.16), box(0.2, 0.012, 0.16, M.black, x - 0.1, top + 0.024, z + 0.16));
   g.add(box(0.4, 0.016, 0.13, M.plastic, x - 0.1, top + 0.026, z - 0.12), box(0.06, 0.02, 0.09, M.plastic, x + 0.17, top + 0.028, z - 0.12));
   const binders = ['#1d4ed8', '#fbbf24', '#0b1e3f', '#1d4ed8', '#94a3b8'];
@@ -210,20 +211,6 @@ function desk(): THREE.Group {
   deskShadow.position.set(x, 0.003, z);
   g.add(chairShadow, deskShadow);
 
-  // The window: the campus outside, the blind half down, and the daylight it lets in.
-  const wz = 3.59;
-  g.add(box(1.5, 1.2, 0.03, M.paintedGrey, 1.85, 1.65, wz, false));
-  const outside = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.1), new THREE.MeshBasicMaterial({ map: outsideTexture() }));
-  outside.rotation.y = Math.PI;
-  outside.position.set(1.85, 1.65, wz - 0.017);
-  g.add(outside, box(0.03, 1.1, 0.02, M.paintedGrey, 1.85, 1.65, wz - 0.022, false), box(1.46, 0.05, 0.1, M.white, 1.85, 1.08, wz - 0.05));
-  for (let i = 0; i < 12; i++) g.add(box(1.4, 0.004, 0.024, M.white, 1.85, 2.18 - i * 0.034, wz - 0.03, false));
-  const patch = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 2.2), new THREE.MeshBasicMaterial({ map: sunPatchTexture(), transparent: true, depthWrite: false, opacity: 0.55, toneMapped: false }));
-  patch.rotation.x = -Math.PI / 2;
-  patch.rotation.z = Math.PI;
-  patch.position.set(1.75, 0.006, 2.45);
-  patch.renderOrder = -1;
-  g.add(patch);
   return g;
 }
 
@@ -356,7 +343,7 @@ export function buildDecor(): THREE.Group {
  * A second row of racks across the room, as in a real network room: closed cabinets with their blanking panels,
  * patch fields and servers' LEDs behind perforated doors, labelled, with a cold-aisle tape on the floor.
  */
-function rackRow(): THREE.Group {
+export function rackRow(): THREE.Group {
   const g = new THREE.Group();
   const leds = ['#22c55e', '#38bdf8', '#22c55e', '#fbbf24'];
   const [w, h, d, z] = [0.6, 2.0, 0.9, 3.7];

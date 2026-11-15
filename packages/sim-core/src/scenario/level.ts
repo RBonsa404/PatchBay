@@ -14,7 +14,12 @@ export interface LevelCable {
   type: CableType;
   a: string;
   b: string;
+  /** A serial line rented from an operator between two sites (see `Cable.leased`). */
+  leased?: boolean;
 }
+
+/** Where a device stands: the technical room by default, another room of the campus, or another site. */
+export type LevelRoom = 'annexe' | 'etage' | 'agence' | 'datacenter';
 
 export interface LevelDevice {
   id: string;
@@ -23,7 +28,7 @@ export interface LevelDevice {
   /** Where the 3D scene places it (metres). Optional: the engine does not care. */
   position?: [number, number, number];
   /** The other room of the building; the position is then relative to it. */
-  room?: 'annexe' | 'etage';
+  room?: LevelRoom;
 }
 
 /**
@@ -66,7 +71,8 @@ export interface Level {
    * Patch panels: the building's fixed cabling. A panel is passive and unknown to the engine: two cords joined by a
    * link between panels make one cable in the `Network`.
    */
-  panels?: { id: string; room?: 'annexe' | 'etage' }[];
+  /** `ntu`: the operator's box on the wall of a site, where the router's serial cable ends a leased line. */
+  panels?: { id: string; room?: LevelRoom; kind?: 'patch' | 'ntu' }[];
   /** `label` is printed beside the `a` port, `labelB` (where the cabling goes from the other end) beside `b`. */
   patchLinks?: { a: string; b: string; label: Text; labelB?: Text }[];
 }
@@ -79,7 +85,7 @@ export function parseEnd(text: string): CableEnd {
 
 function plug(net: Network, cables: LevelCable[]): void {
   for (const c of cables) {
-    const r = net.connect(c.type, parseEnd(c.a), parseEnd(c.b));
+    const r = net.connect(c.type, parseEnd(c.a), parseEnd(c.b), { leased: c.leased === true });
     if (!r.ok) throw new Error(`Cannot plug ${c.type} ${c.a} - ${c.b}: ${r.error}`);
   }
 }

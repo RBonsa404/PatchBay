@@ -231,6 +231,15 @@ export class Stage {
     // By far the dearest effect of the frame, and a soft one: half the resolution does not show, and costs a quarter.
     const sizeAo = this.ao.setSize.bind(this.ao);
     this.ao.setSize = (w, h) => sizeAo(Math.ceil(w / 2), Math.ceil(h / 2));
+    // What does not write depth (glass, shafts of sunlight, soft shadows, the landscape outside) occludes nothing.
+    const hideForAo = this.ao.overrideVisibility.bind(this.ao);
+    this.ao.overrideVisibility = () => {
+      hideForAo();
+      this.scene.traverseVisible((o) => {
+        const material = (o as THREE.Mesh).material as THREE.Material | undefined;
+        if ((o as THREE.Mesh).isMesh && material && !Array.isArray(material) && !material.depthWrite) o.visible = false;
+      });
+    };
     this.composer.addPass(this.ao);
     // High threshold: only LEDs, screens and ceiling panels glow, not the lit walls.
     this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.28, 0.5, 1);
@@ -377,6 +386,7 @@ export class Stage {
     let plain = this.simplified.get(full);
     if (!plain) {
       plain = new THREE.MeshLambertMaterial({
+        vertexColors: full.vertexColors,
         map: full.map,
         lightMap: full.lightMap,
         lightMapIntensity: full.lightMapIntensity,
@@ -518,6 +528,42 @@ export class Stage {
     if (Math.abs(factor - this.zoomFactor) < 0.0005) return;
     this.zoomFactor = factor;
     this.applyFov();
+  }
+
+  private sun: THREE.DirectionalLight | null = null;
+  private indoorFar: number | null = null;
+
+  /**
+   * Out in the street (the trip from one site to another): the sun, high and warm, casting the building's shadow, and
+   * a brighter sky. Back inside, both go.
+   */
+  setOutdoors(on: boolean, focus = new THREE.Vector3(), from = new THREE.Vector3(-0.5, 1, -0.35)): void {
+    if (on) {
+      if (!this.sun) {
+        this.sun = new THREE.DirectionalLight('#fff0d4', 3.2);
+        this.sun.castShadow = this.quality !== 'low';
+        const c = this.sun.shadow.camera;
+        [c.left, c.right, c.top, c.bottom, c.near, c.far] = [-32, 32, 32, -32, 1, 140];
+        this.sun.shadow.mapSize.set(2048, 2048);
+        this.sun.shadow.bias = -0.0004;
+        this.sun.shadow.normalBias = 0.03;
+        this.scene.add(this.sun, this.sun.target);
+      }
+      this.sun.visible = true;
+      this.sun.target.position.copy(focus);
+      this.sun.position.copy(focus).addScaledVector(from.clone().normalize(), 60);
+      this.sky.intensity = 1.5;
+      // Outside, the town around is far: the view reaches it (inside, a short view keeps the depth precise).
+      this.indoorFar ??= this.camera.far;
+      this.camera.far = 400;
+    } else {
+      if (this.sun) this.sun.visible = false;
+      this.sky.intensity = 0.74;
+      if (this.indoorFar !== null) this.camera.far = this.indoorFar;
+    }
+    this.camera.updateProjectionMatrix();
+    this.refreshShadows(1);
+    this.wake();
   }
 
   /** Move the ceiling lights over the room at this height and depth: only the occupied room is fully lit. */

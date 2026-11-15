@@ -1,11 +1,12 @@
-// Mission 8: cable the leased line (DCE at the campus) and the branch PC, type both routers' configuration in their
+// Mission 8: cable the leased line (each router to the carrier's box of its site) and the branch PC, type both routers' configuration in their
 // consoles, then check OSPF across areas and the shared Internet access. node tools/qa/site-distant.cjs [dir]
 const fs = require('fs');
 const { open, startMission, go, hideHud, wait } = require('./lib.cjs');
 
 const OUT = process.argv[2];
 const CABLES = [
-  ['serial', 'R1', 'Serial0/0/1', 'R2', 'Serial0/0/0'],
+  ['serial', 'R1', 'Serial0/0/1', 'NTU1', 'LS1'],
+  ['serial', 'R2', 'Serial0/0/0', 'NTU2', 'LS1'],
   ['crossover', 'PC2', 'FastEthernet0', 'R2', 'FastEthernet0/0'],
 ];
 
@@ -14,7 +15,7 @@ const CABLES = [
   await startMission(page, 8);
   const report = await page.evaluate((cables) => {
     const m = window.__patchbay.mission();
-    const end = (d, p) => m.devices.get(d)?.ports.get(p);
+    const end = (d, p) => (m.devices.get(d) ?? m.panels.get(d))?.ports.get(p);
     const missing = cables.flatMap(([, a, ap, b, bp]) => [[a, ap], [b, bp]]).filter(([d, p]) => !end(d, p)).map((x) => x.join(':'));
     for (const [type, a, ap, b, bp] of cables) {
       m.select(type);
@@ -38,7 +39,7 @@ const CABLES = [
   if (OUT) {
     fs.mkdirSync(OUT, { recursive: true });
     await hideHud(page);
-    const views = { bench: [-0.2, 1.1, Math.PI - 0.5, -0.55, 0, 1.6], room: [2.7, 3.0, Math.PI + 0.72, -0.2, 0], rack: [0, 1.05, Math.PI, -0.12, 0, 2.6] };
+    const views = { bench: [-0.2, 1.1, Math.PI - 0.5, -0.55, 0, 1.6], room: [2.7, 3.0, Math.PI + 0.72, -0.2, 0], rack: [0, 1.05, Math.PI, -0.12, 0, 2.6], 'campus-ntu': [2.2, 1.2, Math.PI + 0.55, 0.12, 0, 0.82], 'agence-rack': [0.6, 400.9, Math.PI - 0.2, -0.12, 0, 1.4], 'agence-room': [3.2, 404.6, Math.PI + 0.62, -0.12, 0, 0.82] };
     for (const [name, view] of Object.entries(views)) {
       await go(page, view);
       await wait(1600);

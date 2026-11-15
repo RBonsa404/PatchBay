@@ -7,7 +7,8 @@ const text = z.object({ fr: z.string().min(1), en: z.string().min(1).optional() 
 const ipv4 = z.string().regex(/^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/, 'adresse IPv4 attendue');
 const end = z.string().regex(/^[^:\s]+:[^:\s]+$/, 'attendu : APPAREIL:PORT');
 const cableType = z.enum(['straight', 'crossover', 'console', 'serial']);
-const cable = z.object({ type: cableType, a: end, b: end }).strict();
+const cable = z.object({ type: cableType, a: end, b: end, leased: z.boolean().optional() }).strict();
+const room = z.enum(['annexe', 'etage', 'agence', 'datacenter']);
 const host = z
   .object({
     ip: ipv4.optional(),
@@ -68,12 +69,12 @@ export const levelSchema = z
             model: z.string().min(1),
             label: text.optional(),
             position: z.tuple([z.number(), z.number(), z.number()]).optional(),
-            room: z.enum(['annexe', 'etage']).optional(),
+            room: room.optional(),
           })
           .strict(),
       )
       .min(1),
-    panels: z.array(z.object({ id: z.string().min(1), room: z.enum(['annexe', 'etage']).optional() }).strict()).optional(),
+    panels: z.array(z.object({ id: z.string().min(1), room: room.optional(), kind: z.enum(['patch', 'ntu']).optional() }).strict()).optional(),
     patchLinks: z.array(z.object({ a: end, b: end, label: text, labelB: text.optional() }).strict()).optional(),
     inventory: z.object({ cables: z.record(cableType, z.number().int().min(0)) }).strict(),
     initial: z

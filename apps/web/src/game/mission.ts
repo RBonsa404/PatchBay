@@ -8,12 +8,12 @@ import { TourGuide } from './tour.js';
 import type { TourStop } from '@patchbay/content';
 import { setGameTarget, type GameTarget } from './gamepad.js';
 import { CableLayer, portFrame } from '../scene/cables.js';
-import { buildDevice, buildPatchPanel, flickerLed, highlightSocket, rackOccupied, setLed, type DeviceView, type PortView } from '../scene/devices.js';
+import { buildDevice, buildNtu, buildPatchPanel, flickerLed, highlightSocket, rackOccupied, setLed, type DeviceView, type PortView } from '../scene/devices.js';
 import { buildWhiteboard } from '../scene/details.js';
-import { buildAnnex } from '../scene/annex.js';
+import { buildAnnex, buildClassrooms, buildSite, buildWestWing } from '../scene/annex.js';
 import { applyLightmap } from '../scene/lightmaps.js';
 import { BUILDING, rackFillers, setMainDoorOpen } from '../scene/room.js';
-import { blockedAt, DOORS, groundAt, ZONES, zoneOf, type ZoneName as Zone } from '../scene/building.js';
+import { blockedAt, DOORS, groundAt, SITE_EXIT_X, SITE_Z, siteOf, ZONES, zoneOf, type SiteName, type ZoneName as Zone } from '../scene/building.js';
 import type { Quality, Stage } from '../scene/stage.js';
 import { AskAicha } from '../ui/askAicha.js';
 import { h } from '../ui/dom.js';
@@ -24,6 +24,8 @@ import { clock, grade, type Grade } from './scoring.js';
 import { canListen, listenOnce } from '../voice.js';
 import { settings } from '../settings.js';
 import { Minimap } from '../ui/minimap.js';
+import { playTrip, showSiteChooser } from '../ui/travel.js';
+import { buildExterior, buildStreet, ENTRANCES } from '../scene/exterior.js';
 import { pauseOpen, showPause } from '../ui/pause.js';
 import { understand, type VoiceCommand } from '../voice-commands.js';
 
@@ -53,7 +55,18 @@ function patchLabel(level: Level, end: string): string {
 }
 
 /** Where each room of a level sits in the building. */
-const ORIGINS: Record<string, Origin> = { '': { y: 0, z: 0 }, annexe: { y: 0, z: BUILDING.annexZ }, etage: { y: BUILDING.floorY, z: 0 } };
+/** Which part of the building a zone is drawn in (see `buildAnnex` and the parts built later). */
+function partOf(zone: Zone): string {
+  if (zone === 'corridor') return 'lower';
+  if (zone === 'corridor1') return 'upper';
+  if (zone === 'classroom0' || zone === 'toilets' || zone === 'lounge') return 'west';
+  if (zone === 'classroom1' || zone === 'classroom2') return 'classes';
+  if (zone.startsWith('agence-')) return 'agence-wing';
+  if (zone.startsWith('datacenter-')) return 'datacenter-wing';
+  return zone;
+}
+
+const ORIGINS: Record<string, Origin> = { '': { y: 0, z: 0 }, annexe: { y: 0, z: BUILDING.annexZ }, etage: { y: BUILDING.floorY, z: 0 }, agence: { y: 0, z: SITE_Z.agence }, datacenter: { y: 0, z: SITE_Z.datacenter } };
 /** How long it takes to walk in from the door when a mission starts. */
 const ENTRANCE_SECONDS = 3.4;
 /** Time allowed when a level does not say, and the share of it left in an exam. */
@@ -207,7 +220,8 @@ export class Mission {
     for (const panel of level.panels ?? []) {
       const origin = ORIGINS[panel.room ?? ''] as Origin;
       const ports = (level.patchLinks ?? []).flatMap((l) => [l.a, l.b]).filter((e) => e.startsWith(`${panel.id}:`)).map((e) => ({ name: e.split(':')[1] as string, label: patchLabel(level, e) }));
-      const view = buildPatchPanel(panel.id, ports, origin.z, origin.y);
+      const view = panel.kind === 'ntu' ? buildNtu(panel.id, ports, origin.z, origin.y) : buildPatchPanel(panel.id, ports, origin.z, origin.y);
+      if (panel.kind === 'ntu') this.ntus.add(panel.id);
       this.panels.set(panel.id, view);
       stage.level.add(view.root);
       this.inPart(panel.room, view.root);
@@ -232,10 +246,16 @@ export class Mission {
       const annex = buildAnnex(floors);
       for (const part of annex.children) applyLightmap(part);
       stage.level.add(annex);
-      for (const [key, name] of [['lab', 'part-lab'], ['lower', 'part-lower'], ['stairs', 'part-stairs'], ['office', 'part-office'], ['upper', 'part-upper'], ['west', 'part-west'], ['classes', 'part-classes']] as const) {
+      for (const [key, name] of [['lab', 'part-lab'], ['lower', 'part-lower'], ['stairs', 'part-stairs'], ['office', 'part-office'], ['upper', 'part-upper']] as const) {
         const object = annex.getObjectByName(name);
         if (object) this.parts.set(key, [...(this.parts.get(key) ?? []), object]);
       }
+      // The campus's street door: the way to the other sites.
+      annex.traverse((o) => {
+        if ((o as THREE.Mesh).isMesh && o.userData.exit) this.picks.push(o);
+      });
+      // The rest of the building comes later, a part at a time, once the mission is on screen.
+      this.later = [() => this.addParts('west', [buildWestWing()]), ...(floors ? [() => this.addParts('classes', [buildClassrooms()])] : [])];
       const main = stage.scene.getObjectByName('technical-room');
       if (main) this.parts.set('room', [...(this.parts.get('room') ?? []), main]);
     }
@@ -254,6 +274,7 @@ export class Mission {
       check: () => this.check(),
       hint: () => this.hint(),
       menu: () => this.openPause(),
+      travel: () => this.openTravel(),
       overview: () => this.overview(),
       ask: () => this.aicha.open(),
       ports: () => this.showPorts(),
@@ -392,6 +413,11 @@ export class Mission {
   }
 
   dispose(): void {
+    this.disposed = true;
+    // Back to the campus, indoors, whatever the player was doing.
+    this.showTown('campus');
+    this.stage.setOutdoors(false);
+    document.body.classList.remove('cinematic');
     for (const fn of this.cleanup) fn();
     this.stopListening?.();
     this.coach?.dispose();
@@ -543,6 +569,7 @@ export class Mission {
       if (e.code === 'KeyB' && !typing) this.showBrief();
       if (e.code === 'KeyO' && !typing) this.hud.toggleObjectives();
       if (e.code === 'KeyC' && !typing) this.minimap?.toggle();
+      if (e.code === 'KeyG' && !typing) this.openTravel();
       if (e.key === 'F1') {
         e.preventDefault();
         showHelp();
@@ -581,7 +608,7 @@ export class Mission {
     };
   }
 
-  private pick(): { port?: PortView; device?: string; board?: boolean } {
+  private pick(): { port?: PortView; device?: string; board?: boolean; exit?: boolean } {
     this.raycaster.setFromCamera(this.pointer, this.stage.camera);
     for (const hit of this.raycaster.intersectObjects(this.picks, false)) {
       // There is no seeing, or reaching, through the walls.
@@ -591,6 +618,7 @@ export class Mission {
       const device = hit.object.userData.device as string | undefined;
       if (device) return { device };
       if (hit.object.userData.whiteboard) return { board: true };
+      if (hit.object.userData.exit) return { exit: true };
     }
     return {};
   }
@@ -644,7 +672,9 @@ export class Mission {
     if (va && vb && (va.roomY !== vb.roomY || va.roomZ !== vb.roomZ)) return t('error.otherRoom');
     if (this.panels.has(port.device) || this.panels.has(this.firstEnd.device)) {
       // A cord goes between a panel and a device: panels are only joined by the building's own cabling.
-      return this.panels.has(port.device) && this.panels.has(this.firstEnd.device) ? t('error.panelToPanel') : this.selected === 'straight' || this.selected === 'crossover' ? null : t('error.incompatible');
+      if (this.panels.has(port.device) && this.panels.has(this.firstEnd.device)) return t('error.panelToPanel');
+      if (this.ntus.has(port.device) || this.ntus.has(this.firstEnd.device)) return this.selected === 'serial' ? null : t('error.incompatible');
+      return this.selected === 'straight' || this.selected === 'crossover' ? null : t('error.incompatible');
     }
     return canPlug(this.selected, this.firstEnd.spec, port.spec) ? null : t('error.incompatible');
   }
@@ -662,8 +692,9 @@ export class Mission {
   }
 
   private onClick(): void {
-    const { port, device, board } = this.pick();
+    const { port, device, board, exit } = this.pick();
     if (board) return this.toggleBoard();
+    if (exit) return this.openTravel();
     const id = port?.device ?? device;
     if (id && !this.inReach(id)) return;
     if (port && this.selected) return this.plugEnd(port);
@@ -748,8 +779,10 @@ export class Mission {
       if (!other) continue;
       const [a, b] = [{ device: cord.end.device, port: cord.end.port }, { device: other.end.device, port: other.end.port }];
       if (this.net.cableAt(a)) continue;
-      // Two identical cords make a straight link, one crossover among them a crossed one.
-      this.net.connect(cord.type === other.type ? 'straight' : 'crossover', a, b);
+      // Two serial cords on the operator's boxes make a leased line; two identical cords a straight link, one
+      // crossover among them a crossed one.
+      if (this.ntus.has(cord.panel.device)) this.net.connect('serial', a, b, { leased: true });
+      else this.net.connect(cord.type === other.type ? 'straight' : 'crossover', a, b);
     }
   }
 
@@ -836,6 +869,198 @@ export class Mission {
   }
 
   private paused = false;
+  /** The operator's boxes: a cord to one is a router's serial cable, two of them joined make a leased line. */
+  private readonly ntus = new Set<string>();
+
+  /** The sites this mission's equipment stands in: the campus, and maybe the agency or the operator's data centre. */
+  private sites(): SiteName[] {
+    const rooms = new Set([...this.level.devices.map((d) => d.room ?? ''), ...(this.level.panels ?? []).map((p) => p.room ?? '')]);
+    return (['campus', 'agence', 'datacenter'] as const).filter((s) => s === 'campus' || rooms.has(s));
+  }
+
+  /** Choose a site, then go: the trip over the map, the player stepping in at the far site's door. */
+  private openTravel(): void {
+    const sites = this.sites();
+    if (sites.length < 2 || this.travelling) return;
+    const here = siteOf(this.player.z);
+    this.paused = true;
+    this.held.clear();
+    showSiteChooser(here, sites, (to) => void this.travel(here, to), () => {
+      this.paused = false;
+      this.clockAt = performance.now();
+    });
+  }
+  private travelling = false;
+  private readonly outside = new Map<SiteName, { exterior: THREE.Object3D; street: THREE.Object3D }>();
+
+  /** Each building from the street, built the first time the player goes out of it or arrives at it. */
+  private outsideOf(site: SiteName): { exterior: THREE.Object3D; street: THREE.Object3D } {
+    let o = this.outside.get(site);
+    if (!o) {
+      const footprint = site === 'campus' ? { x0: -14, x1: 12.6, z0: -11.68, z1: 6 } : { x0: -8, x1: 7, z0: SITE_Z[site] - 9.2, z1: SITE_Z[site] + 6 };
+      o = { exterior: buildExterior(site), street: buildStreet(site, footprint) };
+      o.street.visible = false;
+      this.stage.level.add(o.exterior, o.street);
+      this.outside.set(site, o);
+    }
+    return o;
+  }
+
+  /** Only the town around the site the player is at: the others are hundreds of kilometres away. */
+  private showTown(site: SiteName): void {
+    for (const s of ['campus', 'agence', 'datacenter'] as const) {
+      const town = this.stage.scene.getObjectByName(`panorama-${s}`);
+      if (town) town.visible = s === site;
+    }
+  }
+
+  /** Black out (or back in), the way a scene changes in a film. */
+  private async blackout(on: boolean): Promise<void> {
+    const fade = (this.fade ??= document.body.appendChild(h('div', { class: 'tour-fade', 'aria-hidden': 'true' })));
+    fade.classList.toggle('on', on);
+    await new Promise((r) => setTimeout(r, reducedMotion() ? 0 : 260));
+  }
+
+  /** Out in the street at `site`'s door: sun on, the street shown, the building casting its shadow. */
+  private goOutside(site: SiteName, on: boolean): { door: THREE.Vector3; out: THREE.Vector3; side: THREE.Vector3 } {
+    const e = ENTRANCES[site];
+    const door = new THREE.Vector3(e.x, 0, e.z);
+    const out = new THREE.Vector3(e.out[0], 0, e.out[1]);
+    const side = new THREE.Vector3(-e.out[1], 0, e.out[0]);
+    const o = this.outsideOf(site);
+    o.street.visible = on;
+    this.showTown(site);
+    o.exterior.traverse((m) => ((m as THREE.Mesh).isMesh ? (m.castShadow = on) : null));
+    this.stage.setOutdoors(on, door.clone().addScaledVector(out, -6), out.clone().multiplyScalar(0.7).addScaledVector(side, 0.45).setY(1.1));
+    return { door, out, side };
+  }
+
+  /** A camera move over `seconds`, from one point looking at one target to another. */
+  private shot(seconds: number, from: THREE.Vector3, fromLook: THREE.Vector3, to: THREE.Vector3, toLook: THREE.Vector3): Promise<void> {
+    const camera = this.stage.camera;
+    const look = new THREE.Vector3();
+    return this.stage.animate(seconds, (t) => {
+      camera.position.lerpVectors(from, to, t);
+      camera.lookAt(look.lerpVectors(fromLook, toLook, t));
+    });
+  }
+
+  /**
+   * Going from one site to another, as it would really happen: out through the street door, the building seen from
+   * the street as the camera draws back, the road on the map with its distance, then the other building coming
+   * closer until its door, and in.
+   */
+  private async travel(from: SiteName, to: SiteName): Promise<void> {
+    this.travelling = true;
+    this.select(null);
+    document.body.classList.add('cinematic');
+    const quick = reducedMotion();
+    await this.blackout(true);
+    // Leaving: the rooms not yet built are built now, while the screen is dark (the façade's windows look into them).
+    if (from === 'campus') while (this.later.length) (this.later.shift() as () => void)();
+    if (!quick) {
+      const { door, out, side } = this.goOutside(from, true);
+      const up = new THREE.Vector3(0, 1, 0);
+      const centre = door.clone().addScaledVector(out, -6).addScaledVector(up, 3.2);
+      await this.blackout(false);
+      await this.shot(3.4, door.clone().addScaledVector(out, 2.4).addScaledVector(up, 1.65), door.clone().addScaledVector(up, 1.5), door.clone().addScaledVector(out, 17).addScaledVector(side, 7).addScaledVector(up, 7.5), centre);
+      await this.blackout(true);
+      this.goOutside(from, false);
+    }
+    sound.play('click');
+    await new Promise<void>((resolve) =>
+      playTrip(
+        from,
+        to,
+        () => {
+          this.buildSiteOnce(to);
+          if (!quick) {
+            const { door, out, side } = this.goOutside(to, true);
+            const camera = this.stage.camera;
+            camera.position.copy(door).addScaledVector(out, 20).addScaledVector(side, -8).setY(9);
+            camera.lookAt(door.clone().addScaledVector(out, -6).setY(3));
+            this.stage.wake();
+          }
+          if (this.fade) this.fade.classList.remove('on');
+        },
+        resolve,
+      ),
+    );
+    if (!quick) {
+      const { door, out, side } = this.goOutside(to, true);
+      await this.shot(3.2, door.clone().addScaledVector(out, 20).addScaledVector(side, -8).setY(9), door.clone().addScaledVector(out, -6).setY(3), door.clone().addScaledVector(out, 2.6).setY(1.65), door.clone().setY(1.5));
+      await this.blackout(true);
+      this.goOutside(to, false);
+    }
+    // In through the street door: into the far site's entrance hall, or the campus's ground floor corridor.
+    if (to === 'campus') {
+      this.player.place(-13.1, -2.84, 0);
+      this.player.yaw = Math.PI / 2;
+    } else {
+      this.player.place(SITE_EXIT_X, SITE_Z[to] - 8.4, 0);
+      this.player.yaw = 0;
+    }
+    this.player.pitch = -0.05;
+    this.followZone();
+    this.cull();
+    this.stage.camera.position.copy(this.player.eye);
+    document.body.classList.remove('cinematic');
+    this.travelling = false;
+    this.paused = false;
+    this.clockAt = performance.now();
+    await this.blackout(false);
+    this.hud.toast(t(`zone.${zoneOf(this.player.x, 0.1, this.player.z)}`));
+  }
+
+  /** Parts of the building still to build, one per idle moment; and the far sites already built. */
+  private later: (() => void)[] = [];
+  private readonly builtSites = new Set<string>();
+
+  /** Put parts of the building into the scene: their baked light, what the culling shows, the doors to click. */
+  private addParts(key: string, parts: THREE.Object3D[]): void {
+    for (const p of parts) {
+      applyLightmap(p);
+      this.stage.level.add(p);
+      p.traverse((o) => {
+        if ((o as THREE.Mesh).isMesh && o.userData.exit) this.picks.push(o);
+      });
+    }
+    // A far site comes in two parts: its technical room, and its wing.
+    if (key === 'agence' || key === 'datacenter') {
+      this.parts.set(key, [...(this.parts.get(key) ?? []), parts[0] as THREE.Object3D]);
+      this.parts.set(`${key}-wing`, [...(this.parts.get(`${key}-wing`) ?? []), parts[1] as THREE.Object3D]);
+    } else this.parts.set(key, [...(this.parts.get(key) ?? []), ...parts]);
+    this.shown = '';
+    this.cull();
+  }
+
+  /** Build a far site the first time it is needed. */
+  private buildSiteOnce(site: SiteName): void {
+    if (site === 'campus' || this.builtSites.has(site) || !this.building) return;
+    this.builtSites.add(site);
+    this.addParts(site, buildSite(site));
+  }
+
+  /** Build one waiting part when the browser has a moment, then the next: the frame rate never drops for it. */
+  private buildLater(): void {
+    const next = this.later.shift();
+    if (!next) return;
+    const idle = (window as Window & { requestIdleCallback?: (fn: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
+    const run = (): void => {
+      if (this.disposed) return;
+      next();
+      this.buildLater();
+    };
+    if (idle) idle(run, { timeout: 1500 });
+    else setTimeout(run, 300);
+  }
+
+  /** Everything at once (the light bake and the checks need the whole building). */
+  buildEverything(): void {
+    while (this.later.length) (this.later.shift() as () => void)();
+    for (const site of ['agence', 'datacenter'] as const) this.buildSiteOnce(site);
+  }
+  private disposed = false;
 
   /** The pause menu: the clock stops, the room waits behind it. */
   private openPause(): void {
@@ -1010,14 +1235,33 @@ export class Mission {
   /** The mission is on screen now: what it took to get ready does not count. */
   startClock(): void {
     this.clockAt = performance.now();
+    this.buildLater();
   }
 
   private inPart(room: string | undefined, ...objects: THREE.Object3D[]): void {
-    const key = room === 'annexe' ? 'lab' : room === 'etage' ? 'office' : 'room';
+    const key = room === 'annexe' ? 'lab' : room === 'etage' ? 'office' : room === 'agence' || room === 'datacenter' ? room : 'room';
     this.parts.set(key, [...(this.parts.get(key) ?? []), ...objects]);
   }
 
   /** Walls hide everything beyond them: draw only the parts of the building that can be seen from here. */
+  private readonly frustum = new THREE.Frustum();
+  private readonly viewMatrix = new THREE.Matrix4();
+  private portals: { a: Zone; b: Zone; box: THREE.Box3; centre: THREE.Vector3 }[] | null = null;
+
+  /** Every doorway, the two rooms it joins, and the box of its opening (a little wider, for the frame's lag). */
+  private portalList(): { a: Zone; b: Zone; box: THREE.Box3; centre: THREE.Vector3 }[] {
+    this.portals ??= DOORS.map((d) => {
+      const [nx, nz] = d.along === 'x' ? [0, 0.3] : [0.3, 0];
+      const a = zoneOf(d.x - nx, d.y + 0.1, d.z - nz);
+      const b = zoneOf(d.x + nx, d.y + 0.1, d.z + nz);
+      const half = d.width / 2 + 0.3;
+      const [hx, hz] = d.along === 'x' ? [half, 0.3] : [0.3, half];
+      const box = new THREE.Box3(new THREE.Vector3(d.x - hx, d.y, d.z - hz), new THREE.Vector3(d.x + hx, d.y + 2.4, d.z + hz));
+      return { a, b, box, centre: new THREE.Vector3(d.x, d.y + 1.2, d.z) };
+    });
+    return this.portals;
+  }
+
   private cull(): void {
     if (!this.building) return;
     const zone = zoneOf(this.player.x, this.player.floorY + 0.1, this.player.z);
@@ -1035,11 +1279,26 @@ export class Mission {
       lounge: ['west', 'lower'],
       classroom1: ['classes', 'upper'],
       classroom2: ['classes', 'upper'],
-    };
-    const key = seen[zone].join();
+      agence: ['agence', 'agence-wing'],
+      datacenter: ['datacenter', 'datacenter-wing'],
+      ...Object.fromEntries((['agence', 'datacenter'] as const).flatMap((site) => (['corridor', 'hall', 'office', 'meeting', 'toilets'] as const).map((room) => [`${site}-${room}`, [`${site}-wing`, site]]))),
+    } as Record<Zone, string[]>;
+    // A room beyond a door is drawn only while that doorway is in sight (or the player stands in it): from the
+    // corridor, the rooms behind the player's back cost nothing.
+    const camera = this.stage.camera;
+    camera.updateMatrixWorld();
+    this.frustum.setFromProjectionMatrix(this.viewMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+    const own = partOf(zone);
+    const shown = seen[zone].filter((part) => {
+      if (part === own) return true;
+      const doors = this.portalList().filter((d) => (d.a === zone && partOf(d.b) === part) || (d.b === zone && partOf(d.a) === part));
+      if (!doors.length) return true;
+      return doors.some((d) => this.frustum.intersectsBox(d.box) || d.centre.distanceTo(this.player.eye) < 1.6);
+    });
+    const key = shown.join();
     if (key === this.shown) return;
     this.shown = key;
-    for (const [part, objects] of this.parts) for (const o of objects) o.visible = seen[zone].includes(part);
+    for (const [part, objects] of this.parts) for (const o of objects) o.visible = shown.includes(part);
     this.stage.refreshShadows(0.2);
   }
 
@@ -1061,6 +1320,7 @@ export class Mission {
     const zone = zoneOf(this.player.x, this.player.floorY + 0.1, this.player.z);
     if (zone === this.lastZone) return;
     if (this.lastZone !== null) this.hud.toast(t(`zone.${zone}`));
+    this.showTown(siteOf(this.player.z));
     this.lastZone = zone;
     const floor = this.player.floorY > BUILDING.floorY - 0.5 ? BUILDING.floorY : 0;
     const hall = (BUILDING.corridor.back + BUILDING.corridor.front) / 2;
@@ -1070,6 +1330,7 @@ export class Mission {
     if (zone === 'room' || zone === 'office') this.stage.placeLamps([0.4, floor + 2.9, 1.2, 4], hallLamp(door));
     else if (zone === 'lab') this.stage.placeLamps([0.4, 2.9, BUILDING.annexZ + 1.2, 4], hallLamp(door));
     else if (zone === 'stairs') this.stage.placeLamps([10.2, 4.4, -2.45, 4], [8.6, 1.9, -1.7, 3.2]);
+    else if (zone === 'agence' || zone === 'datacenter') this.stage.placeLamps([0.4, 2.9, SITE_Z[zone] + 1.2, 4], [-3.5, 2.6, SITE_Z[zone] + 3.0, 5]);
     else if (zone !== 'corridor' && zone !== 'corridor1') {
       // The building's other rooms: a lamp over the middle of the room, another at its door.
       const r = (ZONES.find((z) => z.name === zone) as { rect: { x0: number; x1: number; z0: number; z1: number } }).rect;
@@ -1079,6 +1340,7 @@ export class Mission {
     if (zone === 'room') this.stage.setRig(0, 0);
     if (zone === 'lab') this.stage.setRig(0, BUILDING.annexZ);
     if (zone === 'office') this.stage.setRig(BUILDING.floorY, 0);
+    if (zone === 'agence' || zone === 'datacenter') this.stage.setRig(0, SITE_Z[zone]);
   }
 
   /** Every frame: walk, turn the head, and put the camera where the eyes are. */

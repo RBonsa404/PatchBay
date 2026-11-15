@@ -44,6 +44,7 @@ async function startMission(page, n, exam = false) {
 function go(page, [x, z, yaw, pitch, floor = 0, zoom = 0.82]) {
   return page.evaluate(([x, z, yaw, pitch, floor, zoom]) => {
     const m = window.__patchbay.mission();
+    m.buildEverything?.();
     const p = m.player;
     Object.assign(p, { x, z, yaw, pitch, floor });
     p.y = floor ? 3.3 : 0;
