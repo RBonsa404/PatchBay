@@ -1,18 +1,4 @@
-/** Pure text work for the voice: how a line is said, and what a spoken sentence asks for. No browser needed. */
-
-/** What a screen shows, as it should be said: interface names spelled out, separators read as words. */
-export function spoken(text: string): string {
-  return text
-    .replace(/GigabitEthernet\s?|\bGi(?=\d)|\bGE\s?(?=\d)/g, 'Gigabit ')
-    .replace(/FastEthernet\s?|\bFa(?=\d)|\bFE\s?(?=\d)/g, 'Fast Ethernet ')
-    .replace(/\bSerial\s?|\bS(?=\d\/)/g, 'Série ')
-    .replace(/(\d)\/(\d)/g, '$1 barre $2')
-    .replace(/(\d)\/(\d)/g, '$1 barre $2')
-    .replace(/\s*[·•]\s*/g, ', ')
-    .replace(/\n+/g, '. ')
-    .replace(/\s{2,}/g, ' ')
-    .trim();
-}
+/** What a spoken sentence asks for. No browser needed. */
 
 export type VoiceCommand =
   | { kind: 'cable'; cable: 'straight' | 'crossover' | 'console' | 'serial' | null }

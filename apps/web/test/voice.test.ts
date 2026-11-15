@@ -1,14 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { spoken, understand } from '../src/voice-commands.js';
+import { understand } from '../src/voice-commands.js';
 
 const DEVICES = ['R1', 'R2', 'S1', 'S2', 'PC1', 'ADMIN'];
-
-describe('what Aïcha says', () => {
-  it('spells interface names out and reads slashes as words', () => {
-    expect(spoken('Relie PC1 à R1 (Fa0/0)')).toBe('Relie PC1 à R1 (Fast Ethernet 0 barre 0)');
-    expect(spoken('S1 Gi0/2 · S0/0/0')).toBe('S1 Gigabit 0 barre 2, Série 0 barre 0 barre 0');
-  });
-});
 
 describe('voice commands', () => {
   it('takes a cable by its kind', () => {

@@ -17,7 +17,7 @@ import { CABLE_ORDER, Hud } from '../ui/hud.js';
 import { closePanel, Consoles, openPanelKey, resetHostShells, showHostPanel, showBriefPanel, showConfirm, showHelp, showNotice, showPortList } from '../ui/panels.js';
 import { extraCables, tidiness, type Tidiness } from './cabling.js';
 import { clock, grade, type Grade } from './scoring.js';
-import { canListen, listenOnce, voice } from '../voice.js';
+import { canListen, listenOnce } from '../voice.js';
 import { understand, type VoiceCommand } from '../voice-commands.js';
 
 const HOME = { position: new THREE.Vector3(0, 1.78, 2.45), target: new THREE.Vector3(0, 0.86, 0.02) };
@@ -299,7 +299,6 @@ export class Mission {
   dispose(): void {
     for (const fn of this.cleanup) fn();
     this.stopListening?.();
-    voice.stop();
     this.coach?.dispose();
     this.cables.showPreview('straight', null, null);
     this.hud.destroy();

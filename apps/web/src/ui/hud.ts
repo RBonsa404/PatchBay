@@ -1,11 +1,11 @@
-import { BookOpen, Check, CircleCheckBig, CircleHelp, Gauge, Keyboard, Lightbulb, Menu, MessageCircleQuestion, Mic, Scan, Speech, Timer, Volume2, VolumeX, type IconNode } from 'lucide';
+import { BookOpen, Check, CircleCheckBig, CircleHelp, Gauge, Keyboard, Lightbulb, Menu, MessageCircleQuestion, Mic, Scan, Timer, Volume2, VolumeX, type IconNode } from 'lucide';
 import type { CableType, Level, ObjectiveResult } from '@patchbay/sim-core';
 import { t, tx, type Key } from '../i18n.js';
 import { CABLE_STYLE } from '../scene/cables.js';
 import { clock } from '../game/scoring.js';
 import type { Quality } from '../scene/stage.js';
 import { sound } from '../audio.js';
-import { canListen, voice } from '../voice.js';
+import { canListen } from '../voice.js';
 import { icon } from './brand.js';
 import { h, ui } from './dom.js';
 
@@ -80,15 +80,7 @@ export class Hud {
       soundButton.title = muted ? t('hud.soundOff') : t('hud.sound');
     });
 
-    // Aïcha's voice on or off, and the microphone for voice commands (where the browser can hear).
-    const voiceButton = voice.canSpeak
-      ? toolButton(t('voice.toggle'), Speech, () => {
-          const on = voice.toggle();
-          voiceButton?.classList.toggle('off', !on);
-          this.toast(on ? t('voice.on') : t('voice.off'));
-        })
-      : null;
-    voiceButton?.classList.toggle('off', !voice.enabled);
+    // The microphone for voice commands, where the browser can hear.
     this.micButton = canListen ? toolButton(t('voice.listen'), Mic, () => actions.listen()) : null;
 
     const root = h(
@@ -111,7 +103,6 @@ export class Hud {
           h('i', { class: 'tool-sep' }),
           qualityButton,
           soundButton,
-          voiceButton,
           this.micButton,
           toolButton(t('hud.menu'), Menu, () => actions.menu()),
           h('button', { class: 'btn primary small', onclick: () => actions.check() }, icon(CircleCheckBig, 16), h('span', {}, exam ? t('exam.hand') : t('hud.check'))),
