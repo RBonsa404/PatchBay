@@ -4,6 +4,7 @@ import { bake, freeze } from './bake.js';
 import { DOORS, FLOOR_Y, LAB_DESK_ROWS, LAB_Z, ROOMS, STAIRS, WALL as WALL_T, type Door } from './building.js';
 import { contactShadow, keyboardTexture, outsideTexture, photo } from './materials.js';
 import { placeProp } from './props.js';
+import { gearModel } from './gear.js';
 import { buildRoomParts } from './room.js';
 import { zoneShell } from './structure.js';
 import { diagramTexture, screenTexture, textTexture } from './textures.js';
@@ -143,6 +144,27 @@ let loginScreen: THREE.Texture | null = null;
 function workstation(): THREE.Group {
   const g = new THREE.Group();
   const [x, z, side, wallX] = [0, 0, 1, 0.5];
+  const model = gearModel('workstation');
+  if (model) {
+    // Modelled in Blender (art/blender/workstation.py), the student on its +z side: turned so that they sit on -x.
+    const copy = model.clone(true);
+    copy.rotation.y = -Math.PI / 2;
+    copy.traverse((o) => {
+      o.castShadow = true;
+      o.receiveShadow = true;
+    });
+    g.add(copy);
+    loginScreen ??= screenTexture(['IST Network Lab', '', 'login: _']);
+    const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.47, 0.3), new THREE.MeshBasicMaterial({ map: loginScreen, color: '#d8e9ff', toneMapped: false }));
+    screen.rotation.y = -Math.PI / 2;
+    screen.position.set(0.19, 1.026, 0);
+    g.add(screen);
+    g.add(box(0.16, 0.03, 0.16, lit('#cbd2da', 0.6, 0.3), wallX - 0.12, 0.015, 0.3, false), box(0.003, 0.02, 0.022, BLACK, wallX - 0.12, 0.035, 0.3, false));
+    const shadow = contactShadow(1.1, 1.25, 0.45);
+    shadow.position.set(0, 0.004, 0);
+    g.add(shadow);
+    return g;
+  }
   g.add(box(0.8, 0.03, 1.0, WOOD, x, 0.74, z));
   for (const dz of [-0.45, 0.45]) g.add(box(0.72, 0.03, 0.03, STEEL, x, 0.12, z + dz), box(0.03, 0.74, 0.03, STEEL, x + 0.36, 0.37, z + dz), box(0.03, 0.74, 0.03, STEEL, x - 0.36, 0.37, z + dz));
   g.add(soft(0.024, 0.33, 0.5, BLACK, x + side * 0.2, 1.02, z, 0.008), soft(0.04, 0.16, 0.05, STEEL, x + side * 0.22, 0.83, z, 0.012), soft(0.17, 0.012, 0.22, STEEL, x + side * 0.22, 0.76, z, 0.005));

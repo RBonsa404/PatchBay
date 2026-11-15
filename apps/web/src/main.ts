@@ -16,8 +16,10 @@ import { applyLightmap, preloadLightmaps } from './scene/lightmaps.js';
 import { onPropAppeared } from './scene/props.js';
 import { buildRoom, rackFillers } from './scene/room.js';
 import { detectQuality, Stage } from './scene/stage.js';
+import { tx } from './i18n.js';
 import { h } from './ui/dom.js';
 import { showSettings } from './ui/pause.js';
+import { randomTip } from './ui/tips.js';
 import { progress, showBriefing, showMissions, showResults, showTitle } from './ui/screens.js';
 
 // A soft tick on every button of the interface.
@@ -122,6 +124,11 @@ function visit(): void {
 function play(index: number, exam = false, guided = false): void {
   // A screen first, painted before the work starts: the mission is built, then its shaders compiled in the background.
   const loading = bootScreen.cloneNode(true) as HTMLElement;
+  const next = campaign[index] as Level;
+  loading.querySelector('strong')?.replaceWith(
+    h('div', { class: 'loading-title' }, h('span', {}, guided ? 'Visite guidée' : `Mission ${String(index + 1).padStart(2, '0')}`), h('strong', {}, tx(next.title))),
+  );
+  loading.append(h('p', { class: 'loading-tip' }, h('b', {}, 'Astuce'), randomTip()));
   document.body.append(loading);
   sound.setMood('mission');
   requestAnimationFrame(() => {

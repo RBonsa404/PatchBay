@@ -44,6 +44,8 @@ const toolButton = (label: string, glyph: IconNode, onclick: (e: Event) => void)
 export class Hud {
   private readonly root: HTMLElement;
   private readonly objectivesBox: HTMLElement;
+  /** How many objectives are done, beside the title: « 3 / 8 ». */
+  private readonly countLabel = h('span', { class: 'objective-count' });
   private readonly objectivesList: HTMLElement;
   private readonly scoreLabel: HTMLElement;
   private readonly scoreBar: HTMLElement;
@@ -111,7 +113,7 @@ export class Hud {
       h(
         'aside',
         { class: 'objectives panel-solid' },
-        h('header', { onclick: () => this.toggleObjectives(), title: t('objectives.toggle') }, h('span', { class: 'label' }, exam ? t('exam.tasks') : t('hud.objectives')), exam ? null : h('span', { class: 'score-line' }, this.scoreLabel, h('small', {}, '/ 100'))),
+        h('header', { onclick: () => this.toggleObjectives(), title: t('objectives.toggle') }, h('span', { class: 'label' }, exam ? t('exam.tasks') : t('hud.objectives'), exam ? null : this.countLabel), exam ? null : h('span', { class: 'score-line' }, this.scoreLabel, h('small', {}, '/ 100'))),
         exam ? null : h('div', { class: 'progress' }, this.scoreBar),
         this.objectivesList,
       ),
@@ -174,6 +176,7 @@ export class Hud {
     this.scoreLabel.textContent = String(score);
     this.scoreBar.style.width = `${score}%`;
     let foundCurrent = false;
+    this.countLabel.textContent = `${results.filter((r) => r.passed).length} / ${this.level.objectives.length}`;
     this.objectivesList.replaceChildren(
       ...this.level.objectives.map((o) => {
         const done = passed.get(o.id)?.passed ?? false;
