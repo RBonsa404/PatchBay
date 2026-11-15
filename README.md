@@ -12,7 +12,7 @@ Un projet du **Club Informatique de l'IST**, Ouagadougou
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
 ![Three.js](https://img.shields.io/badge/Three.js-0.170-000000?logo=threedotjs&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-Build-646CFF?logo=vite&logoColor=white)
-![Vitest](https://img.shields.io/badge/Tests-237-6E9F18?logo=vitest&logoColor=white)
+![Vitest](https://img.shields.io/badge/Tests-241-6E9F18?logo=vitest&logoColor=white)
 ![PWA](https://img.shields.io/badge/PWA-hors_ligne-5A0FC8?logo=pwa&logoColor=white)
 
 <img src="docs/captures/13-salle-technique-rangee.png" alt="La salle technique du jeu : établi, baie, rayonnages" width="820" />
@@ -51,11 +51,11 @@ Trois principes guident le projet :
 | Domaine | Ce qu'on y trouve |
 |---|---|
 | Déplacement | vue à la première personne, salles, couloirs, escalier et étage ; il faut se rendre devant un appareil pour le toucher |
-| Câblage | câbles droits, croisés, console et série ; panneaux de brassage ; voyants de lien réels ; câbles rangés qui contournent les objets |
+| Câblage | câbles droits, croisés, console et série ; panneaux de brassage ; voyants de lien réels ; câbles rangés qui contournent les objets ; code couleur d'entreprise, cordons de longueur standard, étiquettes aux deux bouts |
 | Console IOS | modes, abréviations, `?`, Tab, historique, messages d'erreur fidèles |
 | Réseau | VLAN, trunk 802.1Q, router-on-a-stick, routage statique, OSPF, ACL, NAT, DHCP, ARP, ICMP |
 | Poste client | invite de commandes : `ipconfig`, `ipconfig /renew`, `ping`, `tracert`, `arp -a` |
-| Évaluation | chrono, note sur 100 (objectifs et rapidité), rangs S à D, trois étoiles, mode examen |
+| Évaluation | chrono, note sur 100 (objectifs et rapidité), rangs S à D, trois étoiles, mode examen, note de propreté du câblage |
 | Accompagnement | tutoriel guidé, indices, schéma de la mission au tableau blanc, Aïcha qui répond avec sa fiche hors ligne, et avec une IA en option |
 | Visualisation | paquets animés sur les câbles : ARP, requêtes, réponses, erreurs, DHCP |
 | Éclairage | lumière des salles précalculée dans Blender (Cycles) : dalles LED, fenêtres, rebonds de lumière ; seules les lumières utiles au matériel restent en temps réel |

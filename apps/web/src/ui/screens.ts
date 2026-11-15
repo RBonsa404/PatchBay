@@ -229,7 +229,9 @@ export function showResults(level: Level, result: Grade, actions: { next?: () =>
         h('div', {}, h('dt', {}, t('results.objectives')), h('dd', {}, `${result.objectives} / 80`)),
         h('div', {}, h('dt', {}, t('results.speed')), h('dd', {}, `${result.speed} / 20`)),
         h('div', {}, h('dt', {}, t('results.time')), h('dd', {}, `${clock(result.used)} / ${clock(result.limit)}`)),
+        result.tidiness ? h('div', { class: 'wide' }, h('dt', {}, t('results.tidy')), h('dd', {}, `${result.tidiness.score} / 100 · ${t(`tidy.${result.tidiness.verdict}`)}`)) : null,
       ),
+      result.tidiness?.bill ? h('p', { class: 'muted small' }, t('results.cords', { bill: result.tidiness.bill })) : null,
       evaluation.complete ? (stars < 3 ? h('p', { class: 'muted' }, t('results.slowHint')) : null) : h('p', { class: 'muted' }, t('results.incomplete')),
       h(
         'ul',

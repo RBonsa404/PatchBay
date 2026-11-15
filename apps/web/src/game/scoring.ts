@@ -1,4 +1,5 @@
 import type { Evaluation } from '@patchbay/sim-core';
+import type { Tidiness } from './cabling.js';
 
 /**
  * The mark of a mission. The objectives are worth 80 points; the last 20 reward speed, and only once everything is
@@ -18,6 +19,8 @@ export interface Grade {
   /** Seconds taken, and seconds allowed. */
   used: number;
   limit: number;
+  /** The tidiness of the cabling, marked apart (the game's, not the engine's). */
+  tidiness?: Tidiness;
 }
 
 const OBJECTIVES = 80;

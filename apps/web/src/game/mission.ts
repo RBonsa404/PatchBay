@@ -15,6 +15,7 @@ import type { Quality, Stage } from '../scene/stage.js';
 import { AskAicha } from '../ui/askAicha.js';
 import { CABLE_ORDER, Hud } from '../ui/hud.js';
 import { closePanel, Consoles, openPanelKey, resetHostShells, showHostPanel, showBriefPanel, showConfirm, showHelp, showNotice, showPortList } from '../ui/panels.js';
+import { extraCables, tidiness, type Tidiness } from './cabling.js';
 import { clock, grade, type Grade } from './scoring.js';
 import { canListen, listenOnce, voice } from '../voice.js';
 import { understand, type VoiceCommand } from '../voice-commands.js';
@@ -108,6 +109,8 @@ export class Mission {
   private recording = false;
   private hops: { from: CableEnd; to: CableEnd; frame: EthernetFrame }[] = [];
   private doneCount = -1;
+  /** Cables taken out after being plugged, for the tidiness mark. */
+  private reworks = 0;
   private readonly player = new Player();
   private readonly held = new Set<string>();
   private padWalk: [number, number] = [0, 0];
@@ -163,7 +166,17 @@ export class Mission {
       stage.level.add(view.root);
       this.picks.push(...view.body, ...[...view.ports.values()].map((p) => p.hit));
     }
-    this.cables = new CableLayer(stage);
+    const models = new Map(level.devices.map((d) => [d.id, catalog[d.model]?.kind ?? null]));
+    this.cables = new CableLayer(stage, (end) => {
+      const kind = models.get(end.device);
+      if (kind !== undefined) return kind;
+      // A patch panel: what is at the far end of the link it is part of, once both sides are plugged.
+      const cord = this.cords.find((c) => c.panel.device === end.device && c.panel.port === end.port);
+      const cable = cord && this.net.cableAt({ device: cord.end.device, port: cord.end.port });
+      if (!cord || !cable) return null;
+      const far = cable.a.device === cord.end.device && cable.a.port === cord.end.port ? cable.b : cable.a;
+      return models.get(far.device) ?? null;
+    });
     this.cables.setObstacles(
       [...this.devices.values()].flatMap((v) => {
         v.root.updateMatrixWorld(true);
@@ -649,9 +662,21 @@ export class Mission {
     if (cord) {
       if (this.net.cableAt({ device: cord.end.device, port: cord.end.port })) this.net.disconnect({ device: cord.end.device, port: cord.end.port });
       this.cords = this.cords.filter((c) => c !== cord);
+      this.reworks++;
       return true;
     }
-    return !this.panels.has(port.device) && this.net.disconnect({ device: port.device, port: port.port });
+    const done = !this.panels.has(port.device) && this.net.disconnect({ device: port.device, port: port.port });
+    if (done) this.reworks++;
+    return done;
+  }
+
+  /** The tidiness of the cabling as it stands: see `cabling.ts`. Console cables are tools, not part of the network. */
+  private tidiness(): Tidiness {
+    const kept = (c: { type: CableType }): boolean => c.type !== 'console';
+    const device = (end: string): string => end.slice(0, end.indexOf(':'));
+    const placed = this.net.cables.filter(kept).map((c) => ({ a: c.a.device, b: c.b.device }));
+    const allowed = [...this.level.solution.cables, ...this.level.initial.cables].filter(kept).map((c) => ({ a: device(c.a), b: device(c.b) }));
+    return tidiness({ extra: extraCables(placed, allowed), reworks: this.reworks, cords: this.cables.cords() });
   }
 
   private onUnplug(): void {
@@ -1112,7 +1137,7 @@ export class Mission {
     const zone = zoneOf(this.player.x, this.player.floorY + 0.1, this.player.z);
     const origin = (zone === 'lab' ? ORIGINS.annexe : zone === 'office' ? ORIGINS.etage : ORIGINS['']) as Origin;
     const finale = this.stage.flyTo(new THREE.Vector3(0, 1.9 + origin.y, 2.8 + origin.z), HOME.target.clone().add(new THREE.Vector3(0, origin.y, origin.z)), 1.6);
-    const result = grade(evaluation, this.remaining, this.limit, timedOut, this.exam);
+    const result = { ...grade(evaluation, this.remaining, this.limit, timedOut, this.exam), tidiness: this.tidiness() };
     void Promise.race([finale, new Promise((resolve) => setTimeout(resolve, 1800))]).then(() => this.events.complete(result));
   }
 

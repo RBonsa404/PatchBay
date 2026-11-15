@@ -493,3 +493,5 @@ body.time-low::after { content: ''; position: fixed; inset: 0; pointer-events: n
 /* Voice: Aïcha's voice switched off, and the microphone while it listens. */
 .tool.off { opacity: 0.45; }
 .tool.listening { color: #f8fafc; background: #b91c1c; box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.35); animation: pulse-ui 1.2s ease-in-out infinite; }
+.results p.small { font-size: 13px; line-height: 1.45; margin-top: 6px; }
+.breakdown .wide { grid-column: 1 / -1; }

@@ -227,7 +227,9 @@ export function atlasLabel(text: string, w: number, h: number, color: string, fo
   g.fillStyle = color;
   g.textAlign = 'center';
   g.textBaseline = 'middle';
-  g.fillText(text, x + w / 2, y + h / 2);
+  // Several lines share the height evenly.
+  const lines = text.split('\n');
+  lines.forEach((line, i) => g.fillText(line, x + w / 2, y + (h * (i + 1)) / (lines.length + 1)));
   g.restore();
   page.texture.needsUpdate = true;
   page.x += w + 4;

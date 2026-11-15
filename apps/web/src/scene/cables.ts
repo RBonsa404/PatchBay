@@ -1,17 +1,21 @@
 import * as THREE from 'three';
-import type { Cable, CableEnd, CableType } from '@patchbay/sim-core';
+import type { Cable, CableEnd, CableType, DeviceKind } from '@patchbay/sim-core';
+import { cableRole, cordLength, cordText, ROLE_COLOUR } from '../game/cabling.js';
 import type { PortView } from './devices.js';
 import { BENCH_TOP, MANAGER, RACK, roomOrigin } from './room.js';
 import { fillet, Rope } from './rope.js';
 import type { Stage } from './stage.js';
 import { atlasLabel } from './textures.js';
 
-/** Cable colours: the usual workshop habits (blue straight, amber crossover, light-blue console, dark serial). */
+/**
+ * Cable colours as they come out of the stock (see `ROLE_COLOUR` for the company code): a straight cable laid between
+ * two network devices is taken in yellow rather than blue.
+ */
 export const CABLE_STYLE: Record<CableType, { colour: string; radius: number }> = {
-  straight: { colour: '#3b82f6', radius: 0.0036 },
-  crossover: { colour: '#f59e0b', radius: 0.0036 },
-  console: { colour: '#22d3ee', radius: 0.0032 },
-  serial: { colour: '#e11d48', radius: 0.0045 },
+  straight: { colour: ROLE_COLOUR.access, radius: 0.0036 },
+  crossover: { colour: ROLE_COLOUR.crossover, radius: 0.0036 },
+  console: { colour: ROLE_COLOUR.console, radius: 0.0032 },
+  serial: { colour: ROLE_COLOUR.serial, radius: 0.0045 },
 };
 
 const keyOf = (c: Cable): string => `${c.type}|${c.a.device}:${c.a.port}|${c.b.device}:${c.b.port}`;
@@ -164,14 +168,15 @@ function segmentHitsRect(a: THREE.Vector3, b: THREE.Vector3, x0: number, x1: num
   return t0;
 }
 
-function plug(type: CableType): THREE.Group {
+function plug(type: CableType, colour = CABLE_STYLE[type].colour): THREE.Group {
   const g = new THREE.Group();
   const body = new THREE.Mesh(
     new THREE.BoxGeometry(type === 'serial' ? 0.024 : 0.013, type === 'serial' ? 0.009 : 0.011, 0.022),
     new THREE.MeshPhysicalMaterial({ color: type === 'serial' ? '#1e293b' : '#dbeafe', roughness: 0.25, transmission: type === 'serial' ? 0 : 0.6, thickness: 0.01 }),
   );
   body.position.z = 0.009;
-  const boot = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.0055, 0.016, 12), new THREE.MeshStandardMaterial({ color: CABLE_STYLE[type].colour, roughness: 0.5 }));
+  const boot = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.0055, 0.016, 12), new THREE.MeshStandardMaterial({ color: colour, roughness: 0.5 }));
+  boot.userData.dyed = 'plain';
   boot.rotation.x = Math.PI / 2;
   boot.position.z = 0.027;
   g.add(body, boot);
@@ -193,7 +198,7 @@ function shortPort(port: string): string {
 function cableLabel(text: string, row: number): THREE.Group {
   const g = new THREE.Group();
   const stock = new THREE.Mesh(new THREE.BoxGeometry(0.0138, 0.0082, 0.0008), LABEL_STOCK);
-  const { texture, uv: [u0, v0, u1, v1] } = atlasLabel(text, 220, 120, '#0f172a', '600 40px Inter, sans-serif');
+  const { texture, uv: [u0, v0, u1, v1] } = atlasLabel(text, 220, 120, '#0f172a', '600 34px Inter, sans-serif');
   let ink = labelInks.get(texture);
   if (!ink) {
     ink = new THREE.MeshStandardMaterial({ map: texture, transparent: true, roughness: 0.7, depthWrite: false });
@@ -223,6 +228,8 @@ export class CableLayer {
   private readonly lanes = new Map<string, number>();
   /** Boxes of the objects standing on the bench, which cables lying on it must go around. */
   private obstacles = new Map<string, THREE.Box3[]>();
+  /** Standard length of the cords of each cable (two for a link through the walls). */
+  private readonly lengths = new Map<string, number[]>();
 
   /** Objects standing on the bench (world-space boxes). Call before the first `sync`. */
   setObstacles(boxes: THREE.Box3[]): void {
@@ -266,7 +273,20 @@ export class CableLayer {
     return curve;
   }
 
-  constructor(private readonly stage: Stage) {}
+  /** `kindOf` says what is plugged at a cable's end, for the colour code (through a patch panel: what is beyond it). */
+  constructor(
+    private readonly stage: Stage,
+    private readonly kindOf: (end: CableEnd) => DeviceKind | null = () => null,
+  ) {}
+
+  private colourOf(cable: Cable): string {
+    return ROLE_COLOUR[cableRole(cable.type, this.kindOf(cable.a), this.kindOf(cable.b))];
+  }
+
+  /** The standard length of every cord in place. */
+  cords(): number[] {
+    return [...this.lengths.values()].flat();
+  }
 
   /** Add the cables that appeared, remove those that are gone. New cables unroll from the first port. */
   sync(cables: Cable[], ports: (device: string, port: string) => PortView | undefined): void {
@@ -278,9 +298,25 @@ export class CableLayer {
       this.views.delete(key);
       this.paths.delete(key);
       this.lanes.delete(key);
+      this.lengths.delete(key);
     }
     for (const [key, cable] of wanted) {
-      if (this.views.has(key)) continue;
+      const shown = this.views.get(key);
+      if (shown) {
+        // A cord to a patch panel learns what it leads to once the far side is plugged: it takes that colour.
+        const colour = this.colourOf(cable);
+        if (shown.userData.colour !== colour) {
+          shown.userData.colour = colour;
+          shown.traverse((o) => {
+            const m = (o as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
+            if (o.userData.dyed && m) {
+              m.color.set(colour);
+              if (o.userData.dyed === 'glow') m.emissive.set(colour);
+            }
+          });
+        }
+        continue;
+      }
       const pa = ports(cable.a.device, cable.a.port);
       const pb = ports(cable.b.device, cable.b.port);
       if (!pa || !pb) continue;
@@ -306,12 +342,13 @@ export class CableLayer {
         const cordB = this.routeInRoom(pb.point, pb.normal, b.point, b.normal, lane, radius);
         curve = new THREE.CatmullRomCurve3([...cordA.points, ...cordB.points], false, 'centripetal', 0.5);
         view = this.build(cable.type, a, b, [cordA, cordB], cable, lane % 2);
-        const plugs = [plug(cable.type), plug(cable.type)];
+        const plugs = [plug(cable.type, this.colourOf(cable)), plug(cable.type, this.colourOf(cable))];
         placePlug(plugs[0] as THREE.Group, pa.point, pa.normal);
         placePlug(plugs[1] as THREE.Group, pb.point, pb.normal);
         view.add(...plugs);
       }
       this.views.set(key, view);
+      this.lengths.set(key, view.userData.cords as number[]);
       this.paths.set(key, { cable, curve });
       this.group.add(view);
     }
@@ -319,22 +356,28 @@ export class CableLayer {
 
   private build(type: CableType, a: { point: THREE.Vector3; normal: THREE.Vector3 }, b: { point: THREE.Vector3; normal: THREE.Vector3 }, curves: THREE.CatmullRomCurve3[], cable: Cable, row = 0): THREE.Group {
     const style = CABLE_STYLE[type];
+    const colour = this.colourOf(cable);
     const group = new THREE.Group();
+    group.userData.colour = colour;
     // A little of its own light: a cable keeps its colour in the shade of the rack.
-    const material = new THREE.MeshStandardMaterial({ color: style.colour, roughness: 0.45, metalness: 0.05, emissive: style.colour, emissiveIntensity: 0.22 });
-    const pa = plug(type);
-    const pb = plug(type);
+    const material = new THREE.MeshStandardMaterial({ color: colour, roughness: 0.45, metalness: 0.05, emissive: colour, emissiveIntensity: 0.22 });
+    const pa = plug(type, colour);
+    const pb = plug(type, colour);
     placePlug(pa, a.point, a.normal);
     placePlug(pb, b.point, b.normal);
-    // Each end says where the other one goes.
-    pa.add(cableLabel(`${cable.b.device} ${shortPort(cable.b.port)}`, row));
-    pb.add(cableLabel(`${cable.a.device} ${shortPort(cable.a.port)}`, row));
+    // The cord of the standard length that reaches, as taken from the stock.
+    const cords = curves.map((c) => cordLength(c.getLength()));
+    group.userData.cords = cords;
+    // Each end says where the other one goes, and the length of its cord.
+    pa.add(cableLabel(`${cable.b.device} ${shortPort(cable.b.port)}\n${cordText(cords[0] as number)}`, row));
+    pb.add(cableLabel(`${cable.a.device} ${shortPort(cable.a.port)}\n${cordText(cords[cords.length - 1] as number)}`, row));
     group.add(pa, pb);
     pb.visible = false;
     // Unroll: grow the drawn part of each tube, then show the far plug.
     for (const curve of curves) {
       const geometry = new THREE.TubeGeometry(curve, 90, style.radius, 6, false);
       const tube = new THREE.Mesh(geometry, material);
+      tube.userData.dyed = 'glow';
       tube.castShadow = true;
       group.add(tube);
       const total = geometry.index ? geometry.index.count : 0;
