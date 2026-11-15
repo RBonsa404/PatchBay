@@ -495,3 +495,41 @@ body.time-low::after { content: ''; position: fixed; inset: 0; pointer-events: n
 .tool.listening { color: #f8fafc; background: #b91c1c; box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.35); animation: pulse-ui 1.2s ease-in-out infinite; }
 .results p.small { font-size: 13px; line-height: 1.45; margin-top: 6px; }
 .breakdown .wide { grid-column: 1 / -1; }
+
+/* The course map: chapters from beginner to expert, a profile with stars and grade. */
+.parcours { background: linear-gradient(180deg, rgba(5, 10, 24, 0.94), rgba(5, 10, 24, 0.86) 60%, rgba(5, 10, 24, 0.78)); display: flex; flex-direction: column; padding: 34px clamp(20px, 5vw, 64px) 22px; gap: 18px; animation: fade-in 0.4s var(--ease-out); }
+.parcours-head { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+.parcours-title { display: flex; align-items: center; gap: 22px; }
+.parcours-title .label { font: 600 11px var(--font-heading); letter-spacing: 0.22em; text-transform: uppercase; color: var(--amber); }
+.parcours-title h2 { margin: 2px 0 0; font: 700 26px var(--font-heading); }
+.profile { position: relative; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px; min-width: 330px; padding: 14px 18px 18px; border: 1px solid var(--line-strong); border-radius: 12px; background: rgba(11, 30, 63, 0.75); }
+.profile > svg { color: var(--amber); }
+.profile strong { display: block; font: 600 16px var(--font-heading); }
+.profile span { font-size: 12.5px; color: var(--text-3); }
+.profile-stars { display: flex; align-items: baseline; gap: 4px; color: var(--amber); }
+.profile-stars strong { font-size: 22px; color: var(--text); }
+.profile-bar { position: absolute; left: 18px; right: 18px; bottom: 8px; height: 3px; border-radius: 2px; background: var(--line-strong); overflow: hidden; }
+.profile-bar b { display: block; height: 100%; background: linear-gradient(90deg, var(--amber), #fde68a); }
+.chapters { flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 520px), 1fr)); align-content: start; gap: 14px; padding-right: 8px; scrollbar-width: thin; }
+.chapter { border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; background: rgba(9, 15, 28, 0.82); display: flex; flex-direction: column; }
+.chapter.locked .chapter-soon { margin-top: auto; }
+.chapter-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.chapter-num { font: 600 11px var(--font-heading); letter-spacing: 0.2em; color: var(--text-3); }
+.chapter-head h3 { margin: 0; font: 700 19px var(--font-heading); }
+.tier { padding: 2px 9px; border-radius: 999px; font: 600 11px var(--font-heading); letter-spacing: 0.06em; text-transform: uppercase; }
+.tier-debutant { background: rgba(16, 185, 129, 0.18); color: #6ee7b7; }
+.tier-intermediaire { background: rgba(56, 189, 248, 0.16); color: #7dd3fc; }
+.tier-avance { background: rgba(251, 191, 36, 0.16); color: #fcd34d; }
+.tier-expert { background: rgba(239, 68, 68, 0.16); color: #fca5a5; }
+.chapter-topics { margin: 6px 0 12px; font-size: 13.5px; color: var(--text-3); }
+.chapter-cards { display: grid; gap: 10px; }
+.mission-card { position: relative; }
+.mission-card.next { border-color: var(--amber); box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.35), 0 10px 30px rgba(251, 191, 36, 0.08); }
+.mission-card.done .num { color: #6ee7b7; }
+.mission-card .ribbon { position: absolute; left: 6px; top: 6px; padding: 1px 7px; border-radius: 4px; background: var(--amber); color: #0b1220; font: 700 10.5px var(--font-heading); letter-spacing: 0.06em; text-transform: uppercase; }
+.mission-card .thumb { position: relative; }
+.chapter.locked { opacity: 0.62; }
+.chapter.locked .chapter-head h3 { color: var(--text-2); }
+.chapter-soon { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px dashed var(--line-strong); border-radius: 10px; color: var(--text-3); font-size: 13.5px; }
+.parcours-foot { display: flex; justify-content: flex-start; }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }

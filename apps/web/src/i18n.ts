@@ -5,7 +5,7 @@ const fr = {
   'app.club': "Club Informatique de l'IST",
   'title.tagline': 'Branche, configure, dépanne. Le réseau comme sur le terrain.',
   'title.play': 'Jouer',
-  'title.missions': 'Missions',
+  'title.missions': 'Parcours',
   'title.credit': 'Formation réseau CCNA · Burkina Faso',
   'missions.title': 'Missions',
   'missions.back': 'Retour',

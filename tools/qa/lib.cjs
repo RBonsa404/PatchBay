@@ -32,7 +32,7 @@ async function open({ width = 1600, height = 900, soft = false, uncapped = false
 async function startMission(page, n, exam = false) {
   await page.click('.menu-item:nth-child(2)');
   await wait(500);
-  await page.click(`.mission-row:nth-child(${n})`);
+  await page.click(`.mission-row[data-mission="${n}"]`);
   await wait(500);
   await page.click(exam ? '.dossier footer .btn:not(.primary)' : '.dossier footer .btn.primary');
   await page.waitForSelector('.hud-timer');

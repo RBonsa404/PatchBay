@@ -1,5 +1,5 @@
 import { sound } from '../audio.js';
-import { ArrowLeft, ArrowRight, ChevronRight, GraduationCap, LayoutList, Play, RotateCcw, Star, Timer } from 'lucide';
+import { ArrowLeft, ArrowRight, ChevronRight, GraduationCap, LayoutList, Lock, Play, RotateCcw, Star, Timer, Trophy } from 'lucide';
 import type { Level } from '@patchbay/sim-core';
 import { clock, type Grade } from '../game/scoring.js';
 import { t, tx } from '../i18n.js';
@@ -78,44 +78,91 @@ export function showTitle(onPlay: () => void, onMissions: () => void): void {
   ui().append(screen);
 }
 
+/**
+ * The course, chapter by chapter, from a beginner's first cable to an expert's troubleshooting: what is open now,
+ * and what comes next (announced, locked until its missions exist).
+ */
+const CHAPTERS: { title: string; tier: string; topics: string; levels: string[] }[] = [
+  { title: 'Premiers pas', tier: 'Débutant', topics: 'Câblage, console, configuration de base, adressage IP', levels: ['l01-cablage-console'] },
+  { title: 'Relier les réseaux', tier: 'Débutant', topics: 'Routeurs, liaison série, routage statique', levels: ['l02-relier-deux-reseaux'] },
+  { title: 'Commutation et VLAN', tier: 'Intermédiaire', topics: 'Switchs, VLAN, trunk 802.1Q', levels: ['l03-deux-salles-vlan'] },
+  { title: 'Le réseau du bâtiment', tier: 'Intermédiaire', topics: 'Brassage, routage inter-VLAN, DHCP, plusieurs étages', levels: ['l04-reseau-du-batiment'] },
+  { title: 'Routage dynamique', tier: 'Avancé', topics: 'OSPF à zone unique, voisins, coûts', levels: [] },
+  { title: 'Services et accès Internet', tier: 'Avancé', topics: 'NAT et PAT, DHCP centralisé, DNS', levels: [] },
+  { title: 'Sécuriser le réseau', tier: 'Avancé', topics: 'Listes de contrôle d’accès, SSH, sécurité des ports', levels: [] },
+  { title: 'Multi-sites', tier: 'Expert', topics: 'Sites distants, liaisons longue distance, OSPF entre sites', levels: [] },
+  { title: 'Dépannage expert', tier: 'Expert', topics: 'Pannes à trouver et réparer, sur tout le campus', levels: [] },
+];
+
+/** The player's standing on the course: stars won, missions passed, and the grade they give. */
+function standing(levels: Level[]): { stars: number; max: number; passed: number; grade: string } {
+  const stars = levels.reduce((n, l) => n + (progress.best(l.id) === null ? 0 : starCount(progress.best(l.id) as number)), 0);
+  const passed = levels.filter((l) => (progress.best(l.id) ?? 0) >= 70).length;
+  const share = stars / (levels.length * 3 || 1);
+  const grade = share >= 0.9 ? 'Expert réseau' : share >= 0.6 ? 'Administrateur réseau' : share >= 0.25 ? 'Technicien' : 'Stagiaire';
+  return { stars, max: levels.length * 3, passed, grade };
+}
+
 export function showMissions(levels: Level[], onPick: (level: Level) => void, onBack: () => void): void {
+  const me = standing(levels);
+  const next = levels.find((l) => (progress.best(l.id) ?? 0) < 70) ?? null;
+  let number = 0;
+  const card = (level: Level): HTMLElement => {
+    const i = levels.indexOf(level);
+    const best = progress.best(level.id);
+    return h(
+      'button',
+      { class: `mission-row mission-card${level === next ? ' next' : ''}${best !== null && best >= 70 ? ' done' : ''}`, 'data-mission': String(i + 1), onclick: () => void leave(screen).then(() => onPick(level)) },
+      h('span', { class: 'thumb', style: { backgroundImage: `url(${import.meta.env.BASE_URL}missions/${i + 1}.jpg)` } }, h('span', { class: 'num' }, String(i + 1).padStart(2, '0')), level === next ? h('span', { class: 'ribbon' }, 'À faire') : null),
+      h(
+        'span',
+        { class: 'body' },
+        h('span', { class: 'name' }, tx(level.title)),
+        h('span', { class: 'summary' }, tx(level.story).split(/(?<=[.!?])\s+/).filter(Boolean).pop() ?? ''),
+        h(
+          'span',
+          { class: 'meta' },
+          h('span', { class: 'difficulty', 'aria-label': `${t('missions.difficulty')} ${level.difficulty} / 5` }, ...[1, 2, 3, 4, 5].map((d) => h('i', { class: d <= level.difficulty ? 'on' : '' }))),
+          best === null ? h('span', { class: 'tag' }, t('missions.new')) : h('span', { class: 'best' }, starRow(best, 14), `${best} / 100`),
+          progress.examBest(level.id) === null ? null : h('span', { class: 'tag exam' }, `${t('exam.best')} ${progress.examBest(level.id)} / 100`),
+        ),
+      ),
+      icon(ChevronRight, 20),
+    );
+  };
   const screen: HTMLElement = h(
     'div',
-    { class: 'screen screen-side' },
+    { class: 'screen parcours' },
     h(
-      'div',
-      { class: 'side-column wide' },
-      logo('small'),
-      h('h2', { class: 'screen-title' }, t('missions.title')),
+      'header',
+      { class: 'parcours-head' },
+      h('div', { class: 'parcours-title' }, logo('small'), h('div', {}, h('span', { class: 'label' }, 'Parcours CCNA'), h('h2', {}, 'Du premier câble au réseau d’un campus'))),
       h(
         'div',
-        { class: 'mission-list' },
-        ...levels.map((level, i) => {
-          const best = progress.best(level.id);
-          return h(
-            'button',
-            { class: 'mission-row', onclick: () => void leave(screen).then(() => onPick(level)) },
-            h('span', { class: 'thumb', style: { backgroundImage: `url(${import.meta.env.BASE_URL}missions/${i + 1}.jpg)` } }, h('span', { class: 'num' }, String(i + 1).padStart(2, '0'))),
-            h(
-              'span',
-              { class: 'body' },
-              h('span', { class: 'name' }, tx(level.title)),
-              // The story's last sentence says what is at stake.
-              h('span', { class: 'summary' }, tx(level.story).split(/(?<=[.!?])\s+/).filter(Boolean).pop() ?? ''),
-              h(
-                'span',
-                { class: 'meta' },
-                h('span', { class: 'difficulty', 'aria-label': `${t('missions.difficulty')} ${level.difficulty} / 5` }, ...[1, 2, 3, 4, 5].map((d) => h('i', { class: d <= level.difficulty ? 'on' : '' }))),
-                best === null ? h('span', { class: 'tag' }, t('missions.new')) : h('span', { class: 'best' }, starRow(best, 14), `${best} / 100`),
-                progress.examBest(level.id) === null ? null : h('span', { class: 'tag exam' }, `${t('exam.best')} ${progress.examBest(level.id)} / 100`),
-              ),
-            ),
-            icon(ChevronRight, 20),
-          );
-        }),
+        { class: 'profile' },
+        icon(Trophy, 26),
+        h('div', {}, h('strong', {}, me.grade), h('span', {}, `${me.passed} / ${levels.length} missions réussies`)),
+        h('div', { class: 'profile-stars' }, icon(Star, 18), h('strong', {}, String(me.stars)), h('span', {}, `/ ${me.max}`)),
+        h('i', { class: 'profile-bar' }, h('b', { style: { width: `${Math.round((me.stars / (me.max || 1)) * 100)}%` } })),
       ),
-      h('div', { class: 'actions' }, button(t('missions.back'), () => void leave(screen).then(onBack), 'ghost', ArrowLeft)),
     ),
+    h(
+      'div',
+      { class: 'chapters' },
+      ...CHAPTERS.map((chapter) => {
+        const own = chapter.levels.map((id) => levels.find((l) => l.id === id)).filter((l): l is Level => !!l);
+        number++;
+        const locked = own.length === 0;
+        return h(
+          'section',
+          { class: `chapter${locked ? ' locked' : ''}` },
+          h('div', { class: 'chapter-head' }, h('span', { class: 'chapter-num' }, `CHAPITRE ${String(number).padStart(2, '0')}`), h('h3', {}, chapter.title), h('span', { class: `tier tier-${chapter.tier.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')}` }, chapter.tier)),
+          h('p', { class: 'chapter-topics' }, chapter.topics),
+          locked ? h('div', { class: 'chapter-soon' }, icon(Lock, 18), h('span', {}, 'Bientôt : missions en préparation')) : h('div', { class: 'chapter-cards' }, ...own.map(card)),
+        );
+      }),
+    ),
+    h('footer', { class: 'parcours-foot' }, button(t('missions.back'), () => void leave(screen).then(onBack), 'ghost', ArrowLeft)),
   );
   ui().append(screen);
 }
