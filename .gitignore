@@ -16,3 +16,4 @@ art/refs/
 
 # Témoin de la session qui travaille sur le plan
 art/.travail-en-cours
+__pycache__/
