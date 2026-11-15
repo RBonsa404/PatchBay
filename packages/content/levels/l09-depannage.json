@@ -1,0 +1,404 @@
+{
+  "id": "l09-depannage",
+  "version": 1,
+  "title": {
+    "fr": "Lundi matin, cinq tickets",
+    "en": "Monday morning, five tickets"
+  },
+  "story": {
+    "fr": "Week-end agité : coupure de courant, un stagiaire plein de bonne volonté qui a « essayé un truc » sur R2 sans sauvegarder, et R1 qui a redémarré sur une vieille configuration. Lundi matin, la boîte du support déborde. Le réseau du campus et de l'agence est celui que tu as construit, mais quelque chose cloche à plusieurs endroits. Cette fois, personne ne te dit quoi taper : pars des symptômes, teste couche par couche, et répare.",
+    "en": "A rough weekend: a power cut, a well-meaning intern who « tried something » on R2 without saving, and R1 rebooting on an old configuration. On Monday morning, the support inbox overflows. The campus and branch network is the one you built, but something is wrong in several places. This time nobody tells you what to type: start from the symptoms, test layer by layer, and fix."
+  },
+  "brief": {
+    "fr": "Même réseau qu'à la mission 8 : campus (R1, S1, PC1 192.168.10.10), FAI (Internet en 203.0.113.1), agence (R2, PC2 192.168.30.10) reliée par la ligne louée R1 S0/0/1 (DCE) – R2 S0/0/0, OSPF zone 0 au campus et zone 1 pour l'agence. Tout est branché.\nTickets ouverts :\n1. PC1 : « Câble réseau débranché », alors que le câble est bien là.\n2. Agence : plus rien ne passe vers le campus depuis le redémarrage de R1.\n3. Agence : même quand la ligne remonte, R2 n'apprend aucune route.\n4. PC2 : « Impossible de joindre l'hôte » vers tout ce qui n'est pas dans l'agence.\n5. Agence : le campus répond, mais pas Internet.\nMéthode : couche 1 (câbles, voyants, show ip interface brief), couche 2-3 (adresses, ipconfig, show ip ospf neighbor, show ip route), puis services (show ip nat translations). Sauvegarde chaque routeur corrigé.",
+    "en": "Same network as mission 8: campus (R1, S1, PC1 192.168.10.10), ISP (Internet at 203.0.113.1), branch (R2, PC2 192.168.30.10) joined by the leased line R1 S0/0/1 (DCE) – R2 S0/0/0, OSPF area 0 at the campus and area 1 for the branch. Everything is plugged in.\nOpen tickets:\n1. PC1: « Network cable unplugged », although the cable is there.\n2. Branch: nothing gets through to the campus since R1 rebooted.\n3. Branch: even when the line comes back, R2 learns no route.\n4. PC2: « Destination host unreachable » to anything outside the branch.\n5. Branch: the campus answers, the Internet doesn't.\nMethod: layer 1 (cables, LEDs, show ip interface brief), layers 2-3 (addresses, ipconfig, show ip ospf neighbor, show ip route), then services (show ip nat translations). Save each router you fix."
+  },
+  "difficulty": 5,
+  "timeLimit": 1800,
+  "settings": {
+    "strictMdix": true
+  },
+  "devices": [
+    {
+      "id": "ADMIN",
+      "model": "pc",
+      "label": {
+        "fr": "Portable d'administration",
+        "en": "Admin laptop"
+      },
+      "position": [
+        0,
+        0.76,
+        0.5
+      ]
+    },
+    {
+      "id": "R1",
+      "model": "cisco-2911",
+      "label": {
+        "fr": "Routeur du campus",
+        "en": "Campus router"
+      },
+      "position": [
+        0,
+        0.9,
+        -0.4
+      ]
+    },
+    {
+      "id": "S1",
+      "model": "catalyst-2960",
+      "label": {
+        "fr": "Switch du campus",
+        "en": "Campus switch"
+      },
+      "position": [
+        0,
+        1.2,
+        -0.4
+      ]
+    },
+    {
+      "id": "PC1",
+      "model": "pc",
+      "label": {
+        "fr": "PC du campus",
+        "en": "Campus PC"
+      },
+      "position": [
+        -1.25,
+        0.76,
+        0.42
+      ]
+    },
+    {
+      "id": "FAI",
+      "model": "cisco-1841",
+      "label": {
+        "fr": "Routeur du fournisseur d'accès",
+        "en": "Internet provider's router"
+      },
+      "position": [
+        -0.62,
+        0.76,
+        -0.05
+      ]
+    },
+    {
+      "id": "R2",
+      "model": "cisco-1841",
+      "label": {
+        "fr": "Routeur de l'agence de Bobo-Dioulasso",
+        "en": "Bobo-Dioulasso branch router"
+      },
+      "position": [
+        0.62,
+        0.76,
+        -0.05
+      ]
+    },
+    {
+      "id": "PC2",
+      "model": "pc",
+      "label": {
+        "fr": "PC de l'agence",
+        "en": "Branch PC"
+      },
+      "position": [
+        1.25,
+        0.76,
+        0.42
+      ]
+    }
+  ],
+  "inventory": {
+    "cables": {
+      "straight": 2,
+      "crossover": 1,
+      "console": 1,
+      "serial": 1
+    }
+  },
+  "initial": {
+    "cables": [
+      {
+        "type": "serial",
+        "a": "FAI:Serial0/0/0",
+        "b": "R1:Serial0/0/0"
+      },
+      {
+        "type": "straight",
+        "a": "S1:GigabitEthernet0/1",
+        "b": "R1:GigabitEthernet0/0"
+      },
+      {
+        "type": "crossover",
+        "a": "PC1:FastEthernet0",
+        "b": "S1:FastEthernet0/1"
+      },
+      {
+        "type": "serial",
+        "a": "R1:Serial0/0/1",
+        "b": "R2:Serial0/0/0"
+      },
+      {
+        "type": "crossover",
+        "a": "PC2:FastEthernet0",
+        "b": "R2:FastEthernet0/0"
+      }
+    ],
+    "hosts": {
+      "PC1": {
+        "ip": "192.168.10.10",
+        "mask": "255.255.255.0",
+        "gateway": "192.168.10.1"
+      },
+      "PC2": {
+        "ip": "192.168.30.10",
+        "mask": "255.255.255.0",
+        "gateway": "192.168.30.254"
+      }
+    },
+    "commands": {
+      "R1": [
+        "enable",
+        "configure terminal",
+        "hostname R1",
+        "interface g0/0",
+        "ip address 192.168.10.1 255.255.255.0",
+        "ip nat inside",
+        "no shutdown",
+        "interface s0/0/0",
+        "ip address 198.51.100.2 255.255.255.248",
+        "ip nat outside",
+        "no shutdown",
+        "interface s0/0/1",
+        "ip address 10.0.0.1 255.255.255.252",
+        "no shutdown",
+        "exit",
+        "ip route 0.0.0.0 0.0.0.0 198.51.100.1",
+        "access-list 1 permit 192.168.10.0 0.0.0.255",
+        "access-list 1 permit 192.168.30.0 0.0.0.255",
+        "ip nat inside source list 1 interface s0/0/0 overload",
+        "router ospf 1",
+        "router-id 1.1.1.1",
+        "network 192.168.10.0 0.0.0.255 area 0",
+        "network 10.0.0.0 0.0.0.3 area 1",
+        "passive-interface g0/0",
+        "default-information originate",
+        "end",
+        "copy running-config startup-config",
+        ""
+      ],
+      "S1": [
+        "enable",
+        "configure terminal",
+        "hostname S1",
+        "end"
+      ],
+      "R2": [
+        "enable",
+        "configure terminal",
+        "hostname R2",
+        "interface fa0/0",
+        "ip address 192.168.30.1 255.255.255.0",
+        "no shutdown",
+        "interface s0/0/0",
+        "ip address 10.0.0.2 255.255.255.252",
+        "no shutdown",
+        "exit",
+        "router ospf 1",
+        "router-id 2.2.2.2",
+        "network 10.0.0.0 0.0.0.3 area 0",
+        "network 192.168.30.0 0.0.0.255 area 1",
+        "passive-interface fa0/0",
+        "end"
+      ],
+      "FAI": [
+        "enable",
+        "configure terminal",
+        "hostname FAI",
+        "interface s0/0/0",
+        "ip address 198.51.100.1 255.255.255.248",
+        "clock rate 64000",
+        "no shutdown",
+        "interface loopback 0",
+        "ip address 203.0.113.1 255.255.255.0",
+        "end",
+        "copy running-config startup-config",
+        ""
+      ]
+    }
+  },
+  "objectives": [
+    {
+      "id": "pc1-link",
+      "type": "cable",
+      "cable": {
+        "type": "straight",
+        "a": "PC1:FastEthernet0",
+        "b": "S1:FastEthernet0/1"
+      },
+      "points": 8,
+      "label": {
+        "fr": "Ticket 1 : PC1 retrouve son lien",
+        "en": "Ticket 1: PC1 gets its link back"
+      },
+      "hint": {
+        "fr": "Câble présent mais lien éteint : regarde sa couleur. Orange = croisé. Entre un PC et un switch, il faut un câble droit (bleu).",
+        "en": "Cable there but link dark: look at its colour. Orange = crossover. Between a PC and a switch you need a straight cable (blue)."
+      }
+    },
+    {
+      "id": "pc1-internet",
+      "type": "ping",
+      "from": "PC1",
+      "to": "203.0.113.1",
+      "expect": "success",
+      "points": 17,
+      "label": {
+        "fr": "Ticket 1 clos : PC1 sort sur Internet",
+        "en": "Ticket 1 closed: PC1 reaches the Internet"
+      }
+    },
+    {
+      "id": "wan-up",
+      "type": "link-up",
+      "device": "R2",
+      "port": "Serial0/0/0",
+      "points": 10,
+      "label": {
+        "fr": "Ticket 2 : la ligne louée est remontée (up/up)",
+        "en": "Ticket 2: the leased line is back up (up/up)"
+      },
+      "hint": {
+        "fr": "show ip interface brief sur R1 : S0/0/1 « up/down » ? Sur une liaison série, le côté DCE (celui où est branché le bout DCE du câble) doit donner l'horloge, et la configuration d'avant le redémarrage n'avait pas été sauvegardée.",
+        "en": "show ip interface brief on R1: S0/0/1 « up/down »? On a serial link the DCE end (where the cable's DCE end is plugged) must supply the clock, and the configuration before the reboot had not been saved."
+      }
+    },
+    {
+      "id": "neighbors",
+      "type": "ospf-neighbor",
+      "device": "R1",
+      "neighbor": "R2",
+      "points": 17,
+      "label": {
+        "fr": "Ticket 3 : R1 et R2 de nouveau voisins OSPF",
+        "en": "Ticket 3: R1 and R2 OSPF neighbours again"
+      },
+      "hint": {
+        "fr": "Ligne up mais pas de voisin : compare show ip protocols (ou show running-config) des deux côtés. Les deux bouts d'une liaison doivent être dans la même zone.",
+        "en": "Line up but no neighbour: compare show ip protocols (or show running-config) at both ends. Both ends of a link must be in the same area."
+      }
+    },
+    {
+      "id": "route-default",
+      "type": "route",
+      "device": "R2",
+      "prefix": "0.0.0.0/0",
+      "protocol": "O E2",
+      "points": 7,
+      "label": {
+        "fr": "R2 a de nouveau sa route par défaut (O*E2)",
+        "en": "R2 has its default route again (O*E2)"
+      }
+    },
+    {
+      "id": "pc2-campus",
+      "type": "ping",
+      "from": "PC2",
+      "to": "192.168.10.10",
+      "expect": "success",
+      "points": 18,
+      "label": {
+        "fr": "Ticket 4 : PC2 joint le campus",
+        "en": "Ticket 4: PC2 reaches the campus"
+      },
+      "hint": {
+        "fr": "ipconfig sur PC2 : la passerelle doit être l'adresse de R2 sur le réseau de l'agence. Un ping vers la passerelle actuelle répond-il ?",
+        "en": "ipconfig on PC2: the gateway must be R2's address on the branch network. Does a ping to the current gateway answer?"
+      }
+    },
+    {
+      "id": "pc2-internet",
+      "type": "ping",
+      "from": "PC2",
+      "to": "203.0.113.1",
+      "expect": "success",
+      "points": 17,
+      "label": {
+        "fr": "Ticket 5 : l'agence sort sur Internet",
+        "en": "Ticket 5: the branch reaches the Internet"
+      },
+      "hint": {
+        "fr": "show ip nat translations pendant un ping de PC2 : aucune ligne 192.168.30.10 ? R1 ne traduit que ce qui entre par une interface ip nat inside. Par où entre l'agence ?",
+        "en": "show ip nat translations while PC2 pings: no 192.168.30.10 line? R1 only translates what enters through an ip nat inside interface. Where does the branch come in?"
+      }
+    },
+    {
+      "id": "saved-r2",
+      "type": "saved",
+      "device": "R2",
+      "points": 6,
+      "label": {
+        "fr": "R2 sauvegardé (le stagiaire ne l'avait jamais fait)",
+        "en": "R2 saved (the intern never did)"
+      }
+    }
+  ],
+  "hints": [
+    {
+      "afterSeconds": 120,
+      "text": {
+        "fr": "Une panne à la fois, en partant du bas : un ping qui échoue au-dessus d'un lien éteint ne t'apprend rien. Les tickets 2 et 3 se cachent l'un derrière l'autre.",
+        "en": "One fault at a time, from the bottom up: a failing ping above a dead link teaches you nothing. Tickets 2 and 3 hide behind each other."
+      }
+    },
+    {
+      "afterSeconds": 600,
+      "text": {
+        "fr": "Rien n'est à reconstruire : chaque panne se répare en une ou deux commandes, ou un câble. Compare avec ce que tu avais fait à la mission 8.",
+        "en": "Nothing needs rebuilding: each fault takes one or two commands, or one cable. Compare with what you did in mission 8."
+      }
+    }
+  ],
+  "solution": {
+    "unplug": [
+      "PC1:FastEthernet0"
+    ],
+    "cables": [
+      {
+        "type": "straight",
+        "a": "PC1:FastEthernet0",
+        "b": "S1:FastEthernet0/1"
+      }
+    ],
+    "hosts": {
+      "PC2": {
+        "ip": "192.168.30.10",
+        "mask": "255.255.255.0",
+        "gateway": "192.168.30.1"
+      }
+    },
+    "commands": {
+      "R1": [
+        "configure terminal",
+        "interface s0/0/1",
+        "clock rate 128000",
+        "ip nat inside",
+        "end",
+        "copy running-config startup-config",
+        ""
+      ],
+      "R2": [
+        "configure terminal",
+        "router ospf 1",
+        "no network 10.0.0.0 0.0.0.3 area 0",
+        "network 10.0.0.0 0.0.0.3 area 1",
+        "end",
+        "copy running-config startup-config",
+        ""
+      ]
+    }
+  }
+}

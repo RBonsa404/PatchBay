@@ -141,7 +141,10 @@ export function buildWhiteboard(level: Level, roomZ = 0, roomY = 0): THREE.Group
 
   g.lineWidth = 6;
   g.lineCap = 'round';
-  for (const cable of [...level.initial.cables, ...level.solution.cables]) {
+  // The plan shows the network as it should be: the faulty cables of a troubleshooting level are left out.
+  const faulty = new Set(level.solution.unplug ?? []);
+  const sound = level.initial.cables.filter((c) => !faulty.has(c.a) && !faulty.has(c.b));
+  for (const cable of [...sound, ...level.solution.cables]) {
     const [ad, ap] = cable.a.split(':') as [string, string];
     const [bd, bp] = cable.b.split(':') as [string, string];
     const a = place.get(ad);

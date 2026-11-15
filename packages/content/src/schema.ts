@@ -87,6 +87,7 @@ export const levelSchema = z
     hints: z.array(z.object({ text, afterSeconds: z.number().int().min(0).optional() }).strict()),
     solution: z
       .object({
+        unplug: z.array(z.string().regex(/^[^:]+:[^:]+$/)).optional(),
         cables: z.array(cable),
         commands: z.record(z.string(), z.array(z.string())),
         hosts: z.record(z.string(), host).optional(),

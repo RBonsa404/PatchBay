@@ -97,7 +97,7 @@ const CHAPTERS: { title: string; tier: string; topics: string; levels: string[] 
   { title: 'Services et accès Internet', tier: 'Avancé', topics: 'NAT et PAT, DHCP centralisé, DNS', levels: ['l06-acces-internet'] },
   { title: 'Sécuriser le réseau', tier: 'Avancé', topics: 'Mots de passe, listes de contrôle d’accès, accès distant filtré', levels: ['l07-securite'] },
   { title: 'Multi-sites', tier: 'Expert', topics: 'Sites distants, ligne louée, OSPF multizone, route par défaut partagée', levels: ['l08-site-distant'] },
-  { title: 'Dépannage expert', tier: 'Expert', topics: 'Pannes à trouver et réparer, sur tout le campus', levels: [] },
+  { title: 'Dépannage expert', tier: 'Expert', topics: 'Pannes à trouver et réparer, du câble au NAT, entre campus et agence', levels: ['l09-depannage'] },
 ];
 
 /** The player's standing on the course: stars won, missions passed, and the grade they give. */

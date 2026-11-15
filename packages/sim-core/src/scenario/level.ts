@@ -54,6 +54,8 @@ export interface Level {
   objectives: Objective[];
   hints: { text: Text; afterSeconds?: number }[];
   solution: {
+    /** Cable ends (`DEVICE:Port`) to unplug first: the faulty cables of a troubleshooting level. */
+    unplug?: string[];
     cables: LevelCable[];
     commands: Record<string, string[]>;
     hosts?: Record<string, HostConfig>;
@@ -103,6 +105,7 @@ export function buildLevel(level: Level): Network {
 
 /** Play the reference solution on top of the starting network. */
 export function applySolution(net: Network, level: Level): void {
+  for (const end of level.solution.unplug ?? []) net.disconnect(parseEnd(end));
   plug(net, level.solution.cables);
   for (const [id, host] of Object.entries(level.solution.hosts ?? {})) net.configureHost(id, host);
   type(net, level.solution.commands);

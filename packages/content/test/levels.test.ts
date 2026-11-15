@@ -6,7 +6,7 @@ const resultOf = (net: Network, level: Level, id: string) => evaluate(net, level
 
 describe('MVP campaign', () => {
   it('has its levels in order', () => {
-    expect(campaign.map((l) => l.id)).toEqual(['l01-cablage-console', 'l02-relier-deux-reseaux', 'l03-deux-salles-vlan', 'l04-reseau-du-batiment', 'l05-routage-ospf', 'l06-acces-internet', 'l07-securite', 'l08-site-distant']);
+    expect(campaign.map((l) => l.id)).toEqual(['l01-cablage-console', 'l02-relier-deux-reseaux', 'l03-deux-salles-vlan', 'l04-reseau-du-batiment', 'l05-routage-ospf', 'l06-acces-internet', 'l07-securite', 'l08-site-distant', 'l09-depannage']);
   });
 
   for (const level of campaign) {
@@ -318,5 +318,39 @@ describe('level 8: the remote site', () => {
     applySolution(net, withCommands({ R1: r1.filter((c) => c !== 'default-information originate'), R2: r2 }));
     expect(resultOf(net, level, 'route-default').passed).toBe(false);
     expect(resultOf(net, level, 'ping-internet').passed).toBe(false);
+  });
+});
+
+describe('level 9: troubleshooting', () => {
+  const level = campaign[8]!;
+
+  it('starts with every ticket open', () => {
+    const ev = evaluate(buildLevel(level), level.objectives);
+    expect(ev.results.filter((r) => r.passed).map((r) => r.id)).toEqual([]);
+  });
+
+  it('hides the area mismatch behind the missing clock', () => {
+    const net = buildLevel(level);
+    net.device('R1').cli!.execute('configure terminal');
+    net.device('R1').cli!.execute('interface s0/0/1');
+    net.device('R1').cli!.execute('clock rate 128000');
+    expect(resultOf(net, level, 'wan-up').passed).toBe(true);
+    expect(resultOf(net, level, 'neighbors').passed).toBe(false);
+  });
+
+  it('keeps ticket 4 open while PC2 points at the wrong gateway', () => {
+    const net = buildLevel(level);
+    applySolution(net, { ...level, solution: { ...level.solution, hosts: {} } });
+    expect(resultOf(net, level, 'neighbors').passed).toBe(true);
+    expect(resultOf(net, level, 'pc2-campus').passed).toBe(false);
+    expect(resultOf(net, level, 'pc1-internet').passed).toBe(true);
+  });
+
+  it('keeps ticket 5 open without ip nat inside on the leased line', () => {
+    const net = buildLevel(level);
+    const r1 = level.solution.commands.R1!.filter((c) => c !== 'ip nat inside');
+    applySolution(net, { ...level, solution: { ...level.solution, commands: { ...level.solution.commands, R1: r1 } } });
+    expect(resultOf(net, level, 'pc2-campus').passed).toBe(true);
+    expect(resultOf(net, level, 'pc2-internet').passed).toBe(false);
   });
 });
