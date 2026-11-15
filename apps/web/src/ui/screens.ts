@@ -96,7 +96,7 @@ const CHAPTERS: { title: string; tier: string; topics: string; levels: string[] 
   { title: 'Routage dynamique', tier: 'Avancé', topics: 'OSPF à zone unique, voisins, coûts', levels: ['l05-routage-ospf'] },
   { title: 'Services et accès Internet', tier: 'Avancé', topics: 'NAT et PAT, DHCP centralisé, DNS', levels: ['l06-acces-internet'] },
   { title: 'Sécuriser le réseau', tier: 'Avancé', topics: 'Mots de passe, listes de contrôle d’accès, accès distant filtré', levels: ['l07-securite'] },
-  { title: 'Multi-sites', tier: 'Expert', topics: 'Sites distants, liaisons longue distance, OSPF entre sites', levels: [] },
+  { title: 'Multi-sites', tier: 'Expert', topics: 'Sites distants, ligne louée, OSPF multizone, route par défaut partagée', levels: ['l08-site-distant'] },
   { title: 'Dépannage expert', tier: 'Expert', topics: 'Pannes à trouver et réparer, sur tout le campus', levels: [] },
 ];
 

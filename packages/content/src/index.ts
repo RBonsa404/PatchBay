@@ -6,6 +6,7 @@ import level04 from '../levels/l04-reseau-du-batiment.json';
 import level05 from '../levels/l05-routage-ospf.json';
 import level06 from '../levels/l06-acces-internet.json';
 import level07 from '../levels/l07-securite.json';
+import level08 from '../levels/l08-site-distant.json';
 import { levelSchema } from './schema.js';
 
 export { levelSchema } from './schema.js';
@@ -22,4 +23,4 @@ export function parseLevel(data: unknown): Level {
 }
 
 /** The MVP campaign, in play order. */
-export const campaign: Level[] = [level01, level02, level03, level04, level05, level06, level07].map(parseLevel);
+export const campaign: Level[] = [level01, level02, level03, level04, level05, level06, level07, level08].map(parseLevel);

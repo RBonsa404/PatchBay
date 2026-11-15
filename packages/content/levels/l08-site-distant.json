@@ -1,0 +1,262 @@
+{
+  "id": "l08-site-distant",
+  "version": 1,
+  "title": {
+    "fr": "Le site distant",
+    "en": "The remote site"
+  },
+  "story": {
+    "fr": "L'IST ouvre une agence à Bobo-Dioulasso. Son routeur, R2, passe d'abord par le club pour être préparé avant le voyage : sur l'établi, un câble série joue la ligne louée de l'opérateur, comme en TP. L'agence doit joindre le campus, profiter de son accès Internet, et rester une zone OSPF à part pour que ses pannes ne secouent pas tout le réseau du campus.",
+    "en": "IST is opening a branch in Bobo-Dioulasso. Its router, R2, first comes through the club to be prepared before the trip: on the bench, a serial cable stands in for the carrier's leased line, as in a lab. The branch must reach the campus, share its Internet access, and stay a separate OSPF area so its troubles don't shake the whole campus network."
+  },
+  "brief": {
+    "fr": "Salle technique : le campus est en service (R1, S1, PC1 192.168.10.10, liaison vers le FAI sur S0/0/0, PAT, OSPF zone 0, router-id 1.1.1.1). Le FAI publie Internet en 203.0.113.1. Sur l'établi : R2, routeur neuf de l'agence, et PC2 (192.168.30.10, passerelle 192.168.30.1).\n1. Ligne louée : câble série R1 S0/0/1 (DCE, côté campus) → R2 S0/0/0. R1 S0/0/1 : 10.0.0.1/30, clock rate 128000. R2 S0/0/0 : 10.0.0.2/30. Allume les deux.\n2. PC2 → R2 Fa0/0 (PC et routeur : câble croisé) ; R2 Fa0/0 : 192.168.30.1/24.\n3. OSPF zone 1 pour l'agence : sur R1, network 10.0.0.0 0.0.0.3 area 1. Sur R2 : router ospf 1, router-id 2.2.2.2, la liaison et le réseau 192.168.30.0/24 en zone 1, passive-interface fa0/0.\n4. R1 annonce sa route par défaut (default-information originate) et traduit aussi l'agence : ip nat inside sur S0/0/1, par où elle arrive, et access-list 1 permit 192.168.30.0 0.0.0.255.\n5. Vérifie sur R2 : show ip ospf neighbor, show ip route (O IA, O*E2). PC2 → PC1 et PC2 → 203.0.113.1. Sauvegarde R1 et R2.",
+    "en": "Technical room: the campus is live (R1, S1, PC1 192.168.10.10, ISP link on S0/0/0, PAT, OSPF area 0, router-id 1.1.1.1). The ISP publishes the Internet at 203.0.113.1. On the bench: R2, the branch's new router, and PC2 (192.168.30.10, gateway 192.168.30.1).\n1. Leased line: serial cable R1 S0/0/1 (DCE, campus end) → R2 S0/0/0. R1 S0/0/1: 10.0.0.1/30, clock rate 128000. R2 S0/0/0: 10.0.0.2/30. Bring both up.\n2. PC2 → R2 Fa0/0 (PC to router: crossover cable); R2 Fa0/0: 192.168.30.1/24.\n3. OSPF area 1 for the branch: on R1, network 10.0.0.0 0.0.0.3 area 1. On R2: router ospf 1, router-id 2.2.2.2, the link and 192.168.30.0/24 in area 1, passive-interface fa0/0.\n4. R1 advertises its default route (default-information originate) and translates the branch too: ip nat inside on S0/0/1, where its traffic comes in, and access-list 1 permit 192.168.30.0 0.0.0.255.\n5. Check on R2: show ip ospf neighbor, show ip route (O IA, O*E2). PC2 → PC1 and PC2 → 203.0.113.1. Save R1 and R2."
+  },
+  "difficulty": 5,
+  "timeLimit": 2100,
+  "settings": {
+    "strictMdix": true
+  },
+  "devices": [
+    { "id": "ADMIN", "model": "pc", "label": { "fr": "Portable d'administration", "en": "Admin laptop" }, "position": [0, 0.76, 0.5] },
+    { "id": "R1", "model": "cisco-2911", "label": { "fr": "Routeur du campus", "en": "Campus router" }, "position": [0, 0.9, -0.4] },
+    { "id": "S1", "model": "catalyst-2960", "label": { "fr": "Switch du campus", "en": "Campus switch" }, "position": [0, 1.2, -0.4] },
+    { "id": "PC1", "model": "pc", "label": { "fr": "PC du campus", "en": "Campus PC" }, "position": [-1.25, 0.76, 0.42] },
+    { "id": "FAI", "model": "cisco-1841", "label": { "fr": "Routeur du fournisseur d'accès", "en": "Internet provider's router" }, "position": [-0.62, 0.76, -0.05] },
+    { "id": "R2", "model": "cisco-1841", "label": { "fr": "Routeur de l'agence de Bobo-Dioulasso", "en": "Bobo-Dioulasso branch router" }, "position": [0.62, 0.76, -0.05] },
+    { "id": "PC2", "model": "pc", "label": { "fr": "PC de l'agence", "en": "Branch PC" }, "position": [1.25, 0.76, 0.42] }
+  ],
+  "inventory": {
+    "cables": {
+      "straight": 2,
+      "crossover": 2,
+      "console": 1,
+      "serial": 1
+    }
+  },
+  "initial": {
+    "cables": [
+      { "type": "serial", "a": "FAI:Serial0/0/0", "b": "R1:Serial0/0/0" },
+      { "type": "straight", "a": "S1:GigabitEthernet0/1", "b": "R1:GigabitEthernet0/0" },
+      { "type": "straight", "a": "PC1:FastEthernet0", "b": "S1:FastEthernet0/1" }
+    ],
+    "hosts": {
+      "PC1": { "ip": "192.168.10.10", "mask": "255.255.255.0", "gateway": "192.168.10.1" },
+      "PC2": { "ip": "192.168.30.10", "mask": "255.255.255.0", "gateway": "192.168.30.1" }
+    },
+    "commands": {
+      "R1": [
+        "enable",
+        "configure terminal",
+        "hostname R1",
+        "interface g0/0",
+        "ip address 192.168.10.1 255.255.255.0",
+        "ip nat inside",
+        "no shutdown",
+        "interface s0/0/0",
+        "ip address 198.51.100.2 255.255.255.248",
+        "ip nat outside",
+        "no shutdown",
+        "exit",
+        "ip route 0.0.0.0 0.0.0.0 198.51.100.1",
+        "access-list 1 permit 192.168.10.0 0.0.0.255",
+        "ip nat inside source list 1 interface s0/0/0 overload",
+        "router ospf 1",
+        "router-id 1.1.1.1",
+        "network 192.168.10.0 0.0.0.255 area 0",
+        "passive-interface g0/0",
+        "end",
+        "copy running-config startup-config",
+        ""
+      ],
+      "S1": ["enable", "configure terminal", "hostname S1", "end"],
+      "R2": ["enable", "configure terminal", "hostname R2", "end"],
+      "FAI": [
+        "enable",
+        "configure terminal",
+        "hostname FAI",
+        "interface s0/0/0",
+        "ip address 198.51.100.1 255.255.255.248",
+        "clock rate 64000",
+        "no shutdown",
+        "interface loopback 0",
+        "ip address 203.0.113.1 255.255.255.0",
+        "end",
+        "copy running-config startup-config",
+        ""
+      ]
+    }
+  },
+  "objectives": [
+    {
+      "id": "cable-wan",
+      "type": "cable",
+      "cable": { "type": "serial", "a": "R1:Serial0/0/1", "b": "R2:Serial0/0/0" },
+      "points": 8,
+      "label": { "fr": "Ligne louée R1 S0/0/1 → R2 S0/0/0, DCE côté campus", "en": "Leased line R1 S0/0/1 → R2 S0/0/0, DCE at the campus" },
+      "hint": { "fr": "En TP, le DCE joue l'opérateur qui donne l'horloge : ici il va sur R1, qui portera le clock rate.", "en": "In a lab, the DCE plays the carrier supplying the clock: here it goes on R1, which will carry the clock rate." }
+    },
+    {
+      "id": "cable-pc2",
+      "type": "cable",
+      "cable": { "type": "crossover", "a": "PC2:FastEthernet0", "b": "R2:FastEthernet0/0" },
+      "points": 5,
+      "label": { "fr": "PC2 relié directement à R2 (Fa0/0)", "en": "PC2 cabled straight into R2 (Fa0/0)" },
+      "hint": { "fr": "Un PC et un routeur émettent sur les mêmes paires : il faut un câble croisé.", "en": "A PC and a router transmit on the same pairs: a crossover cable is needed." }
+    },
+    {
+      "id": "clock-r1",
+      "type": "config",
+      "device": "R1",
+      "check": { "kind": "clock-rate", "interface": "Serial0/0/1" },
+      "points": 4,
+      "label": { "fr": "Horloge sur R1 S0/0/1 (clock rate)", "en": "Clock on R1 S0/0/1 (clock rate)" }
+    },
+    {
+      "id": "wan-up",
+      "type": "link-up",
+      "device": "R2",
+      "port": "Serial0/0/0",
+      "points": 5,
+      "label": { "fr": "Ligne louée active (up/up)", "en": "Leased line up/up" },
+      "hint": { "fr": "no shutdown des deux côtés, et clock rate côté DCE.", "en": "no shutdown at both ends, and clock rate on the DCE end." }
+    },
+    {
+      "id": "lan-r2",
+      "type": "config",
+      "device": "R2",
+      "check": { "kind": "interface-ip", "interface": "FastEthernet0/0", "ip": "192.168.30.1", "mask": "255.255.255.0" },
+      "points": 4,
+      "label": { "fr": "R2 Fa0/0 en 192.168.30.1/24", "en": "R2 Fa0/0 is 192.168.30.1/24" }
+    },
+    {
+      "id": "neighbors",
+      "type": "ospf-neighbor",
+      "device": "R1",
+      "neighbor": "R2",
+      "points": 12,
+      "label": { "fr": "R1 et R2 voisins OSPF (FULL)", "en": "R1 and R2 OSPF neighbours (FULL)" },
+      "hint": { "fr": "Les deux bouts de la liaison doivent être dans la même zone : area 1 sur R1 comme sur R2.", "en": "Both ends of the link must be in the same area: area 1 on R1 as on R2." }
+    },
+    {
+      "id": "passive-r2",
+      "type": "config",
+      "device": "R2",
+      "check": { "kind": "ospf-passive", "interface": "FastEthernet0/0" },
+      "points": 5,
+      "label": { "fr": "Pas de Hello vers le PC de l'agence (passive-interface)", "en": "No Hellos towards the branch PC (passive-interface)" }
+    },
+    {
+      "id": "route-ia",
+      "type": "route",
+      "device": "R2",
+      "prefix": "192.168.10.0/24",
+      "protocol": "O IA",
+      "points": 12,
+      "label": { "fr": "R2 apprend le réseau du campus entre zones (O IA)", "en": "R2 learns the campus network between areas (O IA)" },
+      "hint": { "fr": "R1 a une interface en zone 0 et une en zone 1 : c'est un routeur de bordure (ABR). Il résume la zone 0 pour l'agence en routes O IA.", "en": "R1 has one interface in area 0 and one in area 1: it is an area border router (ABR). It passes area 0 to the branch as O IA routes." }
+    },
+    {
+      "id": "route-default",
+      "type": "route",
+      "device": "R2",
+      "prefix": "0.0.0.0/0",
+      "protocol": "O E2",
+      "points": 10,
+      "label": { "fr": "R2 reçoit la route par défaut par OSPF (O*E2)", "en": "R2 gets the default route through OSPF (O*E2)" },
+      "hint": { "fr": "Sous router ospf 1 de R1 : default-information originate. R1 a déjà sa route statique vers le FAI.", "en": "Under R1's router ospf 1: default-information originate. R1 already has its static route to the ISP." }
+    },
+    {
+      "id": "ping-campus",
+      "type": "ping",
+      "from": "PC2",
+      "to": "192.168.10.10",
+      "expect": "success",
+      "points": 10,
+      "label": { "fr": "L'agence joint le PC du campus", "en": "The branch reaches the campus PC" }
+    },
+    {
+      "id": "ping-internet",
+      "type": "ping",
+      "from": "PC2",
+      "to": "203.0.113.1",
+      "expect": "success",
+      "points": 15,
+      "label": { "fr": "L'agence sort sur Internet par le campus", "en": "The branch reaches the Internet through the campus" },
+      "hint": { "fr": "R1 ne traduit que ce qui entre par une interface ip nat inside et que la liste 1 autorise. L'agence arrive par S0/0/1 : ip nat inside dessus, et access-list 1 permit 192.168.30.0 0.0.0.255. Sans traduction, le FAI ne sait pas répondre à une adresse privée.", "en": "R1 only translates what comes in through an ip nat inside interface and is allowed by list 1. The branch comes in on S0/0/1: ip nat inside there, and access-list 1 permit 192.168.30.0 0.0.0.255. Untranslated, the ISP cannot answer a private address." }
+    },
+    {
+      "id": "saved-r1",
+      "type": "saved",
+      "device": "R1",
+      "points": 5,
+      "label": { "fr": "Configuration de R1 sauvegardée", "en": "R1's configuration saved" }
+    },
+    {
+      "id": "saved-r2",
+      "type": "saved",
+      "device": "R2",
+      "points": 5,
+      "label": { "fr": "Configuration de R2 sauvegardée (avant le voyage !)", "en": "R2's configuration saved (before the trip!)" }
+    }
+  ],
+  "hints": [
+    {
+      "afterSeconds": 180,
+      "text": {
+        "fr": "Par étapes : la ligne louée d'abord (ping 10.0.0.2 depuis R1), puis OSPF (show ip ospf neighbor), puis Internet.",
+        "en": "Step by step: the leased line first (ping 10.0.0.2 from R1), then OSPF (show ip ospf neighbor), then the Internet."
+      }
+    },
+    {
+      "afterSeconds": 900,
+      "text": {
+        "fr": "Voisins bloqués ? Les deux bouts doivent avoir le même réseau, la même zone, et pas de passive-interface sur la liaison.",
+        "en": "Neighbours stuck? Both ends need the same network, the same area, and no passive-interface on the link."
+      }
+    }
+  ],
+  "solution": {
+    "cables": [
+      { "type": "serial", "a": "R1:Serial0/0/1", "b": "R2:Serial0/0/0" },
+      { "type": "crossover", "a": "PC2:FastEthernet0", "b": "R2:FastEthernet0/0" }
+    ],
+    "commands": {
+      "R1": [
+        "configure terminal",
+        "interface s0/0/1",
+        "ip address 10.0.0.1 255.255.255.252",
+        "clock rate 128000",
+        "ip nat inside",
+        "no shutdown",
+        "exit",
+        "access-list 1 permit 192.168.30.0 0.0.0.255",
+        "router ospf 1",
+        "network 10.0.0.0 0.0.0.3 area 1",
+        "default-information originate",
+        "end",
+        "copy running-config startup-config",
+        ""
+      ],
+      "R2": [
+        "configure terminal",
+        "interface fa0/0",
+        "ip address 192.168.30.1 255.255.255.0",
+        "no shutdown",
+        "interface s0/0/0",
+        "ip address 10.0.0.2 255.255.255.252",
+        "no shutdown",
+        "exit",
+        "router ospf 1",
+        "router-id 2.2.2.2",
+        "network 10.0.0.0 0.0.0.3 area 1",
+        "network 192.168.30.0 0.0.0.255 area 1",
+        "passive-interface fa0/0",
+        "end",
+        "copy running-config startup-config",
+        ""
+      ]
+    }
+  }
+}

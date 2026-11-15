@@ -6,7 +6,7 @@ const resultOf = (net: Network, level: Level, id: string) => evaluate(net, level
 
 describe('MVP campaign', () => {
   it('has its levels in order', () => {
-    expect(campaign.map((l) => l.id)).toEqual(['l01-cablage-console', 'l02-relier-deux-reseaux', 'l03-deux-salles-vlan', 'l04-reseau-du-batiment', 'l05-routage-ospf', 'l06-acces-internet', 'l07-securite']);
+    expect(campaign.map((l) => l.id)).toEqual(['l01-cablage-console', 'l02-relier-deux-reseaux', 'l03-deux-salles-vlan', 'l04-reseau-du-batiment', 'l05-routage-ospf', 'l06-acces-internet', 'l07-securite', 'l08-site-distant']);
   });
 
   for (const level of campaign) {
@@ -271,5 +271,52 @@ describe('level 7: securing the network', () => {
     applySolution(net, withR1(r1.map((c) => (c === 'ip access-group ETUDIANTS in' ? 'ip access-group ETUDIANTS out' : c))));
     expect(resultOf(net, level, 'acl-applied').passed).toBe(false);
     expect(resultOf(net, level, 'ssh-blocked').passed).toBe(false);
+  });
+});
+
+describe('level 8: the remote site', () => {
+  const level = campaign[7]!;
+  const { R1: r1, R2: r2 } = level.solution.commands as { R1: string[]; R2: string[] };
+  const withCommands = (commands: Record<string, string[]>): Level => ({ ...level, solution: { ...level.solution, commands } });
+
+  it('starts with the campus online', () => {
+    const net = buildLevel(level);
+    expect(net.ping('PC1', '203.0.113.1').received).toBeGreaterThan(0);
+  });
+
+  it('keeps the branch off the Internet until list 1 covers it', () => {
+    const net = buildLevel(level);
+    applySolution(net, withCommands({ R1: r1.filter((c) => !c.includes('192.168.30.0')), R2: r2 }));
+    expect(resultOf(net, level, 'ping-campus').passed).toBe(true);
+    expect(resultOf(net, level, 'ping-internet').passed).toBe(false);
+  });
+
+  it('does not translate the branch when its way in is not marked ip nat inside', () => {
+    const net = buildLevel(level);
+    applySolution(net, withCommands({ R1: r1.filter((c) => c !== 'ip nat inside'), R2: r2 }));
+    expect(resultOf(net, level, 'ping-campus').passed).toBe(true);
+    expect(resultOf(net, level, 'ping-internet').passed).toBe(false);
+  });
+
+  it('forms no adjacency when the two ends disagree on the area', () => {
+    const net = buildLevel(level);
+    applySolution(net, withCommands({ R1: r1.map((c) => c.replace('area 1', 'area 0')), R2: r2 }));
+    expect(resultOf(net, level, 'neighbors').passed).toBe(false);
+    expect(resultOf(net, level, 'ping-campus').passed).toBe(false);
+  });
+
+  it('sees intra-area routes, not O IA, when everything sits in area 0', () => {
+    const net = buildLevel(level);
+    const area0 = (cmds: string[]) => cmds.map((c) => c.replace('area 1', 'area 0'));
+    applySolution(net, withCommands({ R1: area0(r1), R2: area0(r2) }));
+    expect(resultOf(net, level, 'neighbors').passed).toBe(true);
+    expect(resultOf(net, level, 'route-ia').passed).toBe(false);
+  });
+
+  it('gives the branch no default route without default-information originate', () => {
+    const net = buildLevel(level);
+    applySolution(net, withCommands({ R1: r1.filter((c) => c !== 'default-information originate'), R2: r2 }));
+    expect(resultOf(net, level, 'route-default').passed).toBe(false);
+    expect(resultOf(net, level, 'ping-internet').passed).toBe(false);
   });
 });
