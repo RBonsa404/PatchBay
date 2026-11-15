@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { FACE } from './building.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { contactShadow, outsideTexture, photo, sunPatchTexture } from './materials.js';
 import { placeProp } from './props.js';
@@ -229,18 +230,18 @@ function desk(): THREE.Group {
 /** Wall furniture: trunking and sockets, electrical panel, pegboard, notice board, clock, signs, ceiling details. */
 function walls(): THREE.Group {
   const g = new THREE.Group();
-  const back = -1.595;
+  const back = FACE.back + 0.005;
 
   // White trunking along the walls, with sockets at regular intervals and drops from the ceiling.
   g.add(box(3.9, 0.06, 0.03, M.trunking, -0.45, 0.42, back + 0.015, false), box(0.05, 2.15, 0.025, M.trunking, -2.3, 1.82, back + 0.012, false));
   for (const x of [-2.1, -1.2, 0.7, 1.2]) {
     g.add(box(0.075, 0.075, 0.012, M.white, x, 0.42, back + 0.034, false), box(0.016, 0.022, 0.003, M.black, x, 0.42, back + 0.041, false));
   }
-  g.add(box(0.03, 0.06, 3.2, M.trunking, -3.482, 0.42, 2.0, false));
-  g.add(box(0.03, 0.06, 2.0, M.trunking, 3.482, 0.42, 2.6, false));
+  g.add(box(0.03, 0.06, 5.6, M.trunking, FACE.left + 0.018, 0.42, 2.8, false));
+  g.add(box(0.03, 0.06, 3.0, M.trunking, FACE.right - 0.018, 0.42, 4.2, false));
 
   // Electrical panel on the left wall: a grey cabinet, a window on the breakers, a warning sign.
-  const lx = -3.47;
+  const lx = FACE.left + 0.03;
   g.add(box(0.1, 0.8, 0.56, M.paintedGrey, lx, 1.45, -1.12));
   g.add(box(0.004, 0.3, 0.42, M.black, lx + 0.052, 1.56, -1.12, false));
   for (let i = 0; i < 9; i++) g.add(box(0.008, 0.08, 0.026, i % 4 === 3 ? M.red : M.white, lx + 0.056, 1.6, -1.27 + i * 0.037, false));
@@ -260,21 +261,22 @@ function walls(): THREE.Group {
   peg.add(box(0.1, 0.16, 0.03, M.amber, 0.5, 1.76, 0.02), box(0.07, 0.05, 0.002, M.black, 0.5, 1.8, 0.036, false));
   peg.add(box(0.13, 0.03, 0.015, M.blue, -0.3, 1.45, 0.012), box(0.03, 0.03, 0.02, M.steel, -0.22, 1.45, 0.014), box(0.16, 0.022, 0.015, M.amber, 0.02, 1.45, 0.012), box(0.14, 0.022, 0.015, M.red, 0.26, 1.45, 0.012));
   peg.rotation.y = -Math.PI / 2;
-  peg.position.set(3.487, 0, 2.6);
+  const rx = FACE.right - 3.5;
+  peg.position.set(3.487 + rx, 0, 2.6);
   g.add(peg);
-  g.add(box(0.45, 0.85, 1.25, M.paintedGrey, 3.26, 0.425, 2.6));
-  g.add(box(0.46, 0.03, 1.28, M.wood, 3.25, 0.865, 2.6));
-  g.add(box(0.004, 0.75, 0.003, M.black, 3.031, 0.42, 2.6, false));
-  for (const dz of [-0.06, 0.06]) g.add(box(0.016, 0.12, 0.016, M.steel, 3.025, 0.5, 2.6 + dz, false));
+  g.add(box(0.45, 0.85, 1.25, M.paintedGrey, 3.26 + rx, 0.425, 2.6));
+  g.add(box(0.46, 0.03, 1.28, M.wood, 3.25 + rx, 0.865, 2.6));
+  g.add(box(0.004, 0.75, 0.003, M.black, 3.031 + rx, 0.42, 2.6, false));
+  for (const dz of [-0.06, 0.06]) g.add(box(0.016, 0.12, 0.016, M.steel, 3.025 + rx, 0.5, 2.6 + dz, false));
   // A real toolbox and a multimeter on the cupboard.
-  placeProp(g, 'metal_toolbox', { x: 3.25, y: 0.88, z: 2.25, turn: -Math.PI / 2 });
-  placeProp(g, 'retro_multimeter', { x: 3.25, y: 0.88, z: 2.95, turn: -Math.PI / 2 - 0.25, scale: 0.8 });
+  placeProp(g, 'metal_toolbox', { x: 3.25 + rx, y: 0.88, z: 2.25, turn: -Math.PI / 2 });
+  placeProp(g, 'retro_multimeter', { x: 3.25 + rx, y: 0.88, z: 2.95, turn: -Math.PI / 2 - 0.25, scale: 0.8 });
   const cupboardShadow = contactShadow(0.8, 1.6, 0.5);
-  cupboardShadow.position.set(3.2, 0.003, 2.6);
+  cupboardShadow.position.set(3.2 + rx, 0.003, 2.6);
   g.add(cupboardShadow);
 
   // Notice board on the left wall: pinned sheets and a network plan.
-  const board = box(0.018, 0.8, 1.15, lit('#8a6a48', 0.95), -3.49, 1.55, 2.85, false);
+  const board = box(0.018, 0.8, 1.15, lit('#8a6a48', 0.95), FACE.left + 0.01, 1.55, 2.85, false);
   g.add(board);
   const sheets: [string[], string, number, number][] = [
     [['PLANNING', 'TP RÉSEAUX'], '#f8fafc', 2.5, 1.72],
@@ -286,7 +288,7 @@ function walls(): THREE.Group {
   for (const [lines, colour, z, y] of sheets) {
     const sheet = sign(0.27, 0.27, colour, '#0b1e3f', lines);
     sheet.rotation.y = Math.PI / 2;
-    sheet.position.set(-3.479, y, z);
+    sheet.position.set(FACE.left + 0.021, y, z);
     g.add(sheet);
   }
 
@@ -304,8 +306,8 @@ function walls(): THREE.Group {
   placeProp(g, 'fire_alarm', { x: -2.32, y: 1.45, z: back + 0.002 });
 
   // Ceiling: an air duct with its grilles, a smoke detector.
-  g.add(box(4.8, 0.26, 0.42, M.paintedGrey, -0.4, 2.86, 3.15));
-  for (const x of [-2.2, -0.4, 1.4]) g.add(box(0.5, 0.012, 0.3, M.darkSteel, x, 2.725, 3.15, false));
+  g.add(box(4.8, 0.26, 0.42, M.paintedGrey, -0.4, 2.86, FACE.front - 0.45));
+  for (const x of [-2.2, -0.4, 1.4]) g.add(box(0.5, 0.012, 0.3, M.darkSteel, x, 2.725, FACE.front - 0.45, false));
   g.add(cylinder(0.065, 0.035, M.white, -0.6, 2.98, 1.4));
   return g;
 }
@@ -314,15 +316,15 @@ function walls(): THREE.Group {
 function floor(): THREE.Group {
   const g = new THREE.Group();
   const bin = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.12, 0.38, 20), M.darkSteel);
-  bin.position.set(0.25, 0.19, 3.3);
+  bin.position.set(0.25, 0.19, FACE.front - 0.3);
   bin.castShadow = true;
   const binShadow = contactShadow(0.5, 0.5, 0.5);
-  binShadow.position.set(0.25, 0.003, 3.3);
+  binShadow.position.set(0.25, 0.003, FACE.front - 0.3);
   g.add(bin, binShadow);
 
   // Yellow floor tape marking the clearance in front of the cabinets.
   const tape = lit('#eab308', 0.7);
-  g.add(box(0.05, 0.002, 2.2, tape, 2.6, 0.003, 0.62, false), box(0.05, 0.002, 1.1, tape, 2.2, 0.003, -1.05, false));
+  g.add(box(0.05, 0.002, 2.2, tape, FACE.right - 0.9, 0.003, 0.62, false), box(0.05, 0.002, 1.1, tape, FACE.right - 1.3, 0.003, -1.05, false));
 
   // The bench's lower shelf: three crates in a row, labels to the front.
   ['OUTILLAGE', 'TESTEURS', 'CORDONS'].forEach((label, i) => {
@@ -333,8 +335,77 @@ function floor(): THREE.Group {
   return g;
 }
 
+/** How far the room's walls moved out from where these pieces were first laid out (3.5 m either side, 3.6 m ahead). */
+const LEFT = FACE.left + 3.5;
+const RIGHT = FACE.right - 3.5;
+const AHEAD = FACE.front - 3.6;
+
 export function buildDecor(): THREE.Group {
   const g = new THREE.Group();
-  g.add(shelving(), cabinetRow(), desk(), walls(), floor());
+  const left = shelving();
+  left.position.x = LEFT;
+  const right = cabinetRow();
+  right.position.x = RIGHT;
+  const front = desk();
+  front.position.z = AHEAD;
+  g.add(left, right, front, walls(), floor(), rackRow());
+  return g;
+}
+
+/**
+ * A second row of racks across the room, as in a real network room: closed cabinets with their blanking panels,
+ * patch fields and servers' LEDs behind perforated doors, labelled, with a cold-aisle tape on the floor.
+ */
+function rackRow(): THREE.Group {
+  const g = new THREE.Group();
+  const leds = ['#22c55e', '#38bdf8', '#22c55e', '#fbbf24'];
+  const [w, h, d, z] = [0.6, 2.0, 0.9, 3.7];
+  for (let n = 0; n < 9; n++) {
+    const x = -2.7 + n * 0.675;
+    g.add(box(w - 0.01, h, d, M.black, x, h / 2, z));
+    // The perforated front door, with the handle, and the machines behind it.
+    g.add(box(w - 0.05, h - 0.12, 0.006, M.darkSteel, x, h / 2, z - d / 2 - 0.004));
+    for (let i = 0; i < 30; i++) {
+      const slot = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.14, 0.024), new THREE.MeshBasicMaterial({ color: '#05070a' }));
+      slot.rotation.y = Math.PI;
+      slot.position.set(x, 0.16 + i * 0.058, z - d / 2 - 0.0075);
+      g.add(slot);
+      if ((i + n) % 3 === 0) {
+        for (let k = 0; k < 3; k++) {
+          const led = new THREE.Mesh(new THREE.CircleGeometry(0.0045, 8), new THREE.MeshBasicMaterial({ color: leds[(i + k + n) % 4], toneMapped: false }));
+          led.rotation.y = Math.PI;
+          led.position.set(x - 0.17 + k * 0.025, 0.16 + i * 0.058, z - d / 2 - 0.008);
+          g.add(led);
+        }
+      }
+    }
+    g.add(box(0.025, 0.22, 0.03, M.steel, x + w / 2 - 0.06, 1.1, z - d / 2 - 0.02, false));
+    // The rear door, perforated too, with the power strips' lights behind it.
+    g.add(box(w - 0.05, h - 0.12, 0.006, M.darkSteel, x, h / 2, z + d / 2 + 0.004));
+    for (let i = 0; i < 30; i++) {
+      const slot = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.14, 0.024), new THREE.MeshBasicMaterial({ color: '#05070a' }));
+      slot.position.set(x, 0.16 + i * 0.058, z + d / 2 + 0.0075);
+      g.add(slot);
+    }
+    for (const dx of [-0.2, 0.2]) {
+      const strip = new THREE.Mesh(new THREE.PlaneGeometry(0.012, 1.6), new THREE.MeshBasicMaterial({ color: '#1e3a5f' }));
+      strip.position.set(x + dx, 1.0, z + d / 2 + 0.008);
+      g.add(strip);
+      const power = new THREE.Mesh(new THREE.CircleGeometry(0.005, 8), new THREE.MeshBasicMaterial({ color: '#22c55e', toneMapped: false }));
+      power.position.set(x + dx, 1.82, z + d / 2 + 0.009);
+      g.add(power);
+    }
+    const tag = sign(0.24, 0.06, '#0b1e3f', '#e2e8f0', [`BAIE-${String(n + 5).padStart(2, '0')}`]);
+    tag.rotation.y = Math.PI;
+    tag.position.set(x, 1.93, z - d / 2 - 0.009);
+    g.add(tag);
+  }
+  // A cable tray over the row, the cold aisle's yellow tape in front of it.
+  g.add(box(6.1, 0.06, 0.4, lit('#fbbf24', 0.6, 0.3), 0, 2.35, z));
+  const tape = lit('#eab308', 0.7);
+  g.add(box(6.1, 0.002, 0.05, tape, 0, 0.003, z - d / 2 - 0.6, false));
+  const shadow = contactShadow(6.4, 1.3, 0.6);
+  shadow.position.set(0, 0.003, z);
+  g.add(shadow);
   return g;
 }

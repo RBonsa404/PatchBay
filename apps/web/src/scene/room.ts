@@ -2,8 +2,10 @@ import * as THREE from 'three';
 import clubLogoUrl from '../assets/club-logo-512.webp';
 import dedsecLogoUrl from '../assets/dedsec/dedsec-logo-sombre.svg';
 import { bake } from './bake.js';
+import { DOOR_HEIGHT, DOORS, FACE, FLOOR_Y, LAB_Z, ROOMS, roomOrigin as originOf } from './building.js';
+import { zoneShell } from './structure.js';
 import { buildDecor } from './decor.js';
-import { ceilingTexture, contactShadow, esdMatNormal, esdMatTexture, paintTexture, perforatedTexture, photo, photoRelief, rackRailTexture, raisedFloorNormal, raisedFloorTexture } from './materials.js';
+import { contactShadow, esdMatNormal, esdMatTexture, paintTexture, perforatedTexture, photo, photoRelief, rackRailTexture } from './materials.js';
 import { placeProp } from './props.js';
 import { textTexture } from './textures.js';
 
@@ -23,22 +25,19 @@ const RACK_UNIT = 0.0445;
 /** The free part of the rack: above the UPS, below the patch panel. */
 const RACK_FREE = { from: 0.07 + RACK_UNIT * 3, to: 1.335 } as const;
 
-const ROOM = { width: 7, back: -1.6, front: 3.6, height: 3 } as const;
+/** The technical room's inner faces (see `building.ts`). */
+const ROOM = { width: FACE.right - FACE.left, back: FACE.back, front: FACE.front, height: 3 } as const;
 
-/** The building around the technical room: a corridor behind its back wall, and the lab room across it. */
+/** The building around the technical room, as the rest of the game knows it (the plan itself is `building.ts`). */
 export const BUILDING = {
-  annexZ: -7,
-  floorY: 3.3,
-  corridor: { back: -3.4, front: -1.6 },
-  door: { x: -2.95, width: 0.92, height: 2.05 },
-  /** Two flights side by side, from x = 4.5 to the landing, split along z. */
-  stairs: { flightEnd: 7, landingEnd: 8, split: -2.5, back: -3.4, front: -1.6, rise: 3.3 },
+  annexZ: LAB_Z,
+  floorY: FLOOR_Y,
+  corridor: { back: ROOMS.corridor.z0, front: ROOMS.corridor.z1 },
+  door: { x: (DOORS[0] as { x: number }).x, width: (DOORS[0] as { width: number }).width, height: DOOR_HEIGHT },
 } as const;
 
 /** Where the room containing a world position starts: everything in a room is laid out as in the technical room. */
-export function roomOrigin(y: number, z: number): { y: number; z: number } {
-  return { y: y > BUILDING.floorY - 0.1 ? BUILDING.floorY : 0, z: z < BUILDING.corridor.back ? BUILDING.annexZ : 0 };
-}
+export const roomOrigin = originOf;
 
 let paintMaterial: THREE.Material | null = null;
 const wallPaint = (): THREE.Material => new THREE.MeshStandardMaterial({ map: paintTexture(), ...photoRelief('painted_plaster_wall', 3, 1.3), normalScale: new THREE.Vector2(0.22, 0.22), roughness: 0.95 });
@@ -102,10 +101,10 @@ export function setMainDoorOpen(open: boolean): void {
   if (mainDoor) mainDoor.rotation.y = open ? Math.PI * 0.96 : 0;
 }
 
-/** A room's shell, bench, rack and cable tray; `door` says which wall has the doorway. */
-export function buildRoomParts(door: 'back' | 'front'): THREE.Group {
+/** A room's bench, rack and cable tray, laid out as in the technical room (its walls come from `structure.ts`). */
+export function buildRoomParts(): THREE.Group {
   const g = new THREE.Group();
-  g.add(shell(door), bench(), rack(), cableTray());
+  g.add(bench(), rack(), cableTray());
   return g;
 }
 
@@ -127,58 +126,12 @@ export function buildRoom(): THREE.Group {
   const room = new THREE.Group();
   room.name = 'technical-room';
   const decor = buildDecor();
-  room.add(shell('back'), bench(), rack(), serverCabinet(), cableTray(), wallItems(), decor);
+  room.add(zoneShell('room', { raisedFloor: true, lights: true }), bench(), rack(), serverCabinet(), cableTray(), wallItems(), decor);
   decor.traverse((o) => {
     if (o.userData.doorSign) mainDoor?.add(o.userData.doorSign as THREE.Object3D);
   });
   bake(room);
   return room;
-}
-
-/** Floor, walls, ceiling and lights. */
-function shell(door: 'back' | 'front'): THREE.Group {
-  const g = new THREE.Group();
-  const depth = ROOM.front - ROOM.back;
-
-  const floorTex = raisedFloorTexture();
-  floorTex.repeat.set(ROOM.width / 1.2, depth / 1.2);
-  const floorNormal = raisedFloorNormal();
-  floorNormal.repeat.set(ROOM.width / 1.2, depth / 1.2);
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.width, depth), new THREE.MeshStandardMaterial({ map: floorTex, normalMap: floorNormal, normalScale: new THREE.Vector2(0.8, 0.8), roughnessMap: photo('smooth_concrete_floor', ROOM.width / 1.2, depth / 1.2).roughnessMap, roughness: 0.75, metalness: 0.08 }));
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.z = (ROOM.front + ROOM.back) / 2;
-  floor.receiveShadow = true;
-  g.add(floor);
-
-  if (door === 'back') {
-    doorWall(g, ROOM.width, ROOM.back, 0);
-    paintedWall(g, ROOM.width, 0, ROOM.front, Math.PI);
-  } else {
-    paintedWall(g, ROOM.width, 0, ROOM.back, 0);
-    doorWall(g, ROOM.width, ROOM.front, Math.PI);
-  }
-  paintedWall(g, depth, -ROOM.width / 2, (ROOM.front + ROOM.back) / 2, Math.PI / 2);
-  paintedWall(g, depth, ROOM.width / 2, (ROOM.front + ROOM.back) / 2, -Math.PI / 2);
-
-  const tiles = ceilingTexture();
-  tiles.repeat.set(ROOM.width / 0.6, depth / 0.6);
-  const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.width, depth), new THREE.MeshStandardMaterial({ map: tiles, roughness: 0.95 }));
-  ceiling.rotation.x = Math.PI / 2;
-  ceiling.position.set(0, ROOM.height, (ROOM.front + ROOM.back) / 2);
-  g.add(ceiling);
-
-  // LED panels set in the ceiling (the stage's key light comes from the one above the bench).
-  const panelMaterial = new THREE.MeshBasicMaterial({ color: '#f8fbff', toneMapped: false });
-  const frameMaterial = steel('#cbd5e1', 0.5, 0.3);
-  for (const [x, z] of [[-1.5, 0.3], [0.4, 0.6], [2.2, 0.3], [-1.5, 2.2], [0.4, 2.4], [2.2, 2.2]] as const) {
-    const frame = box(0.64, 0.02, 0.64, frameMaterial, false);
-    frame.position.set(x, ROOM.height - 0.01, z);
-    const light = new THREE.Mesh(new THREE.PlaneGeometry(0.58, 0.58), panelMaterial);
-    light.rotation.x = Math.PI / 2;
-    light.position.set(x, ROOM.height - 0.021, z);
-    g.add(frame, light);
-  }
-  return g;
 }
 
 /** Lab bench: steel frame, laminate top covered by an anti-static mat, a drawer unit and a lower shelf. */
@@ -410,7 +363,7 @@ function serverCabinet(): THREE.Group {
   const shadow = contactShadow(w + 0.3, d + 0.3, 0.6);
   shadow.position.y = 0.003;
   g.add(glass, handle, label, shadow);
-  g.position.set(2.75, 0, ROOM.back + d / 2 + 0.05);
+  g.position.set(ROOM.width / 2 - 0.75, 0, ROOM.back + d / 2 + 0.05);
   return g;
 }
 
@@ -503,18 +456,25 @@ function wallItems(): THREE.Group {
 
   // Door on the back wall, left.
   // The leaf swings on its hinge, on the left of the doorway.
-  const { x: doorX, width: doorW, height: doorH } = BUILDING.door;
+  // A double door: the wide leaf on its hinge, the narrow one kept shut.
+  const { x: doorX, width: doorW } = BUILDING.door;
+  const doorH = BUILDING.door.height - 0.01;
+  const leafMaterial = new THREE.MeshStandardMaterial({ color: '#8b9bb0', roughness: 0.6, metalness: 0.2 });
+  const wide = doorW * 0.62;
   const hinge = new THREE.Group();
   hinge.position.set(doorX - doorW / 2, 0, z + 0.005);
-  const door = box(doorW, doorH, 0.04, new THREE.MeshStandardMaterial({ color: '#8b9bb0', roughness: 0.6, metalness: 0.2 }));
-  door.position.set(doorW / 2, doorH / 2, 0);
+  const door = box(wide, doorH, 0.04, leafMaterial);
+  door.position.set(wide / 2, doorH / 2, 0);
   const lever = box(0.14, 0.02, 0.03, steel('#e2e8f0', 0.2, 1), false);
-  lever.position.set(doorW - 0.11, 1.02, 0.035);
+  lever.position.set(wide - 0.11, 1.02, 0.035);
   hinge.add(door, lever);
+  const narrow = box(doorW - wide, doorH, 0.04, leafMaterial);
+  narrow.position.set(doorX + doorW / 2 - (doorW - wide) / 2, doorH / 2, z + 0.005);
+  g.add(narrow);
   hinge.userData.dynamic = true;
   mainDoor = hinge;
   const exit = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 0.12), new THREE.MeshBasicMaterial({ map: textTexture('SORTIE', { width: 320, height: 120, color: '#ffffff', font: '700 64px Inter, sans-serif' }), color: '#22c55e', toneMapped: false }));
-  exit.position.set(-2.95, 2.3, z + 0.003);
+  exit.position.set(doorX, 2.32, z + 0.003);
   g.add(hinge, exit);
 
   // Split air conditioner high on the wall: a server room is kept cool.
@@ -527,7 +487,7 @@ function wallItems(): THREE.Group {
   g.add(ac, vent, acLed);
 
   // Fire extinguisher on the left wall with its sign.
-  placeProp(g, 'korean_fire_extinguisher_01', { x: -3.27, y: 0, z: -0.6, turn: Math.PI / 2 });
+  placeProp(g, 'korean_fire_extinguisher_01', { x: -ROOM.width / 2 + 0.23, y: 0, z: -0.6, turn: Math.PI / 2 });
   const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.2), new THREE.MeshStandardMaterial({ color: '#dc2626', roughness: 0.6 }));
   sign.rotation.y = Math.PI / 2;
   sign.position.set(-ROOM.width / 2 + 0.003, 1.3, -0.6);

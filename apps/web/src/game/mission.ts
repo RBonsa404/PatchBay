@@ -11,6 +11,7 @@ import { buildWhiteboard } from '../scene/details.js';
 import { buildAnnex } from '../scene/annex.js';
 import { applyLightmap } from '../scene/lightmaps.js';
 import { BUILDING, rackFillers, setMainDoorOpen } from '../scene/room.js';
+import { DOORS, zoneOf, type ZoneName as Zone } from '../scene/building.js';
 import type { Quality, Stage } from '../scene/stage.js';
 import { AskAicha } from '../ui/askAicha.js';
 import { CABLE_ORDER, Hud } from '../ui/hud.js';
@@ -40,15 +41,6 @@ const BOARD_VIEW = new THREE.Vector3(-1.75, 1.62, -0.5);
 type Origin = { y: number; z: number };
 /** Where each room of a level sits in the building. */
 const ORIGINS: Record<string, Origin> = { '': { y: 0, z: 0 }, annexe: { y: 0, z: BUILDING.annexZ }, etage: { y: BUILDING.floorY, z: 0 } };
-type Zone = 'room' | 'corridor' | 'lab' | 'stairs' | 'corridor1' | 'office';
-/** Which part of the building a position is in. */
-function zoneOf(x: number, y: number, z: number): Zone {
-  if (x > 4.5) return 'stairs';
-  const upper = y > BUILDING.floorY - 0.5;
-  if (z > BUILDING.corridor.front) return upper ? 'office' : 'room';
-  if (z < BUILDING.corridor.back) return 'lab';
-  return upper ? 'corridor1' : 'corridor';
-}
 /** How long it takes to walk in from the door when a mission starts. */
 const ENTRANCE_SECONDS = 3.4;
 /** Time allowed when a level does not say, and the share of it left in an exam. */
@@ -768,10 +760,10 @@ export class Mission {
     const id = ++this.flight;
     const eye = this.player.eye;
     const path = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(-2.95, 1.62, -1.35),
-      new THREE.Vector3(-2.35, 1.62, -0.45),
-      new THREE.Vector3(-1.95, 1.62, 0.6),
-      new THREE.Vector3(-1.1, 1.62, 1.2),
+      new THREE.Vector3(BUILDING.door.x, 1.62, -2.9),
+      new THREE.Vector3(BUILDING.door.x, 1.62, -1.0),
+      new THREE.Vector3(-3.4, 1.62, 0.5),
+      new THREE.Vector3(-1.8, 1.62, 1.3),
       eye,
     ]);
     const ahead = new THREE.Vector3();
@@ -889,8 +881,8 @@ export class Mission {
   private cull(): void {
     if (!this.building) return;
     const zone = zoneOf(this.player.x, this.player.floorY + 0.1, this.player.z);
-    // Through the two aligned doors, the far room shows only from the door's side of the room.
-    const nearDoors = this.player.x < -1.6;
+    // Through the two aligned doors, the far room shows only from the doors' side of the room.
+    const nearDoors = this.player.x < (DOORS[0] as { x: number }).x + 1.4;
     const seen: Record<Zone, string[]> = {
       room: ['room', 'lower', ...(nearDoors ? ['lab'] : [])],
       corridor: ['room', 'lower', 'lab', 'stairs'],
@@ -929,10 +921,11 @@ export class Mission {
     const hall = (BUILDING.corridor.back + BUILDING.corridor.front) / 2;
     const hallLamp = (x: number, y = floor): [number, number, number, number] => [x, y + 2.25, hall, 3.2];
     // Over the room the player is in, and over the corridor they can see through its door.
-    if (zone === 'room' || zone === 'office') this.stage.placeLamps([0.4, floor + 2.9, 1.2, 4], hallLamp(-2.2));
-    else if (zone === 'lab') this.stage.placeLamps([0.4, 2.9, BUILDING.annexZ + 1.2, 4], hallLamp(-2.2));
-    else if (zone === 'stairs') this.stage.placeLamps([7.5, 4.25, hall, 4], [5.5, 1.6, hall, 3.2]);
-    else this.stage.placeLamps(hallLamp(-2.2), hallLamp(2.2));
+    const door = BUILDING.door.x;
+    if (zone === 'room' || zone === 'office') this.stage.placeLamps([0.4, floor + 2.9, 1.2, 4], hallLamp(door));
+    else if (zone === 'lab') this.stage.placeLamps([0.4, 2.9, BUILDING.annexZ + 1.2, 4], hallLamp(door));
+    else if (zone === 'stairs') this.stage.placeLamps([10.2, 4.4, -2.45, 4], [8.6, 1.9, -1.7, 3.2]);
+    else this.stage.placeLamps(hallLamp(door), hallLamp(2.0));
     if (zone === 'room') this.stage.setRig(0, 0);
     if (zone === 'lab') this.stage.setRig(0, BUILDING.annexZ);
     if (zone === 'office') this.stage.setRig(BUILDING.floorY, 0);
