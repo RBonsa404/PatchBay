@@ -533,3 +533,20 @@ body.time-low::after { content: ''; position: fixed; inset: 0; pointer-events: n
 .chapter-soon { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px dashed var(--line-strong); border-radius: 10px; color: var(--text-3); font-size: 13.5px; }
 .parcours-foot { display: flex; justify-content: flex-start; }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* Pause menu and settings: the room dimmed and blurred behind a single card. */
+.pause-screen { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: rgba(5, 10, 24, 0.72); backdrop-filter: blur(6px); animation: fade-in 0.2s var(--ease-out); }
+.pause-card { width: min(440px, calc(100vw - 32px)); display: grid; gap: 14px; padding: 30px 32px; border: 1px solid var(--line-strong); border-radius: 16px; background: #0b1220; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55); }
+.pause-card .label { font: 600 11px var(--font-heading); letter-spacing: 0.22em; text-transform: uppercase; color: var(--amber); }
+.pause-card h2 { margin: -6px 0 4px; font: 700 22px var(--font-heading); }
+.pause-card .menu { display: grid; gap: 8px; }
+.settings-card { width: min(560px, calc(100vw - 32px)); }
+.setting { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255, 255, 255, 0.02); }
+.setting > svg { color: var(--text-3); }
+.setting input[type='checkbox'] { width: 20px; height: 20px; accent-color: var(--amber); }
+.setting input[type='range'] { width: 150px; accent-color: var(--amber); }
+.setting output { min-width: 40px; text-align: right; font: 600 13px var(--font-mono, monospace); color: var(--text-2); }
+.segmented { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 8px; overflow: hidden; }
+.segmented button { padding: 6px 12px; border: 0; background: transparent; color: var(--text-2); font: 600 13px var(--font-heading); cursor: pointer; }
+.segmented button.on { background: var(--amber); color: #0b1220; }
+.pause-card .small { font-size: 12.5px; margin: -6px 0 0; }

@@ -20,3 +20,4 @@ __pycache__/
 
 # Scène exportée pour le précalcul de la lumière (régénérée par tools/bake)
 art/bake/
+art/qa/

@@ -17,6 +17,7 @@ import { onPropAppeared } from './scene/props.js';
 import { buildRoom, rackFillers } from './scene/room.js';
 import { detectQuality, Stage } from './scene/stage.js';
 import { h } from './ui/dom.js';
+import { showSettings } from './ui/pause.js';
 import { progress, showBriefing, showMissions, showResults, showTitle } from './ui/screens.js';
 
 // A soft tick on every button of the interface.
@@ -93,7 +94,7 @@ function endShowcase(): void {
 
 function title(): void {
   showcase();
-  showTitle(() => briefing(firstUnfinished()), missions);
+  showTitle(() => briefing(firstUnfinished()), missions, () => showSettings(stage, title));
 }
 
 function missions(): void {

@@ -19,6 +19,8 @@ import { closePanel, Consoles, openPanelKey, resetHostShells, showHostPanel, sho
 import { extraCables, tidiness, type Tidiness } from './cabling.js';
 import { clock, grade, type Grade } from './scoring.js';
 import { canListen, listenOnce } from '../voice.js';
+import { settings } from '../settings.js';
+import { pauseOpen, showPause } from '../ui/pause.js';
 import { understand, type VoiceCommand } from '../voice-commands.js';
 
 const HOME = { position: new THREE.Vector3(0, 1.78, 2.45), target: new THREE.Vector3(0, 0.86, 0.02) };
@@ -227,7 +229,7 @@ export class Mission {
     this.hud = new Hud(level, {
       check: () => this.check(),
       hint: () => this.hint(),
-      menu: () => this.leave(),
+      menu: () => this.openPause(),
       overview: () => this.overview(),
       ask: () => this.aicha.open(),
       ports: () => this.showPorts(),
@@ -341,8 +343,8 @@ export class Mission {
       if (down && down.id === e.pointerId && Math.hypot(e.clientX - down.x, e.clientY - down.y) >= 6) cancelPress();
       // Dragging turns the head: the room follows the pointer.
       if (down && down.id === e.pointerId && last && e.buttons) {
-        const speed = LOOK_SPEED / this.zoom;
-        this.player.turn((e.clientX - last[0]) * speed, (e.clientY - last[1]) * speed);
+        const speed = (LOOK_SPEED * settings.lookSpeed) / this.zoom;
+        this.player.turn((e.clientX - last[0]) * speed, (e.clientY - last[1]) * speed * (settings.invertY ? -1 : 1));
         last = [e.clientX, e.clientY];
       }
       if (e.pointerType === 'touch' && down) return; // a finger dragging turns the head, not the aim
@@ -422,9 +424,13 @@ export class Mission {
       }
       if (e.code.startsWith('Shift')) this.held.add('Shift');
       if (e.key === 'Escape') {
+        // Close what is open first; with nothing open, Escape pauses the game.
+        if (pauseOpen()) return;
         if (openPanelKey()) closePanel();
-        this.select(null);
-        if (this.anchor) this.overview(0.7);
+        else if (this.selected || this.firstEnd || this.anchor) {
+          this.select(null);
+          if (this.anchor) this.overview(0.7);
+        } else this.openPause();
       }
       if (e.code === 'KeyT' && !typing) this.toggleBoard();
       if (e.code === 'KeyV' && !typing) this.listenVoice();
@@ -718,6 +724,27 @@ export class Mission {
     showBriefPanel(tx(this.level.title), tx(this.level.brief));
   }
 
+  private paused = false;
+
+  /** The pause menu: the clock stops, the room waits behind it. */
+  private openPause(): void {
+    if (this.finished) return this.events.menu();
+    this.paused = true;
+    this.held.clear();
+    showPause(this.stage, {
+      resume: () => {
+        this.paused = false;
+        this.clockAt = performance.now();
+      },
+      brief: () => this.showBrief(),
+      help: () => showHelp(),
+      quit: () => {
+        this.paused = false;
+        this.leave();
+      },
+    }, tx(this.level.title));
+  }
+
   /** Leaving loses the work in progress: ask first. */
   private leave(): void {
     if (this.finished) return this.events.menu();
@@ -847,6 +874,7 @@ export class Mission {
     const now = performance.now();
     const real = (now - this.clockAt) / 1000;
     this.clockAt = now;
+    if (this.paused) return;
     if (this.finished) return;
     this.twinkle(dt);
     if (this.entrance > 0) {
@@ -934,6 +962,7 @@ export class Mission {
   /** Every frame: walk, turn the head, and put the camera where the eyes are. */
   private walk(dt: number): void {
     this.tickClock(dt);
+    if (this.paused) return;
     const camera = this.stage.camera;
     for (const code of this.held) {
       const turn = TURN_KEYS[code];

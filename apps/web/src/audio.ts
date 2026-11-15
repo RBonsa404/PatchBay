@@ -115,6 +115,11 @@ class Sound {
     return this.muted;
   }
 
+  /** Whether the music is on (it may still be silent while the sound is muted). */
+  get musicPlaying(): boolean {
+    return this.musicOn;
+  }
+
   /** Turn the music alone on or off; returns whether it now plays. */
   toggleMusic(): boolean {
     this.musicOn = !this.musicOn;

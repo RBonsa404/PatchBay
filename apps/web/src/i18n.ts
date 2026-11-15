@@ -155,6 +155,17 @@ const fr = {
   'voice.denied': 'Le micro est bloqué : autorise-le dans le navigateur.',
   'voice.offline': 'Les commandes vocales demandent une connexion.',
   'voice.nothing': 'Je n’ai rien entendu.',
+  'pause.title': 'Pause',
+  'pause.resume': 'Reprendre',
+  'pause.quit': 'Quitter la mission',
+  'pause.note': 'Le chrono est arrêté pendant la pause.',
+  'settings.title': 'Paramètres',
+  'settings.heading': 'Réglages du jeu',
+  'settings.qualityNote': 'Moyenne conseillée ; haute pour une carte graphique dédiée ; basse pour un PC modeste.',
+  'settings.music': 'Musique',
+  'settings.look': 'Sensibilité de la souris',
+  'settings.invert': 'Inverser l’axe vertical',
+  'settings.done': 'Terminé',
 } as const;
 
 export type Key = keyof typeof fr;

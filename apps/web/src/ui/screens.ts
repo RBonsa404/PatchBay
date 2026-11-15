@@ -1,5 +1,5 @@
 import { sound } from '../audio.js';
-import { ArrowLeft, ArrowRight, ChevronRight, GraduationCap, LayoutList, Lock, Play, RotateCcw, Star, Timer, Trophy } from 'lucide';
+import { ArrowLeft, ArrowRight, ChevronRight, GraduationCap, LayoutList, Lock, Play, RotateCcw, Settings, Star, Timer, Trophy } from 'lucide';
 import type { Level } from '@patchbay/sim-core';
 import { clock, type Grade } from '../game/scoring.js';
 import { t, tx } from '../i18n.js';
@@ -54,7 +54,7 @@ const button = (label: string, onclick: () => void, kind = '', glyph?: Parameter
   h('button', { class: `btn ${kind}`, onclick }, glyph && !after ? icon(glyph) : null, h('span', {}, label), glyph && after ? icon(glyph) : null);
 
 /** Title: the room in the background, the game's name and menu on the left, the club at the bottom. */
-export function showTitle(onPlay: () => void, onMissions: () => void): void {
+export function showTitle(onPlay: () => void, onMissions: () => void, onSettings?: () => void): void {
   const screen: HTMLElement = h(
     'div',
     { class: 'screen screen-side' },
@@ -69,6 +69,7 @@ export function showTitle(onPlay: () => void, onMissions: () => void): void {
         { class: 'menu', 'aria-label': 'Menu principal' },
         h('button', { class: 'menu-item primary', onclick: () => void leave(screen).then(onPlay) }, icon(Play, 20), h('span', {}, t('title.play')), icon(ChevronRight, 20)),
         h('button', { class: 'menu-item', onclick: () => void leave(screen).then(onMissions) }, icon(LayoutList, 20), h('span', {}, t('title.missions')), icon(ChevronRight, 20)),
+        onSettings ? h('button', { class: 'menu-item', onclick: () => void leave(screen).then(onSettings) }, icon(Settings, 20), h('span', {}, t('settings.title')), icon(ChevronRight, 20)) : null,
       ),
       h('p', { class: 'muted title-note' }, t('title.network')),
       h('footer', { class: 'club' }, clubBadge(), h('div', {}, h('strong', {}, t('app.club')), h('span', {}, t('title.credit')))),
