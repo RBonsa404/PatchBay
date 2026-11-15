@@ -983,7 +983,10 @@ export class Mission {
   /** Every frame: the colleagues breathe, walk their rounds, turn to the player when spoken to. */
   private livePeople(dt: number): void {
     let near: (typeof this.people)[number] | null = null;
-    let best = 2.2;
+    let best = Infinity;
+    const turn = (root: THREE.Object3D, want: number): void => {
+      root.rotation.y += Math.atan2(Math.sin(want - root.rotation.y), Math.cos(want - root.rotation.y)) * Math.min(1, dt * 4);
+    };
     for (const p of this.people) {
       const root = p.person.root;
       const d = Math.hypot(root.position.x - this.player.x, root.position.z - this.player.z);
@@ -994,13 +997,18 @@ export class Mission {
       p.person.update(dt, d > 10 ? 20 : 0);
       if (p.talking > 0) {
         p.talking -= dt;
-        const want = Math.atan2(this.player.x - root.position.x, this.player.z - root.position.z);
-        root.rotation.y += Math.atan2(Math.sin(want - root.rotation.y), Math.cos(want - root.rotation.y)) * Math.min(1, dt * 4);
-        if (p.talking <= 0) {
-          p.person.play(p.who.motion);
-          if (!p.who.walk) root.rotation.y = p.who.at.yaw;
+        let want = Math.atan2(this.player.x - root.position.x, this.player.z - root.position.z);
+        // Someone seated turns on their chair, not off it: a quarter turn at most.
+        if (p.who.motion.startsWith('Sitting')) {
+          const off = Math.atan2(Math.sin(want - p.who.at.yaw), Math.cos(want - p.who.at.yaw));
+          want = p.who.at.yaw + Math.max(-0.6, Math.min(0.6, off));
         }
-      } else if (p.who.walk) {
+        turn(root, want);
+        if (p.talking <= 0) p.person.play(p.who.motion);
+      } else if (!p.who.walk) {
+        // Back to what they were doing, turning back the way they were facing.
+        turn(root, p.who.at.yaw);
+      } else {
         const target = p.who.walk[p.leg % p.who.walk.length] as [number, number];
         const dx = target[0] - root.position.x;
         const dz = target[1] - root.position.z;
@@ -1013,8 +1021,12 @@ export class Mission {
           root.rotation.y = Math.atan2(dx, dz);
         }
       }
-      if (d < best && sameFloor) {
-        best = d;
+      // The one the player is looking at, not merely the closest: someone behind or to the side is not spoken to.
+      const toward = Math.atan2(root.position.x - this.player.x, root.position.z - this.player.z);
+      const off = Math.abs(Math.atan2(Math.sin(toward - this.player.yaw), Math.cos(toward - this.player.yaw)));
+      const score = d + off * 1.5;
+      if (d < 2.2 && off < 0.9 && score < best) {
+        best = score;
         near = p;
       }
     }

@@ -122,7 +122,8 @@ export const COLLEAGUES: Colleague[] = [
     model: 'mariam',
     name: 'Mariam',
     role: 'Ingénieure réseau, opérateur',
-    at: { x: -2.1, y: 0, z: S.datacenter - 6.0, yaw: -Math.PI / 2 },
+    // In front of the wall of screens, turned to the room: she shows the visitor the network she watches.
+    at: { x: -2.35, y: 0, z: S.datacenter - 5.6, yaw: Math.PI / 2 - 0.35 },
     motion: 'Idle_Loop',
     lines: [
       'Le mur d’écrans, c’est notre carte du pays : chaque ville, chaque ligne. Rouge, c’est une alarme.',

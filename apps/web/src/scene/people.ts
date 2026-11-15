@@ -59,6 +59,41 @@ function model(name: string): Promise<THREE.Group> {
 /** Turn added to a model so that it faces +z (the way the game's yaw 0 looks). */
 const FACING = 0;
 
+/**
+ * The soft dark patch under a person's feet. The room's shadow maps are drawn again only when something in it changes
+ * (see `Stage.refreshShadows`): a person casting into them would leave a frozen shadow behind as they walk. A contact
+ * shadow that moves with them, as most games do for characters, costs nothing and never lags.
+ */
+let blob: { geometry: THREE.PlaneGeometry; material: THREE.MeshBasicMaterial } | null = null;
+function contactShadow(): THREE.Mesh {
+  if (!blob) {
+    const size = 128;
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = size;
+    const g = canvas.getContext('2d') as CanvasRenderingContext2D;
+    const grad = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    grad.addColorStop(0, 'rgba(0,0,0,0.55)');
+    grad.addColorStop(0.45, 'rgba(0,0,0,0.32)');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, size, size);
+    const map = new THREE.CanvasTexture(canvas);
+    map.colorSpace = THREE.SRGBColorSpace;
+    const geometry = new THREE.PlaneGeometry(1, 1);
+    geometry.rotateX(-Math.PI / 2);
+    blob = {
+      geometry,
+      material: new THREE.MeshBasicMaterial({ map, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, toneMapped: false }),
+    };
+  }
+  const mesh = new THREE.Mesh(blob.geometry, blob.material);
+  mesh.name = 'contact-shadow';
+  mesh.scale.set(0.75, 1, 0.6);
+  mesh.position.y = 0.006;
+  mesh.renderOrder = 1;
+  return mesh;
+}
+
 export class Person {
   readonly root = new THREE.Group();
   private mixer: THREE.AnimationMixer | null = null;
@@ -80,10 +115,9 @@ export class Person {
         body.traverse((o) => {
           const mesh = o as THREE.SkinnedMesh;
           if (!mesh.isMesh) return;
-          // Eyes, brows and lashes are too small to cast a shadow worth a pass of their own.
-          const tiny = /eye|brow|lash|low-poly/i.test(mesh.name);
-          mesh.castShadow = !tiny;
-          mesh.receiveShadow = !tiny;
+          // They take the room's shadows but cast none into its still shadow maps (see `contactShadow`).
+          mesh.castShadow = false;
+          mesh.receiveShadow = !/eye|brow|lash|low-poly/i.test(mesh.name);
           // Skinned meshes move away from their bind pose: never let the frustum test hide a person by mistake.
           mesh.frustumCulled = false;
           // Hair, brows and lashes are cut out of their pictures: a hard edge sorts right, a blended one would not.
@@ -97,7 +131,7 @@ export class Person {
             }
           }
         });
-        this.root.add(body);
+        this.root.add(body, contactShadow());
         this.mixer = new THREE.AnimationMixer(body);
         for (const clip of list) this.actions.set(clip.name, this.mixer.clipAction(clip));
         this.mixer.addEventListener('finished', () => {
