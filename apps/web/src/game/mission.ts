@@ -44,6 +44,13 @@ const ZOOM_MAX = 4.5;
 const BOARD_CENTRE = new THREE.Vector3(-1.75, 1.62, -1.56);
 const BOARD_VIEW = new THREE.Vector3(-1.75, 1.62, -0.5);
 type Origin = { y: number; z: number };
+/** What is written beside a patch panel port: where its building cable goes. */
+function patchLabel(level: Level, end: string): string {
+  const link = (level.patchLinks ?? []).find((l) => l.a === end || l.b === end);
+  if (!link) return '';
+  return tx(link.a === end ? link.label : link.labelB);
+}
+
 /** Where each room of a level sits in the building. */
 const ORIGINS: Record<string, Origin> = { '': { y: 0, z: 0 }, annexe: { y: 0, z: BUILDING.annexZ }, etage: { y: BUILDING.floorY, z: 0 } };
 /** How long it takes to walk in from the door when a mission starts. */
@@ -196,7 +203,7 @@ export class Mission {
     const floors = rooms.includes('etage');
     for (const panel of level.panels ?? []) {
       const origin = ORIGINS[panel.room ?? ''] as Origin;
-      const ports = (level.patchLinks ?? []).flatMap((l) => [l.a, l.b]).filter((e) => e.startsWith(`${panel.id}:`)).map((e) => ({ name: e.split(':')[1] as string, label: tx((level.patchLinks ?? []).find((l) => l.a === e)?.label) }));
+      const ports = (level.patchLinks ?? []).flatMap((l) => [l.a, l.b]).filter((e) => e.startsWith(`${panel.id}:`)).map((e) => ({ name: e.split(':')[1] as string, label: patchLabel(level, e) }));
       const view = buildPatchPanel(panel.id, ports, origin.z, origin.y);
       this.panels.set(panel.id, view);
       stage.level.add(view.root);

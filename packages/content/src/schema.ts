@@ -28,6 +28,8 @@ const configCheck = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('clock-rate'), interface: z.string() }).strict(),
   z.object({ kind: z.literal('access-vlan'), interface: z.string(), vlan: z.number().int().min(1).max(4094) }).strict(),
   z.object({ kind: z.literal('trunk'), interface: z.string() }).strict(),
+  z.object({ kind: z.literal('ospf-passive'), interface: z.string() }).strict(),
+  z.object({ kind: z.literal('router-id'), equals: ipv4 }).strict(),
 ]);
 
 const base = { id: z.string().min(1), label: text, hint: text.optional(), points: z.number().int().min(0) };
@@ -42,6 +44,7 @@ const objective = z.discriminatedUnion('type', [
   z.object({ ...base, type: z.literal('route'), device: z.string(), prefix: z.string().regex(/^[\d.]+\/\d{1,2}$/), protocol: z.enum(['C', 'S', 'O', 'O IA', 'O E2']).optional() }).strict(),
   z.object({ ...base, type: z.literal('saved'), device: z.string() }).strict(),
   z.object({ ...base, type: z.literal('dhcp-lease'), device: z.string(), network: ipv4, mask: ipv4 }).strict(),
+  z.object({ ...base, type: z.literal('ospf-neighbor'), device: z.string(), neighbor: z.string() }).strict(),
 ]);
 
 export const levelSchema = z
@@ -68,7 +71,7 @@ export const levelSchema = z
       )
       .min(1),
     panels: z.array(z.object({ id: z.string().min(1), room: z.enum(['annexe', 'etage']).optional() }).strict()).optional(),
-    patchLinks: z.array(z.object({ a: end, b: end, label: text }).strict()).optional(),
+    patchLinks: z.array(z.object({ a: end, b: end, label: text, labelB: text.optional() }).strict()).optional(),
     inventory: z.object({ cables: z.record(cableType, z.number().int().min(0)) }).strict(),
     initial: z
       .object({
@@ -98,6 +101,7 @@ export const levelSchema = z
       if (level.objectives.findIndex((x) => x.id === o.id) !== i) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['objectives', i, 'id'], message: `id en double : ${o.id}` });
       if ('device' in o) known(o.device, ['objectives', i, 'device']);
       if ('from' in o) known(o.from, ['objectives', i, 'from']);
+      if ('neighbor' in o) known(o.neighbor, ['objectives', i, 'neighbor']);
     });
     for (const [i, c] of [...level.initial.cables, ...level.solution.cables].entries()) {
       known(c.a.split(':')[0] as string, ['cables', i, 'a']);

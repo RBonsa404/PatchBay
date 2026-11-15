@@ -1,0 +1,736 @@
+{
+  "id": "l05-routage-ospf",
+  "version": 1,
+  "title": {
+    "fr": "Le routage dynamique",
+    "en": "Dynamic routing"
+  },
+  "story": {
+    "fr": "Avec trois salles et bientôt d'autres, les routes statiques deviennent ingérables : chaque nouveau réseau oblige à retoucher tous les routeurs, et une liaison coupée isole une salle entière. Le club passe à OSPF. Chaque salle a désormais son routeur, relié aux deux autres par le câblage du bâtiment : un triangle, pour qu'un lien coupé ne coupe personne. Les adresses sont déjà en place ; à toi de brasser, puis de laisser les routeurs se découvrir et s'échanger leurs réseaux.",
+    "en": "With three rooms and more to come, static routes are unmanageable: every new network means editing every router, and one cut link isolates a whole room. The club moves to OSPF. Each room now has its router, linked to the other two through the building's cabling: a triangle, so a cut link cuts nobody off. Addresses are already set; patch the links, then let the routers discover each other and share their networks."
+  },
+  "brief": {
+    "fr": "Salle technique : R1, PC1, panneau PP-TECH. Salle de TP : R2, PC2, PP-TP. Étage : R3, PC3, PP-ADM. Les interfaces sont déjà adressées et allumées.\n1. Brassage (câbles droits) : R1 Gi0/1 → PP-TECH port 1 et R2 Gi0/1 → PP-TP port 1 ; R1 Gi0/2 → PP-TECH port 2 et R3 Gi0/1 → PP-ADM port 1 ; R2 Gi0/2 → PP-TP port 2 et R3 Gi0/2 → PP-ADM port 2.\n2. Chaque PC sur le Gi0/0 du routeur de sa salle (PC1 192.168.1.10, PC2 192.168.2.10, PC3 192.168.3.10).\n3. Sur chaque routeur : router ospf 1, router-id 1.1.1.1 (R1), 2.2.2.2 (R2), 3.3.3.3 (R3), une commande network par réseau directement connecté, en zone 0 (liaisons 10.0.12.0/30, 10.0.13.0/30, 10.0.23.0/30 : masque générique 0.0.0.3 ; réseaux des PC : 0.0.0.255).\n4. passive-interface g0/0 : pas de Hello vers les PC.\n5. Vérifie show ip ospf neighbor et show ip route (lignes O), PC1 → PC3 et PC2 → PC1, puis sauvegarde les trois routeurs.",
+    "en": "Technical room: R1, PC1, panel PP-TECH. Lab room: R2, PC2, PP-TP. First floor: R3, PC3, PP-ADM. Interfaces are already addressed and up.\n1. Patching (straight cables): R1 Gi0/1 → PP-TECH port 1 and R2 Gi0/1 → PP-TP port 1; R1 Gi0/2 → PP-TECH port 2 and R3 Gi0/1 → PP-ADM port 1; R2 Gi0/2 → PP-TP port 2 and R3 Gi0/2 → PP-ADM port 2.\n2. Each PC on its room router's Gi0/0 (PC1 192.168.1.10, PC2 192.168.2.10, PC3 192.168.3.10).\n3. On each router: router ospf 1, router-id 1.1.1.1 (R1), 2.2.2.2 (R2), 3.3.3.3 (R3), one network command per connected network, in area 0 (links 10.0.12.0/30, 10.0.13.0/30, 10.0.23.0/30: wildcard 0.0.0.3; PC networks: 0.0.0.255).\n4. passive-interface g0/0: no Hellos towards the PCs.\n5. Check show ip ospf neighbor and show ip route (O lines), PC1 → PC3 and PC2 → PC1, then save the three routers."
+  },
+  "difficulty": 4,
+  "timeLimit": 2400,
+  "settings": {
+    "strictMdix": false
+  },
+  "devices": [
+    {
+      "id": "ADMIN",
+      "model": "pc",
+      "label": {
+        "fr": "Portable de la salle technique",
+        "en": "Technical room laptop"
+      },
+      "position": [
+        -0.8,
+        0.76,
+        0.25
+      ]
+    },
+    {
+      "id": "R1",
+      "model": "cisco-2911",
+      "label": {
+        "fr": "Routeur de la salle technique",
+        "en": "Technical room router"
+      },
+      "position": [
+        0,
+        0.9,
+        -0.4
+      ]
+    },
+    {
+      "id": "PC1",
+      "model": "pc",
+      "label": {
+        "fr": "PC de la salle technique",
+        "en": "Technical room PC"
+      },
+      "position": [
+        0.95,
+        0.76,
+        0.25
+      ]
+    },
+    {
+      "id": "R2",
+      "model": "cisco-2911",
+      "label": {
+        "fr": "Routeur de la salle de TP",
+        "en": "Lab room router"
+      },
+      "position": [
+        0,
+        0.9,
+        -0.4
+      ],
+      "room": "annexe"
+    },
+    {
+      "id": "ADMIN2",
+      "model": "pc",
+      "label": {
+        "fr": "Portable de la salle de TP",
+        "en": "Lab room laptop"
+      },
+      "position": [
+        -0.2,
+        0.76,
+        0.35
+      ],
+      "room": "annexe"
+    },
+    {
+      "id": "PC2",
+      "model": "pc",
+      "label": {
+        "fr": "PC de la salle de TP",
+        "en": "Lab room PC"
+      },
+      "position": [
+        0.95,
+        0.76,
+        0.25
+      ],
+      "room": "annexe"
+    },
+    {
+      "id": "R3",
+      "model": "cisco-2911",
+      "label": {
+        "fr": "Routeur de l'étage",
+        "en": "First-floor router"
+      },
+      "position": [
+        0,
+        0.9,
+        -0.4
+      ],
+      "room": "etage"
+    },
+    {
+      "id": "ADMIN3",
+      "model": "pc",
+      "label": {
+        "fr": "Portable de l'administration",
+        "en": "Administration laptop"
+      },
+      "position": [
+        -0.2,
+        0.76,
+        0.35
+      ],
+      "room": "etage"
+    },
+    {
+      "id": "PC3",
+      "model": "pc",
+      "label": {
+        "fr": "PC de l'administration",
+        "en": "Administration PC"
+      },
+      "position": [
+        0.95,
+        0.76,
+        0.25
+      ],
+      "room": "etage"
+    }
+  ],
+  "panels": [
+    {
+      "id": "PP-TECH"
+    },
+    {
+      "id": "PP-TP",
+      "room": "annexe"
+    },
+    {
+      "id": "PP-ADM",
+      "room": "etage"
+    }
+  ],
+  "patchLinks": [
+    {
+      "a": "PP-TECH:P1",
+      "b": "PP-TP:P1",
+      "label": {
+        "fr": "vers la salle de TP",
+        "en": "to the lab room"
+      },
+      "labelB": {
+        "fr": "vers la salle technique",
+        "en": "to the technical room"
+      }
+    },
+    {
+      "a": "PP-TECH:P2",
+      "b": "PP-ADM:P1",
+      "label": {
+        "fr": "vers l'étage",
+        "en": "to the first floor"
+      },
+      "labelB": {
+        "fr": "vers la salle technique",
+        "en": "to the technical room"
+      }
+    },
+    {
+      "a": "PP-TP:P2",
+      "b": "PP-ADM:P2",
+      "label": {
+        "fr": "vers l'étage",
+        "en": "to the first floor"
+      },
+      "labelB": {
+        "fr": "vers la salle de TP",
+        "en": "to the lab room"
+      }
+    }
+  ],
+  "inventory": {
+    "cables": {
+      "straight": 11,
+      "crossover": 2,
+      "console": 3
+    }
+  },
+  "initial": {
+    "cables": [],
+    "hosts": {
+      "PC1": {
+        "ip": "192.168.1.10",
+        "mask": "255.255.255.0",
+        "gateway": "192.168.1.1"
+      },
+      "PC2": {
+        "ip": "192.168.2.10",
+        "mask": "255.255.255.0",
+        "gateway": "192.168.2.1"
+      },
+      "PC3": {
+        "ip": "192.168.3.10",
+        "mask": "255.255.255.0",
+        "gateway": "192.168.3.1"
+      }
+    },
+    "commands": {
+      "R1": [
+        "enable",
+        "configure terminal",
+        "hostname R1",
+        "interface g0/0",
+        "ip address 192.168.1.1 255.255.255.0",
+        "no shutdown",
+        "interface g0/1",
+        "ip address 10.0.12.1 255.255.255.252",
+        "no shutdown",
+        "interface g0/2",
+        "ip address 10.0.13.1 255.255.255.252",
+        "no shutdown",
+        "end"
+      ],
+      "R2": [
+        "enable",
+        "configure terminal",
+        "hostname R2",
+        "interface g0/0",
+        "ip address 192.168.2.1 255.255.255.0",
+        "no shutdown",
+        "interface g0/1",
+        "ip address 10.0.12.2 255.255.255.252",
+        "no shutdown",
+        "interface g0/2",
+        "ip address 10.0.23.1 255.255.255.252",
+        "no shutdown",
+        "end"
+      ],
+      "R3": [
+        "enable",
+        "configure terminal",
+        "hostname R3",
+        "interface g0/0",
+        "ip address 192.168.3.1 255.255.255.0",
+        "no shutdown",
+        "interface g0/1",
+        "ip address 10.0.13.2 255.255.255.252",
+        "no shutdown",
+        "interface g0/2",
+        "ip address 10.0.23.2 255.255.255.252",
+        "no shutdown",
+        "end"
+      ]
+    }
+  },
+  "objectives": [
+    {
+      "id": "link-r1r2",
+      "type": "link-up",
+      "device": "R1",
+      "port": "GigabitEthernet0/1",
+      "points": 6,
+      "label": {
+        "fr": "R1 et R2 reliés par le brassage",
+        "en": "R1 and R2 linked through the patch panels"
+      },
+      "hint": {
+        "fr": "Gi0/1 de R1 sur le port 1 de PP-TECH, Gi0/1 de R2 sur le port 1 de PP-TP.",
+        "en": "R1 Gi0/1 to PP-TECH port 1, R2 Gi0/1 to PP-TP port 1."
+      }
+    },
+    {
+      "id": "link-r1r3",
+      "type": "link-up",
+      "device": "R1",
+      "port": "GigabitEthernet0/2",
+      "points": 6,
+      "label": {
+        "fr": "R1 et R3 reliés par le brassage",
+        "en": "R1 and R3 linked through the patch panels"
+      },
+      "hint": {
+        "fr": "Gi0/2 de R1 sur le port 2 de PP-TECH, Gi0/1 de R3 sur le port 1 de PP-ADM.",
+        "en": "R1 Gi0/2 to PP-TECH port 2, R3 Gi0/1 to PP-ADM port 1."
+      }
+    },
+    {
+      "id": "link-r2r3",
+      "type": "link-up",
+      "device": "R2",
+      "port": "GigabitEthernet0/2",
+      "points": 6,
+      "label": {
+        "fr": "Liaison de secours R2–R3 active",
+        "en": "Backup link R2–R3 up"
+      },
+      "hint": {
+        "fr": "Gi0/2 de R2 sur le port 2 de PP-TP, Gi0/2 de R3 sur le port 2 de PP-ADM.",
+        "en": "R2 Gi0/2 to PP-TP port 2, R3 Gi0/2 to PP-ADM port 2."
+      }
+    },
+    {
+      "id": "lan-r1",
+      "type": "link-up",
+      "device": "R1",
+      "port": "GigabitEthernet0/0",
+      "points": 2,
+      "label": {
+        "fr": "PC1 relié à R1 (Gi0/0)",
+        "en": "PC1 cabled to R1 (Gi0/0)"
+      },
+      "hint": {
+        "fr": "Un câble droit suffit : les ports Gigabit du 2911 croisent d'eux-mêmes (auto-MDIX).",
+        "en": "A straight cable is enough: the 2911's Gigabit ports cross over by themselves (auto-MDIX)."
+      }
+    },
+    {
+      "id": "lan-r2",
+      "type": "link-up",
+      "device": "R2",
+      "port": "GigabitEthernet0/0",
+      "points": 2,
+      "label": {
+        "fr": "PC2 relié à R2 (Gi0/0)",
+        "en": "PC2 cabled to R2 (Gi0/0)"
+      },
+      "hint": {
+        "fr": "Un câble droit suffit : les ports Gigabit du 2911 croisent d'eux-mêmes (auto-MDIX).",
+        "en": "A straight cable is enough: the 2911's Gigabit ports cross over by themselves (auto-MDIX)."
+      }
+    },
+    {
+      "id": "lan-r3",
+      "type": "link-up",
+      "device": "R3",
+      "port": "GigabitEthernet0/0",
+      "points": 2,
+      "label": {
+        "fr": "PC3 relié à R3 (Gi0/0)",
+        "en": "PC3 cabled to R3 (Gi0/0)"
+      },
+      "hint": {
+        "fr": "Un câble droit suffit : les ports Gigabit du 2911 croisent d'eux-mêmes (auto-MDIX).",
+        "en": "A straight cable is enough: the 2911's Gigabit ports cross over by themselves (auto-MDIX)."
+      }
+    },
+    {
+      "id": "rid-r1",
+      "type": "config",
+      "device": "R1",
+      "check": {
+        "kind": "router-id",
+        "equals": "1.1.1.1"
+      },
+      "points": 3,
+      "label": {
+        "fr": "R1 : router-id 1.1.1.1",
+        "en": "R1: router-id 1.1.1.1"
+      },
+      "hint": {
+        "fr": "router ospf 1, puis router-id 1.1.1.1. Si le processus tournait déjà : clear ip ospf process.",
+        "en": "router ospf 1, then router-id 1.1.1.1. If the process was already running: clear ip ospf process."
+      }
+    },
+    {
+      "id": "rid-r2",
+      "type": "config",
+      "device": "R2",
+      "check": {
+        "kind": "router-id",
+        "equals": "2.2.2.2"
+      },
+      "points": 3,
+      "label": {
+        "fr": "R2 : router-id 2.2.2.2",
+        "en": "R2: router-id 2.2.2.2"
+      },
+      "hint": {
+        "fr": "router ospf 1, puis router-id 2.2.2.2. Si le processus tournait déjà : clear ip ospf process.",
+        "en": "router ospf 1, then router-id 2.2.2.2. If the process was already running: clear ip ospf process."
+      }
+    },
+    {
+      "id": "rid-r3",
+      "type": "config",
+      "device": "R3",
+      "check": {
+        "kind": "router-id",
+        "equals": "3.3.3.3"
+      },
+      "points": 3,
+      "label": {
+        "fr": "R3 : router-id 3.3.3.3",
+        "en": "R3: router-id 3.3.3.3"
+      },
+      "hint": {
+        "fr": "router ospf 1, puis router-id 3.3.3.3. Si le processus tournait déjà : clear ip ospf process.",
+        "en": "router ospf 1, then router-id 3.3.3.3. If the process was already running: clear ip ospf process."
+      }
+    },
+    {
+      "id": "adj-r1r2",
+      "type": "ospf-neighbor",
+      "device": "R1",
+      "neighbor": "R2",
+      "points": 8,
+      "label": {
+        "fr": "R1 et R2 voisins OSPF (FULL)",
+        "en": "R1 and R2 are OSPF neighbours (FULL)"
+      },
+      "hint": {
+        "fr": "show ip ospf neighbor sur R1. Les deux bouts du lien doivent l'annoncer par une commande network, dans la même zone 0.",
+        "en": "show ip ospf neighbor on R1. Both ends of the link must announce it with a network command, in the same area 0."
+      }
+    },
+    {
+      "id": "adj-r1r3",
+      "type": "ospf-neighbor",
+      "device": "R1",
+      "neighbor": "R3",
+      "points": 8,
+      "label": {
+        "fr": "R1 et R3 voisins OSPF (FULL)",
+        "en": "R1 and R3 are OSPF neighbours (FULL)"
+      },
+      "hint": {
+        "fr": "show ip ospf neighbor sur R1. Les deux bouts du lien doivent l'annoncer par une commande network, dans la même zone 0.",
+        "en": "show ip ospf neighbor on R1. Both ends of the link must announce it with a network command, in the same area 0."
+      }
+    },
+    {
+      "id": "adj-r2r3",
+      "type": "ospf-neighbor",
+      "device": "R2",
+      "neighbor": "R3",
+      "points": 8,
+      "label": {
+        "fr": "R2 et R3 voisins OSPF (FULL)",
+        "en": "R2 and R3 are OSPF neighbours (FULL)"
+      },
+      "hint": {
+        "fr": "show ip ospf neighbor sur R2. Les deux bouts du lien doivent l'annoncer par une commande network, dans la même zone 0.",
+        "en": "show ip ospf neighbor on R2. Both ends of the link must announce it with a network command, in the same area 0."
+      }
+    },
+    {
+      "id": "passive-r1",
+      "type": "config",
+      "device": "R1",
+      "check": {
+        "kind": "ospf-passive",
+        "interface": "GigabitEthernet0/0"
+      },
+      "points": 3,
+      "label": {
+        "fr": "R1 : réseau des PC en interface passive",
+        "en": "R1: PC network as a passive interface"
+      },
+      "hint": {
+        "fr": "Aucun routeur derrière Gi0/0 : passive-interface g0/0 annonce le réseau sans envoyer de Hello aux PC.",
+        "en": "No router behind Gi0/0: passive-interface g0/0 announces the network without sending Hellos to the PCs."
+      }
+    },
+    {
+      "id": "passive-r2",
+      "type": "config",
+      "device": "R2",
+      "check": {
+        "kind": "ospf-passive",
+        "interface": "GigabitEthernet0/0"
+      },
+      "points": 3,
+      "label": {
+        "fr": "R2 : réseau des PC en interface passive",
+        "en": "R2: PC network as a passive interface"
+      },
+      "hint": {
+        "fr": "Aucun routeur derrière Gi0/0 : passive-interface g0/0 annonce le réseau sans envoyer de Hello aux PC.",
+        "en": "No router behind Gi0/0: passive-interface g0/0 announces the network without sending Hellos to the PCs."
+      }
+    },
+    {
+      "id": "passive-r3",
+      "type": "config",
+      "device": "R3",
+      "check": {
+        "kind": "ospf-passive",
+        "interface": "GigabitEthernet0/0"
+      },
+      "points": 3,
+      "label": {
+        "fr": "R3 : réseau des PC en interface passive",
+        "en": "R3: PC network as a passive interface"
+      },
+      "hint": {
+        "fr": "Aucun routeur derrière Gi0/0 : passive-interface g0/0 annonce le réseau sans envoyer de Hello aux PC.",
+        "en": "No router behind Gi0/0: passive-interface g0/0 announces the network without sending Hellos to the PCs."
+      }
+    },
+    {
+      "id": "route-r1-2",
+      "type": "route",
+      "device": "R1",
+      "prefix": "192.168.2.0/24",
+      "protocol": "O",
+      "points": 5,
+      "label": {
+        "fr": "R1 apprend le réseau de la salle de TP par OSPF",
+        "en": "R1 learns the lab room's network through OSPF"
+      },
+      "hint": {
+        "fr": "show ip route : la ligne doit commencer par O. Une route statique (S) ne compte pas.",
+        "en": "show ip route: the line must start with O. A static route (S) does not count."
+      }
+    },
+    {
+      "id": "route-r1-3",
+      "type": "route",
+      "device": "R1",
+      "prefix": "192.168.3.0/24",
+      "protocol": "O",
+      "points": 5,
+      "label": {
+        "fr": "R1 apprend le réseau de l'étage par OSPF",
+        "en": "R1 learns the first floor's network through OSPF"
+      },
+      "hint": {
+        "fr": "R3 doit annoncer 192.168.3.0 0.0.0.255 en zone 0.",
+        "en": "R3 must announce 192.168.3.0 0.0.0.255 in area 0."
+      }
+    },
+    {
+      "id": "route-r2-3",
+      "type": "route",
+      "device": "R2",
+      "prefix": "192.168.3.0/24",
+      "protocol": "O",
+      "points": 4,
+      "label": {
+        "fr": "R2 apprend le réseau de l'étage",
+        "en": "R2 learns the first floor's network"
+      }
+    },
+    {
+      "id": "route-r3-1",
+      "type": "route",
+      "device": "R3",
+      "prefix": "192.168.1.0/24",
+      "protocol": "O",
+      "points": 4,
+      "label": {
+        "fr": "R3 apprend le réseau de la salle technique",
+        "en": "R3 learns the technical room's network"
+      }
+    },
+    {
+      "id": "ping-13",
+      "type": "ping",
+      "to": "192.168.3.10",
+      "expect": "success",
+      "points": 7,
+      "label": {
+        "fr": "PC1 joint PC3 à l'étage",
+        "en": "PC1 reaches PC3 upstairs"
+      },
+      "hint": {
+        "fr": "Si le ping échoue, regarde show ip route sur chaque routeur du chemin, dans les deux sens.",
+        "en": "If the ping fails, check show ip route on every router of the path, both ways."
+      },
+      "from": "PC1"
+    },
+    {
+      "id": "ping-21",
+      "type": "ping",
+      "to": "192.168.1.10",
+      "expect": "success",
+      "points": 5,
+      "label": {
+        "fr": "PC2 joint PC1 dans la salle technique",
+        "en": "PC2 reaches PC1 in the technical room"
+      },
+      "from": "PC2"
+    },
+    {
+      "id": "saved-r1",
+      "type": "saved",
+      "device": "R1",
+      "points": 2,
+      "label": {
+        "fr": "Configuration de R1 sauvegardée",
+        "en": "R1's configuration saved"
+      },
+      "hint": {
+        "fr": "copy running-config startup-config",
+        "en": "copy running-config startup-config"
+      }
+    },
+    {
+      "id": "saved-r2",
+      "type": "saved",
+      "device": "R2",
+      "points": 1,
+      "label": {
+        "fr": "Configuration de R2 sauvegardée",
+        "en": "R2's configuration saved"
+      },
+      "hint": {
+        "fr": "copy running-config startup-config",
+        "en": "copy running-config startup-config"
+      }
+    },
+    {
+      "id": "saved-r3",
+      "type": "saved",
+      "device": "R3",
+      "points": 1,
+      "label": {
+        "fr": "Configuration de R3 sauvegardée",
+        "en": "R3's configuration saved"
+      },
+      "hint": {
+        "fr": "copy running-config startup-config",
+        "en": "copy running-config startup-config"
+      }
+    }
+  ],
+  "hints": [
+    {
+      "afterSeconds": 180,
+      "text": {
+        "fr": "Brasse d'abord les trois liaisons et vérifie les voyants : OSPF ne trouvera aucun voisin sur un lien éteint.",
+        "en": "Patch the three links first and check the LEDs: OSPF finds no neighbour on a dead link."
+      }
+    },
+    {
+      "afterSeconds": 900,
+      "text": {
+        "fr": "Masque générique = inverse du masque : 255.255.255.252 devient 0.0.0.3, 255.255.255.0 devient 0.0.0.255.",
+        "en": "Wildcard = inverted mask: 255.255.255.252 becomes 0.0.0.3, 255.255.255.0 becomes 0.0.0.255."
+      }
+    }
+  ],
+  "solution": {
+    "cables": [
+      {
+        "type": "straight",
+        "a": "R1:GigabitEthernet0/1",
+        "b": "R2:GigabitEthernet0/1"
+      },
+      {
+        "type": "straight",
+        "a": "R1:GigabitEthernet0/2",
+        "b": "R3:GigabitEthernet0/1"
+      },
+      {
+        "type": "straight",
+        "a": "R2:GigabitEthernet0/2",
+        "b": "R3:GigabitEthernet0/2"
+      },
+      {
+        "type": "straight",
+        "a": "PC1:FastEthernet0",
+        "b": "R1:GigabitEthernet0/0"
+      },
+      {
+        "type": "straight",
+        "a": "PC2:FastEthernet0",
+        "b": "R2:GigabitEthernet0/0"
+      },
+      {
+        "type": "straight",
+        "a": "PC3:FastEthernet0",
+        "b": "R3:GigabitEthernet0/0"
+      }
+    ],
+    "commands": {
+      "R1": [
+        "configure terminal",
+        "router ospf 1",
+        "router-id 1.1.1.1",
+        "network 192.168.1.0 0.0.0.255 area 0",
+        "network 10.0.12.0 0.0.0.3 area 0",
+        "network 10.0.13.0 0.0.0.3 area 0",
+        "passive-interface g0/0",
+        "end",
+        "clear ip ospf process",
+        "yes",
+        "copy running-config startup-config",
+        ""
+      ],
+      "R2": [
+        "configure terminal",
+        "router ospf 1",
+        "router-id 2.2.2.2",
+        "network 192.168.2.0 0.0.0.255 area 0",
+        "network 10.0.12.0 0.0.0.3 area 0",
+        "network 10.0.23.0 0.0.0.3 area 0",
+        "passive-interface g0/0",
+        "end",
+        "clear ip ospf process",
+        "yes",
+        "copy running-config startup-config",
+        ""
+      ],
+      "R3": [
+        "configure terminal",
+        "router ospf 1",
+        "router-id 3.3.3.3",
+        "network 192.168.3.0 0.0.0.255 area 0",
+        "network 10.0.13.0 0.0.0.3 area 0",
+        "network 10.0.23.0 0.0.0.3 area 0",
+        "passive-interface g0/0",
+        "end",
+        "clear ip ospf process",
+        "yes",
+        "copy running-config startup-config",
+        ""
+      ]
+    }
+  }
+}

@@ -32,8 +32,8 @@
     { "id": "PP-ADM", "room": "etage" }
   ],
   "patchLinks": [
-    { "a": "PP-TECH:P1", "b": "PP-TP:P1", "label": { "fr": "vers la salle de TP", "en": "to the lab room" } },
-    { "a": "PP-TECH:P2", "b": "PP-ADM:P1", "label": { "fr": "vers l'étage", "en": "to the first floor" } }
+    { "a": "PP-TECH:P1", "b": "PP-TP:P1", "label": { "fr": "vers la salle de TP", "en": "to the lab room" }, "labelB": { "fr": "vers la salle technique", "en": "to the technical room" } },
+    { "a": "PP-TECH:P2", "b": "PP-ADM:P1", "label": { "fr": "vers l'étage", "en": "to the first floor" }, "labelB": { "fr": "vers la salle technique", "en": "to the technical room" } }
   ],
   "inventory": { "cables": { "straight": 10, "crossover": 2, "console": 3 } },
   "initial": {

@@ -65,7 +65,8 @@ export interface Level {
    * link between panels make one cable in the `Network`.
    */
   panels?: { id: string; room?: 'annexe' | 'etage' }[];
-  patchLinks?: { a: string; b: string; label: Text }[];
+  /** `label` is printed beside the `a` port, `labelB` (where the cabling goes from the other end) beside `b`. */
+  patchLinks?: { a: string; b: string; label: Text; labelB?: Text }[];
 }
 
 export function parseEnd(text: string): CableEnd {

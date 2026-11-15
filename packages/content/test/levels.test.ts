@@ -6,7 +6,7 @@ const resultOf = (net: Network, level: Level, id: string) => evaluate(net, level
 
 describe('MVP campaign', () => {
   it('has its levels in order', () => {
-    expect(campaign.map((l) => l.id)).toEqual(['l01-cablage-console', 'l02-relier-deux-reseaux', 'l03-deux-salles-vlan', 'l04-reseau-du-batiment']);
+    expect(campaign.map((l) => l.id)).toEqual(['l01-cablage-console', 'l02-relier-deux-reseaux', 'l03-deux-salles-vlan', 'l04-reseau-du-batiment', 'l05-routage-ospf']);
   });
 
   for (const level of campaign) {
@@ -157,5 +157,39 @@ describe('level 4: the building', () => {
   it('has patch links between panels that exist', () => {
     const ids = level.panels!.map((p) => p.id);
     for (const link of level.patchLinks!) for (const end of [link.a, link.b]) expect(ids).toContain(end.split(':')[0]);
+  });
+});
+
+describe('level 5: dynamic routing', () => {
+  const level = campaign[4]!;
+  const withCommands = (commands: Record<string, string[]>): Level => ({ ...level, solution: { ...level.solution, commands: { ...level.solution.commands, ...commands } } });
+
+  it('keeps every room reachable when one side of the triangle is cut', () => {
+    const net = buildLevel(level);
+    applySolution(net, level);
+    net.disconnect({ device: 'R1', port: 'GigabitEthernet0/2' });
+    expect(resultOf(net, level, 'adj-r1r3')).toMatchObject({ passed: false, reason: 'no-neighbor' });
+    expect(resultOf(net, level, 'route-r1-3').passed).toBe(true);
+    expect(resultOf(net, level, 'ping-13').passed).toBe(true);
+  });
+
+  it('does not count a static route as learnt through OSPF', () => {
+    const net = buildLevel(level);
+    applySolution(net, withCommands({ R3: ['configure terminal', 'ip route 192.168.1.0 255.255.255.0 10.0.13.1', 'end'] }));
+    expect(resultOf(net, level, 'route-r3-1')).toMatchObject({ passed: false, reason: 'no-route' });
+    expect(resultOf(net, level, 'adj-r1r3').passed).toBe(false);
+  });
+
+  it('sees a forgotten passive interface and a router ID that never took effect', () => {
+    const net = buildLevel(level);
+    const r2 = level.solution.commands.R2!.filter((c) => !c.startsWith('passive') && !c.startsWith('clear') && c !== 'yes');
+    applySolution(net, withCommands({ R2: r2 }));
+    expect(resultOf(net, level, 'passive-r2').passed).toBe(false);
+    expect(resultOf(net, level, 'rid-r2').passed).toBe(false);
+    expect(resultOf(net, level, 'adj-r1r2').passed).toBe(true);
+  });
+
+  it('labels both ends of every building cable', () => {
+    for (const link of level.patchLinks!) expect(link.labelB, link.b).toBeDefined();
   });
 });

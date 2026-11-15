@@ -15,7 +15,11 @@ export type ConfigCheck =
   | { kind: 'interface-ip'; interface: string; ip: string; mask: string }
   | { kind: 'clock-rate'; interface: string }
   | { kind: 'access-vlan'; interface: string; vlan: number }
-  | { kind: 'trunk'; interface: string };
+  | { kind: 'trunk'; interface: string }
+  /** The interface takes part in OSPF but sends no Hello (a LAN with no router behind it). */
+  | { kind: 'ospf-passive'; interface: string }
+  /** The OSPF process runs with this router ID. */
+  | { kind: 'router-id'; equals: string };
 
 interface Base {
   id: string;
@@ -36,6 +40,8 @@ export type Objective = Base &
     | { type: 'route'; device: string; prefix: string; protocol?: RouteCode }
     | { type: 'saved'; device: string }
     | { type: 'dhcp-lease'; device: string; network: string; mask: string }
+    /** `device` and `neighbor` are OSPF neighbours, adjacency FULL. */
+    | { type: 'ospf-neighbor'; device: string; neighbor: string }
   );
 
 /** Why an objective failed, as a stable code the interface translates. */
@@ -51,7 +57,8 @@ export type FailureReason =
   | 'reachable'
   | 'unexpected-result'
   | 'no-route'
-  | 'not-saved';
+  | 'not-saved'
+  | 'no-neighbor';
 
 export interface ObjectiveResult {
   id: string;
@@ -117,6 +124,10 @@ function check(net: Network, o: Objective): Omit<ObjectiveResult, 'id' | 'points
             return config.interfaces.find((i) => i.name === c.interface)?.switchport?.accessVlan === c.vlan;
           case 'trunk':
             return config.interfaces.find((i) => i.name === c.interface)?.switchport?.mode === 'trunk';
+          case 'ospf-passive':
+            return net.ospf.view(o.device)?.interfaces.find((i) => i.name === c.interface)?.passive === true;
+          case 'router-id':
+            return net.ospf.activeRouterId(o.device) === c.equals;
         }
       })();
       return has ? ok : fail('missing-config');
@@ -147,6 +158,11 @@ function check(net: Network, o: Objective): Omit<ObjectiveResult, 'id' | 'points
       const host = net.device(o.device).host;
       if (!host?.dhcp || !host.ip || !host.mask) return fail('missing-config');
       return networkOf(host.ip, host.mask) === o.network && host.mask === o.mask ? ok : fail('missing-config');
+    }
+    case 'ospf-neighbor': {
+      const id = net.ospf.activeRouterId(o.neighbor);
+      const full = net.ospf.view(o.device)?.interfaces.some((i) => i.neighbors.some((n) => n.routerId === id && n.state === 'FULL'));
+      return id !== null && full ? ok : fail('no-neighbor');
     }
     case 'saved': {
       const cli = net.device(o.device).cli;
