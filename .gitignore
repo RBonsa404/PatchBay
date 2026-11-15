@@ -21,3 +21,7 @@ __pycache__/
 # Scène exportée pour le précalcul de la lumière (régénérée par tools/bake)
 art/bake/
 art/qa/
+apps/web/public/models/people/
+
+# Local state of `wrangler dev`
+.wrangler/

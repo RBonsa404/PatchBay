@@ -1,6 +1,9 @@
 import { onRequestPost } from './api/aicha.js';
+import { classesRequest, type ClassesEnv } from './api/classes.js';
 
-interface Env {
+export { Classroom } from './api/classes.js';
+
+interface Env extends ClassesEnv {
   DEEPSEEK_API_KEY?: string;
   DEEPSEEK_BASE_URL?: string;
   DEEPSEEK_MODEL?: string;
@@ -11,6 +14,7 @@ interface Env {
 export default {
   fetch(request: Request, env: Env): Promise<Response> | Response {
     const { pathname } = new URL(request.url);
+    if (pathname === '/api/classes' || pathname.startsWith('/api/classes/')) return classesRequest(request, env);
     if (pathname !== '/api/aicha') return env.ASSETS.fetch(request);
     if (request.method !== 'POST') return new Response(null, { status: 405, headers: { Allow: 'POST' } });
     return onRequestPost({ request, env });

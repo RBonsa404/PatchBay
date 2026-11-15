@@ -1,5 +1,5 @@
 import { sound } from '../audio.js';
-import { ArrowLeft, ArrowRight, ChevronRight, Compass, GraduationCap, LayoutList, Lock, Play, RotateCcw, Settings, Star, Timer, Trophy } from 'lucide';
+import { ArrowLeft, ArrowRight, ChevronRight, Compass, GraduationCap, LayoutList, Lock, Play, RotateCcw, School, Settings, Star, Timer, Trophy } from 'lucide';
 import type { Level } from '@patchbay/sim-core';
 import { clock, type Grade } from '../game/scoring.js';
 import { tourSeen } from '../game/tour.js';
@@ -55,7 +55,7 @@ const button = (label: string, onclick: () => void, kind = '', glyph?: Parameter
   h('button', { class: `btn ${kind}`, onclick }, glyph && !after ? icon(glyph) : null, h('span', {}, label), glyph && after ? icon(glyph) : null);
 
 /** Title: the room in the background, the game's name and menu on the left, the club at the bottom. */
-export function showTitle(onPlay: () => void, onMissions: () => void, onSettings?: () => void, onTour?: () => void): void {
+export function showTitle(onPlay: () => void, onMissions: () => void, onSettings?: () => void, onTour?: () => void, onClass?: () => void, className?: string): void {
   const newcomer = !tourSeen() && progress.best('l01-cablage-console') === null;
   const screen: HTMLElement = h(
     'div',
@@ -74,6 +74,9 @@ export function showTitle(onPlay: () => void, onMissions: () => void, onSettings
           ? h('button', { class: `menu-item${newcomer ? ' suggested' : ''}`, onclick: () => void leave(screen).then(onTour) }, icon(Compass, 20), h('span', {}, t('title.tour'), newcomer ? h('small', {}, t('title.tourNew')) : null), icon(ChevronRight, 20))
           : null,
         h('button', { class: 'menu-item', onclick: () => void leave(screen).then(onMissions) }, icon(LayoutList, 20), h('span', {}, t('title.missions')), icon(ChevronRight, 20)),
+        onClass
+          ? h('button', { class: 'menu-item', onclick: () => void leave(screen).then(onClass) }, icon(School, 20), h('span', {}, 'Ma classe', className ? h('small', {}, className) : null), icon(ChevronRight, 20))
+          : null,
         onSettings ? h('button', { class: 'menu-item', onclick: () => void leave(screen).then(onSettings) }, icon(Settings, 20), h('span', {}, t('settings.title')), icon(ChevronRight, 20)) : null,
       ),
       h('p', { class: 'muted title-note' }, t('title.network')),
@@ -174,7 +177,8 @@ export function showMissions(levels: Level[], onPick: (level: Level) => void, on
 }
 
 /** Mission order: Aïcha's message, the work order and what will be checked. */
-export function showBriefing(level: Level, index: number, onStart: () => void, onBack: () => void, onExam?: () => void): void {
+/** `examOnly`: a homework given as an exam, which starts only as one. */
+export function showBriefing(level: Level, index: number, onStart: () => void, onBack: () => void, onExam?: () => void, examOnly = false): void {
   const screen: HTMLElement = h(
     'div',
     { class: 'screen screen-center' },
@@ -186,7 +190,7 @@ export function showBriefing(level: Level, index: number, onStart: () => void, o
         ? h('div', { class: 'mentor-line' }, mentorPortrait(), h('div', {}, h('strong', {}, `${MENTOR.name} · ${MENTOR.role}`), h('p', {}, tx(level.story))))
         : null,
       h('section', {}, h('h3', {}, t('briefing.order')), h('div', { class: 'brief' }, tx(level.brief))),
-      h('p', { class: 'time-line' }, icon(Timer, 16), h('span', { style: { whiteSpace: 'nowrap' } }, `${t('briefing.time')} : ${clock(level.timeLimit ?? 600)}`), h('small', {}, onExam ? t('exam.note') : '')),
+      h('p', { class: 'time-line' }, icon(Timer, 16), h('span', { style: { whiteSpace: 'nowrap' } }, `${t('briefing.time')} : ${clock(level.timeLimit ?? 600)}`), h('small', {}, onExam || examOnly ? t('exam.note') : '')),
       h(
         'section',
         {},
@@ -198,7 +202,7 @@ export function showBriefing(level: Level, index: number, onStart: () => void, o
         {},
         button(t('briefing.back'), () => void leave(screen).then(onBack), 'ghost', ArrowLeft),
         onExam ? button(t('exam.start'), () => void leave(screen).then(onExam), 'ghost', GraduationCap) : null,
-        button(t('briefing.start'), () => void leave(screen).then(onStart), 'primary', ArrowRight, true),
+        button(examOnly ? t('exam.start') : t('briefing.start'), () => void leave(screen).then(onStart), 'primary', examOnly ? GraduationCap : ArrowRight, true),
       ),
     ),
   );

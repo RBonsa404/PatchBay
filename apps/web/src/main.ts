@@ -9,6 +9,7 @@ import { campaign, tour, TOUR_LEVEL } from '@patchbay/content';
 import { catalog, type Level } from '@patchbay/sim-core';
 import { sound } from './audio.js';
 import { startGamepad } from './game/gamepad.js';
+import { classroom } from './game/classroom.js';
 import { Mission } from './game/mission.js';
 import { buildDevice, rackOccupied } from './scene/devices.js';
 import { loadGear } from './scene/gear.js';
@@ -19,6 +20,7 @@ import { detectQuality, Stage } from './scene/stage.js';
 import { tx } from './i18n.js';
 import { h } from './ui/dom.js';
 import { panorama } from './scene/outside.js';
+import { showClassroom } from './ui/classroom.js';
 import { showSettings } from './ui/pause.js';
 import { randomTip } from './ui/tips.js';
 import { progress, showBriefing, showMissions, showResults, showTitle } from './ui/screens.js';
@@ -99,7 +101,14 @@ function endShowcase(): void {
 
 function title(): void {
   showcase();
-  showTitle(() => briefing(firstUnfinished()), missions, () => showSettings(stage, title), visit);
+  const member = classroom.membership();
+  showTitle(() => briefing(firstUnfinished()), missions, () => showSettings(stage, title), visit, myClass, member?.className);
+}
+
+/** The student's homework or the teacher's board. */
+function myClass(): void {
+  showcase();
+  showClassroom(campaign, { play: (index, exam) => briefing(index, exam ? 'exam' : 'practice'), back: title });
 }
 
 function missions(): void {
@@ -112,10 +121,13 @@ function firstUnfinished(): number {
   return i < 0 ? 0 : i;
 }
 
-function briefing(index: number): void {
+/** A homework's mode shows only its own start button; from the course, both. */
+function briefing(index: number, mode?: 'practice' | 'exam'): void {
   showcase();
   const level = campaign[index] as Level;
-  showBriefing(level, index, () => play(index), missions, () => play(index, true));
+  const back = mode ? myClass : missions;
+  if (mode === 'exam') showBriefing(level, index, () => play(index, true), back, undefined, true);
+  else showBriefing(level, index, () => play(index), back, mode ? undefined : () => play(index, true));
 }
 
 /** The guided tour of the equipment, in the building of the mission where every kind of it is found. */
@@ -143,6 +155,10 @@ function play(index: number, exam = false, guided = false): void {
         complete: (result) => {
           if (exam) progress.recordExam(level.id, result.total);
           else progress.record(level.id, result.total);
+          // Guided tours are not marked; a student's result goes to their class, or waits for the network.
+          if (!guided && classroom.membership()?.role === 'student') {
+            void classroom.report(level.id, exam, result).then((sent) => notify(sent ? 'Résultat envoyé à ta classe.' : 'Résultat gardé : il partira vers ta classe dès que le réseau reviendra.'));
+          }
           const next = index + 1 < campaign.length ? () => briefing(index + 1) : undefined;
           showResults(level, result, { ...(next ? { next } : {}), retry: () => play(index, exam), menu: missions });
         },
@@ -181,6 +197,10 @@ if (import.meta.env.DEV) {
     },
   };
 }
+
+// Results that waited for the network leave as soon as it is back.
+void classroom.flush();
+window.addEventListener('online', () => void classroom.flush());
 
 // The equipment's models come first: every room built afterwards uses them.
 void Promise.all([loadGear(), lightmaps]).finally(() => {

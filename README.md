@@ -56,6 +56,7 @@ Trois principes guident le projet :
 | Réseau | VLAN, trunk 802.1Q, router-on-a-stick, routage statique, OSPF, ACL, NAT, DHCP, ARP, ICMP |
 | Poste client | invite de commandes : `ipconfig`, `ipconfig /renew`, `ping`, `tracert`, `arp -a` |
 | Évaluation | chrono, note sur 100 (objectifs et rapidité), rangs S à D, trois étoiles, mode examen, note de propreté du câblage |
+| Classes | « Ma classe » : le professeur ouvre une classe (code à donner aux étudiants, clé personnelle), choisit les missions à faire en entraînement ou en examen avec une date limite, suit le meilleur essai de chaque étudiant et exporte les notes en CSV ; les résultats partent à la fin de chaque mission, et attendent le réseau s'il manque |
 | Accompagnement | tutoriel guidé, indices, schéma de la mission au tableau blanc, Aïcha qui répond avec sa fiche hors ligne, et avec une IA en option |
 | Visualisation | paquets animés sur les câbles : ARP, requêtes, réponses, erreurs, DHCP |
 | Éclairage | lumière des salles précalculée dans Blender (Cycles) : dalles LED, fenêtres, rebonds de lumière ; seules les lumières utiles au matériel restent en temps réel |
@@ -133,11 +134,11 @@ Le jeu s'ouvre sur http://127.0.0.1:5180.
 
 ## Tests et contrôles qualité
 
-289 tests couvrent le moteur et les missions : sessions IOS comparées à des sorties de référence, commutation, routage, OSPF, ACL, NAT, DHCP, et résolution complète de chaque mission. GitHub Actions les relance à chaque envoi, avec le contrôle des types, l'analyse statique et la construction.
+298 tests couvrent le moteur, les missions et le serveur des classes : sessions IOS comparées à des sorties de référence, commutation, routage, OSPF, ACL, NAT, DHCP, et résolution complète de chaque mission. GitHub Actions les relance à chaque envoi, avec le contrôle des types, l'analyse statique et la construction.
 
 ## Déploiement
 
-Le jeu est un site statique. Le guide pas à pas pour le publier gratuitement est dans [docs/08-deploiement.md](docs/08-deploiement.md).
+Le jeu est un site statique, servi par un Worker Cloudflare qui porte aussi l'API d'Aïcha et celle des classes (un Durable Object avec stockage SQLite par classe, inclus dans l'offre gratuite, créé automatiquement au déploiement par `wrangler.jsonc`). Le guide pas à pas pour le publier gratuitement est dans [docs/08-deploiement.md](docs/08-deploiement.md).
 
 | Réglage | Valeur |
 |---|---|
@@ -155,7 +156,7 @@ PatchBay/
 ├── packages/
 │   ├── sim-core/       le moteur de simulation et ses tests
 │   └── content/        les missions et leur schéma
-├── functions/        l'API d'Aïcha (Cloudflare Workers ou Pages), facultative
+├── functions/        le Worker : API d'Aïcha (facultative) et des classes
 ├── docs/               vision, spécifications, décisions, captures
 └── .github/workflows/  intégration continue
 ```

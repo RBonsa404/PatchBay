@@ -1,5 +1,6 @@
 {
-  // Deployment on Cloudflare Workers: the game's static files, and Aïcha's online answers at /api/aicha.
+  // Deployment on Cloudflare Workers: the game's static files, Aïcha's online answers at /api/aicha, and the classes
+  // (teachers, students, results) at /api/classes, one Durable Object with SQLite storage per class (free plan).
   "name": "patchbay",
   "compatibility_date": "2026-10-01",
   "main": "functions/worker.ts",
@@ -7,5 +8,9 @@
     "directory": "apps/web/dist",
     "binding": "ASSETS",
     "run_worker_first": ["/api/*"]
-  }
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "CLASSROOMS", "class_name": "Classroom" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Classroom"] }]
 }
