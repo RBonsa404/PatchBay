@@ -236,6 +236,7 @@ const ROUTER_SIZE: Record<string, [w: number, h: number, d: number, label: strin
 
 function buildRouter(id: string, model: DeviceModel, m: Materials, view: DeviceView): void {
   const [w, h, d, name] = ROUTER_SIZE[model.id] ?? [0.4, 0.06, 0.3, model.label];
+  if (buildFromGear(model.id === 'cisco-1841' ? 'router-1841' : 'router-2911', id, model, m, view, `${id} · ${name}`)) return;
   const chassis = roundedChassis(w, h, d, m.chassis);
   chassis.position.y = h / 2;
   const front = mesh(new THREE.BoxGeometry(w - 0.004, h - 0.004, 0.003), m.panel, false);
@@ -301,8 +302,8 @@ function buildRouter(id: string, model: DeviceModel, m: Materials, view: DeviceV
 
 /** A socket that is part of a Blender model: only what the game adds to it (its light, its pick box, its mouth). */
 function modelSocket(parent: THREE.Object3D, m: Materials, device: string, spec: PortSpec, at: THREE.Vector3, led: THREE.Vector3 | null): PortView {
-  const [w, h] = [0.0117, 0.01];
   const plain = spec.kind === 'serial' || spec.kind === 'rs232';
+  const [w, h] = spec.kind === 'serial' ? [0.022, 0.008] : [0.0117, 0.01];
   // The marker stands 4 mm in front of the socket's face.
   const socket = new THREE.Mesh(new THREE.PlaneGeometry(w, h), socketLight('hover', plain));
   socket.position.set(at.x, at.y, at.z - 0.0035);
@@ -331,7 +332,7 @@ function buildFromGear(name: GearName, id: string, model: DeviceModel, m: Materi
   const markers = new Map<string, THREE.Object3D>();
   copy.traverse((o) => {
     const label = (o.userData.name as string | undefined) ?? o.name;
-    if (label.startsWith('port:') || label.startsWith('led:')) markers.set(label, o);
+    if (label.startsWith('port:') || label.startsWith('led:') || label === 'tag') markers.set(label, o);
     else if ((o as THREE.Mesh).isMesh) {
       o.castShadow = true;
       o.receiveShadow = true;
@@ -345,8 +346,10 @@ function buildFromGear(name: GearName, id: string, model: DeviceModel, m: Materi
     const led = markers.get(`led:${spec.name}`);
     view.ports.set(spec.name, modelSocket(view.root, m, id, spec, local(at), led ? local(led) : null));
   }
-  // The hostname on a printed tag, in the blank space between the console and the ports.
-  label(view.root, tag, -view.width / 2 + 0.13, view.height * 0.62, view.depth / 2, 0.07, 0.012, '#0f172a');
+  // The hostname on a printed tag, where the model marks it (else between the console and the ports).
+  const spot = markers.get('tag');
+  const at = spot ? local(spot) : new THREE.Vector3(-view.width / 2 + 0.13, view.height * 0.62, view.depth / 2);
+  label(view.root, tag, at.x, at.y, view.depth / 2, 0.07, 0.012, '#0f172a');
   return true;
 }
 

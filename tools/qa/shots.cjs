@@ -7,6 +7,7 @@ const TAG = process.argv[3] || 'r';
 const VIEWS = {
   rack: [0, 1.05, Math.PI, -0.12, 0, 2.6],
   switch: [0, 0.85, Math.PI, -0.18, 0, 4.2],
+  router: [0, 0.7, Math.PI, -0.62, 0, 3.0],
   bench: [-0.2, 1.1, Math.PI - 0.5, -0.55, 0, 1.6],
   room: [2.7, 3.0, Math.PI + 0.72, -0.2, 0],
   back: [0.6, 0.95, 0.3, -0.12, 0],

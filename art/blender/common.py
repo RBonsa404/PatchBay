@@ -126,6 +126,13 @@ def marker(name, at, parent=None):
     return e
 
 
+def attach(child, parent):
+    """Parent `child` to `parent` without moving it: its world position stays where it was placed."""
+    parent_matrix = parent.matrix_world.copy()
+    child.parent = parent
+    child.matrix_parent_inverse = parent_matrix.inverted()
+
+
 def join(objects, name):
     """Merge meshes that share a fate into one object (fewer draw calls in the game)."""
     for o in bpy.context.selected_objects:

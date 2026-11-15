@@ -135,8 +135,9 @@ for name in ('GigabitEthernet0/1', 'GigabitEthernet0/2'):
     details.append(c.box(f'port-led-{name}', (3.0 * mm, 0.8 * mm, 1.5 * mm), (x, face - 0.1 * mm, z + 12.8 * mm), M['led-off']))
 
 body = c.join([case, bezel, recess, *details, *labels], 'Catalyst-2960-24TT')
+markers.append(c.marker('tag', (x_mm(135), face - 0.2 * mm, 27 * mm)))
 for m in markers:
-    m.parent = body
+    c.attach(m, body)
 
 out = c.args()
 c.export_glb(out[0])
