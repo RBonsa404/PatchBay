@@ -6,7 +6,7 @@ const resultOf = (net: Network, level: Level, id: string) => evaluate(net, level
 
 describe('MVP campaign', () => {
   it('has its levels in order', () => {
-    expect(campaign.map((l) => l.id)).toEqual(['l01-cablage-console', 'l02-relier-deux-reseaux', 'l03-deux-salles-vlan', 'l04-reseau-du-batiment', 'l05-routage-ospf']);
+    expect(campaign.map((l) => l.id)).toEqual(['l01-cablage-console', 'l02-relier-deux-reseaux', 'l03-deux-salles-vlan', 'l04-reseau-du-batiment', 'l05-routage-ospf', 'l06-acces-internet']);
   });
 
   for (const level of campaign) {
@@ -191,5 +191,40 @@ describe('level 5: dynamic routing', () => {
 
   it('labels both ends of every building cable', () => {
     for (const link of level.patchLinks!) expect(link.labelB, link.b).toBeDefined();
+  });
+});
+
+describe('level 6: reaching the Internet', () => {
+  const level = campaign[5]!;
+  const r1 = level.solution.commands.R1!;
+  const withR1 = (commands: string[]): Level => ({ ...level, solution: { ...level.solution, commands: { R1: commands } } });
+
+  it('loses the replies without address translation', () => {
+    const net = buildLevel(level);
+    applySolution(net, withR1(r1.filter((c) => !c.startsWith('ip nat inside source'))));
+    expect(resultOf(net, level, 'web-pat')).toMatchObject({ passed: false, reason: 'unexpected-result' });
+    expect(resultOf(net, level, 'ping-ext').passed).toBe(false);
+    expect(resultOf(net, level, 'default-route').passed).toBe(true);
+  });
+
+  it('lets the club browse with PAT alone, but keeps its server hidden without the static entry', () => {
+    const net = buildLevel(level);
+    applySolution(net, withR1(r1.filter((c) => !c.includes('source static'))));
+    expect(resultOf(net, level, 'web-pat').passed).toBe(true);
+    expect(resultOf(net, level, 'srv-static').passed).toBe(false);
+  });
+
+  it('never reaches a private address from the Internet', () => {
+    const net = buildLevel(level);
+    applySolution(net, level);
+    expect(net.tcpConnect('EXT', '192.168.10.5', 80)).not.toBe('open');
+  });
+
+  it('catches the serial cable plugged the wrong way round', () => {
+    const net = buildLevel(level);
+    applySolution(net, { ...level, solution: { ...level.solution, cables: level.solution.cables.slice(1) } });
+    net.connect('serial', { device: 'R1', port: 'Serial0/0/0' }, { device: 'FAI', port: 'Serial0/0/0' });
+    expect(resultOf(net, level, 'cable-serial')).toMatchObject({ passed: false, reason: 'serial-reversed' });
+    expect(resultOf(net, level, 'serial-up').passed).toBe(false);
   });
 });

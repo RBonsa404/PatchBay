@@ -19,7 +19,9 @@ export type ConfigCheck =
   /** The interface takes part in OSPF but sends no Hello (a LAN with no router behind it). */
   | { kind: 'ospf-passive'; interface: string }
   /** The OSPF process runs with this router ID. */
-  | { kind: 'router-id'; equals: string };
+  | { kind: 'router-id'; equals: string }
+  /** `ip nat inside` or `ip nat outside` on the interface. */
+  | { kind: 'nat-role'; interface: string; role: 'inside' | 'outside' };
 
 interface Base {
   id: string;
@@ -128,6 +130,8 @@ function check(net: Network, o: Objective): Omit<ObjectiveResult, 'id' | 'points
             return net.ospf.view(o.device)?.interfaces.find((i) => i.name === c.interface)?.passive === true;
           case 'router-id':
             return net.ospf.activeRouterId(o.device) === c.equals;
+          case 'nat-role':
+            return config.interfaces.find((i) => i.name === c.interface)?.natRole === c.role;
         }
       })();
       return has ? ok : fail('missing-config');

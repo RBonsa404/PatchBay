@@ -94,7 +94,7 @@ const CHAPTERS: { title: string; tier: string; topics: string; levels: string[] 
   { title: 'Commutation et VLAN', tier: 'Intermédiaire', topics: 'Switchs, VLAN, trunk 802.1Q', levels: ['l03-deux-salles-vlan'] },
   { title: 'Le réseau du bâtiment', tier: 'Intermédiaire', topics: 'Brassage, routage inter-VLAN, DHCP, plusieurs étages', levels: ['l04-reseau-du-batiment'] },
   { title: 'Routage dynamique', tier: 'Avancé', topics: 'OSPF à zone unique, voisins, coûts', levels: ['l05-routage-ospf'] },
-  { title: 'Services et accès Internet', tier: 'Avancé', topics: 'NAT et PAT, DHCP centralisé, DNS', levels: [] },
+  { title: 'Services et accès Internet', tier: 'Avancé', topics: 'NAT et PAT, DHCP centralisé, DNS', levels: ['l06-acces-internet'] },
   { title: 'Sécuriser le réseau', tier: 'Avancé', topics: 'Listes de contrôle d’accès, SSH, sécurité des ports', levels: [] },
   { title: 'Multi-sites', tier: 'Expert', topics: 'Sites distants, liaisons longue distance, OSPF entre sites', levels: [] },
   { title: 'Dépannage expert', tier: 'Expert', topics: 'Pannes à trouver et réparer, sur tout le campus', levels: [] },

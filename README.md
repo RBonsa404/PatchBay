@@ -70,6 +70,7 @@ Trois principes guident le projet :
 | 3 | Deux salles, deux VLAN | salle technique et salle de TP | VLAN, trunks, routage inter-VLAN | 25 min |
 | 4 | Le réseau du bâtiment | rez-de-chaussée et étage | brassage, trois switches, DHCP par VLAN | 45 min |
 | 5 | Le routage dynamique | les trois salles | OSPF à zone unique, router-id, voisins, interfaces passives, triangle redondant | 40 min |
+| 6 | L'accès à Internet | salle technique | liaison vers le FAI, route par défaut, DHCP avec DNS, PAT, NAT statique | 35 min |
 
 Chaque mission existe aussi en mode examen : 30 % de temps en moins, sans indice ni assistant, objectifs non cochés.
 
@@ -129,7 +130,7 @@ Le jeu s'ouvre sur http://127.0.0.1:5180.
 
 ## Tests et contrôles qualité
 
-249 tests couvrent le moteur et les missions : sessions IOS comparées à des sorties de référence, commutation, routage, OSPF, ACL, NAT, DHCP, et résolution complète de chaque mission. GitHub Actions les relance à chaque envoi, avec le contrôle des types, l'analyse statique et la construction.
+258 tests couvrent le moteur et les missions : sessions IOS comparées à des sorties de référence, commutation, routage, OSPF, ACL, NAT, DHCP, et résolution complète de chaque mission. GitHub Actions les relance à chaque envoi, avec le contrôle des types, l'analyse statique et la construction.
 
 ## Déploiement
 

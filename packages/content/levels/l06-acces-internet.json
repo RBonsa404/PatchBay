@@ -1,0 +1,482 @@
+{
+  "id": "l06-acces-internet",
+  "version": 1,
+  "title": {
+    "fr": "L'accès à Internet",
+    "en": "Reaching the Internet"
+  },
+  "story": {
+    "fr": "Le club a enfin son abonnement Internet. Le fournisseur d'accès a livré son routeur dans notre salle technique, avec une liaison série et un petit bloc de six adresses publiques. Problème : nos PC ont des adresses privées, qu'Internet ne sait pas joindre. À toi de faire de R1 la porte de sortie du club : adresses distribuées automatiquement, traduction d'adresses pour tout le monde, et une adresse publique fixe pour publier le site du club.",
+    "en": "The club finally has its Internet subscription. The provider delivered its router into our technical room, with a serial line and a small block of six public addresses. Trouble is, our PCs have private addresses the Internet cannot reach. Make R1 the club's way out: addresses handed out automatically, address translation for everyone, and one fixed public address to publish the club's website."
+  },
+  "brief": {
+    "fr": "Salle technique : R1 et S1 dans la baie, PC1, le serveur web du club SRV (192.168.10.5), le routeur du FAI et un serveur qui joue Internet (203.0.113.10, web et DNS). R1 Gi0/0 est déjà en 192.168.10.1/24. Le FAI est configuré : n'y touche pas.\n1. Câble S1 Gi0/1 → R1 Gi0/0, PC1 → S1 Fa0/1, SRV → S1 Fa0/2, et la liaison série FAI S0/0/0 (DCE) → R1 S0/0/0.\n2. R1 S0/0/0 : 198.51.100.2/29 (le FAI est en .1), no shutdown. Route par défaut vers 198.51.100.1.\n3. DHCP sur R1 : adresses .1 à .10 exclues, pool CLUB (192.168.10.0/24, passerelle 192.168.10.1, DNS 203.0.113.10). Puis ipconfig /renew sur PC1.\n4. NAT : ip nat inside sur Gi0/0, ip nat outside sur S0/0/0. PAT pour le réseau 192.168.10.0/24 (liste 1) sur l'adresse de S0/0/0. NAT statique 192.168.10.5 ↔ 198.51.100.5 pour le serveur.\n5. Vérifie : PC1 ouvre http://203.0.113.10, Internet ouvre http://198.51.100.5, show ip nat translations. Sauvegarde R1.",
+    "en": "Technical room: R1 and S1 in the rack, PC1, the club web server SRV (192.168.10.5), the ISP's router and a server standing in for the Internet (203.0.113.10, web and DNS). R1 Gi0/0 is already 192.168.10.1/24. The ISP router is configured: leave it alone.\n1. Cable S1 Gi0/1 → R1 Gi0/0, PC1 → S1 Fa0/1, SRV → S1 Fa0/2, and the serial line ISP S0/0/0 (DCE) → R1 S0/0/0.\n2. R1 S0/0/0: 198.51.100.2/29 (the ISP is .1), no shutdown. Default route to 198.51.100.1.\n3. DHCP on R1: .1 to .10 excluded, pool CLUB (192.168.10.0/24, gateway 192.168.10.1, DNS 203.0.113.10). Then ipconfig /renew on PC1.\n4. NAT: ip nat inside on Gi0/0, ip nat outside on S0/0/0. PAT for 192.168.10.0/24 (list 1) on S0/0/0's address. Static NAT 192.168.10.5 ↔ 198.51.100.5 for the server.\n5. Check: PC1 opens http://203.0.113.10, the Internet opens http://198.51.100.5, show ip nat translations. Save R1."
+  },
+  "difficulty": 4,
+  "timeLimit": 2100,
+  "settings": {
+    "strictMdix": true
+  },
+  "devices": [
+    {
+      "id": "ADMIN",
+      "model": "pc",
+      "label": {
+        "fr": "Portable d'administration",
+        "en": "Admin laptop"
+      },
+      "position": [
+        0,
+        0.76,
+        0.5
+      ]
+    },
+    {
+      "id": "R1",
+      "model": "cisco-2911",
+      "label": {
+        "fr": "Routeur du club",
+        "en": "Club router"
+      },
+      "position": [
+        0,
+        0.9,
+        -0.4
+      ]
+    },
+    {
+      "id": "S1",
+      "model": "catalyst-2960",
+      "label": {
+        "fr": "Switch du club",
+        "en": "Club switch"
+      },
+      "position": [
+        0,
+        1.2,
+        -0.4
+      ]
+    },
+    {
+      "id": "PC1",
+      "model": "pc",
+      "label": {
+        "fr": "PC du club",
+        "en": "Club PC"
+      },
+      "position": [
+        -1.25,
+        0.76,
+        0.42
+      ]
+    },
+    {
+      "id": "SRV",
+      "model": "server",
+      "label": {
+        "fr": "Serveur web du club",
+        "en": "Club web server"
+      },
+      "position": [
+        -0.62,
+        0.76,
+        -0.05
+      ]
+    },
+    {
+      "id": "FAI",
+      "model": "cisco-1841",
+      "label": {
+        "fr": "Routeur du fournisseur d'accès",
+        "en": "Internet provider's router"
+      },
+      "position": [
+        0.62,
+        0.76,
+        -0.05
+      ]
+    },
+    {
+      "id": "EXT",
+      "model": "server",
+      "label": {
+        "fr": "Serveur sur Internet (web et DNS)",
+        "en": "Server on the Internet (web and DNS)"
+      },
+      "position": [
+        1.25,
+        0.76,
+        0.42
+      ]
+    }
+  ],
+  "inventory": {
+    "cables": {
+      "straight": 4,
+      "crossover": 2,
+      "console": 1,
+      "serial": 1
+    }
+  },
+  "initial": {
+    "cables": [
+      {
+        "type": "crossover",
+        "a": "FAI:FastEthernet0/1",
+        "b": "EXT:FastEthernet0"
+      }
+    ],
+    "hosts": {
+      "PC1": {
+        "dhcp": true
+      },
+      "SRV": {
+        "ip": "192.168.10.5",
+        "mask": "255.255.255.0",
+        "gateway": "192.168.10.1",
+        "services": {
+          "tcp": [
+            80
+          ]
+        }
+      },
+      "EXT": {
+        "ip": "203.0.113.10",
+        "mask": "255.255.255.0",
+        "gateway": "203.0.113.1",
+        "services": {
+          "tcp": [
+            80
+          ],
+          "udp": [
+            53
+          ]
+        }
+      }
+    },
+    "commands": {
+      "R1": [
+        "enable",
+        "configure terminal",
+        "hostname R1",
+        "interface g0/0",
+        "ip address 192.168.10.1 255.255.255.0",
+        "no shutdown",
+        "end"
+      ],
+      "S1": [
+        "enable",
+        "configure terminal",
+        "hostname S1",
+        "end"
+      ],
+      "FAI": [
+        "enable",
+        "configure terminal",
+        "hostname FAI",
+        "interface s0/0/0",
+        "ip address 198.51.100.1 255.255.255.248",
+        "clock rate 64000",
+        "no shutdown",
+        "interface fa0/1",
+        "ip address 203.0.113.1 255.255.255.0",
+        "no shutdown",
+        "end",
+        "copy running-config startup-config",
+        ""
+      ]
+    }
+  },
+  "objectives": [
+    {
+      "id": "cable-serial",
+      "type": "cable",
+      "cable": {
+        "type": "serial",
+        "a": "FAI:Serial0/0/0",
+        "b": "R1:Serial0/0/0"
+      },
+      "points": 8,
+      "label": {
+        "fr": "Liaison série vers le FAI, côté DCE chez le FAI",
+        "en": "Serial link to the ISP, DCE end at the ISP"
+      },
+      "hint": {
+        "fr": "C'est le fournisseur qui donne l'horloge : l'extrémité DCE du câble se branche sur son routeur.",
+        "en": "The provider supplies the clock: the cable's DCE end goes into its router."
+      }
+    },
+    {
+      "id": "serial-up",
+      "type": "link-up",
+      "device": "R1",
+      "port": "Serial0/0/0",
+      "points": 6,
+      "label": {
+        "fr": "Liaison série active (up/up)",
+        "en": "Serial link up/up"
+      },
+      "hint": {
+        "fr": "no shutdown sur S0/0/0 de R1. Le FAI a déjà réglé son horloge.",
+        "en": "no shutdown on R1 S0/0/0. The ISP has already set its clock."
+      }
+    },
+    {
+      "id": "cable-r1",
+      "type": "cable",
+      "cable": {
+        "type": "straight",
+        "a": "S1:GigabitEthernet0/1",
+        "b": "R1:GigabitEthernet0/0"
+      },
+      "points": 3,
+      "label": {
+        "fr": "S1 relié à R1",
+        "en": "S1 cabled to R1"
+      },
+      "hint": {
+        "fr": "Switch et routeur sont différents : câble droit.",
+        "en": "A switch and a router are different: straight cable."
+      }
+    },
+    {
+      "id": "cable-pc1",
+      "type": "cable",
+      "cable": {
+        "type": "straight",
+        "a": "PC1:FastEthernet0",
+        "b": "S1:FastEthernet0/1"
+      },
+      "points": 3,
+      "label": {
+        "fr": "PC1 relié à S1 (Fa0/1)",
+        "en": "PC1 cabled to S1 (Fa0/1)"
+      }
+    },
+    {
+      "id": "cable-srv",
+      "type": "cable",
+      "cable": {
+        "type": "straight",
+        "a": "SRV:FastEthernet0",
+        "b": "S1:FastEthernet0/2"
+      },
+      "points": 3,
+      "label": {
+        "fr": "Serveur du club relié à S1 (Fa0/2)",
+        "en": "Club server cabled to S1 (Fa0/2)"
+      }
+    },
+    {
+      "id": "wan-ip",
+      "type": "config",
+      "device": "R1",
+      "check": {
+        "kind": "interface-ip",
+        "interface": "Serial0/0/0",
+        "ip": "198.51.100.2",
+        "mask": "255.255.255.248"
+      },
+      "points": 5,
+      "label": {
+        "fr": "R1 S0/0/0 en 198.51.100.2/29",
+        "en": "R1 S0/0/0 is 198.51.100.2/29"
+      },
+      "hint": {
+        "fr": "/29 = 255.255.255.248 : le FAI nous loue 6 adresses publiques, de .1 à .6.",
+        "en": "/29 = 255.255.255.248: the ISP rents us 6 public addresses, .1 to .6."
+      }
+    },
+    {
+      "id": "default-route",
+      "type": "route",
+      "device": "R1",
+      "prefix": "0.0.0.0/0",
+      "protocol": "S",
+      "points": 8,
+      "label": {
+        "fr": "Route par défaut vers le FAI",
+        "en": "Default route to the ISP"
+      },
+      "hint": {
+        "fr": "ip route 0.0.0.0 0.0.0.0 198.51.100.1 : tout ce qui n'est pas chez nous part chez le FAI.",
+        "en": "ip route 0.0.0.0 0.0.0.0 198.51.100.1: anything not ours goes to the ISP."
+      }
+    },
+    {
+      "id": "lease-pc1",
+      "type": "dhcp-lease",
+      "device": "PC1",
+      "network": "192.168.10.0",
+      "mask": "255.255.255.0",
+      "points": 10,
+      "label": {
+        "fr": "PC1 reçoit son adresse par DHCP",
+        "en": "PC1 gets its address by DHCP"
+      },
+      "hint": {
+        "fr": "ip dhcp pool CLUB, network, default-router, dns-server ; puis ipconfig /renew sur PC1.",
+        "en": "ip dhcp pool CLUB, network, default-router, dns-server; then ipconfig /renew on PC1."
+      }
+    },
+    {
+      "id": "nat-in",
+      "type": "config",
+      "device": "R1",
+      "check": {
+        "kind": "nat-role",
+        "interface": "GigabitEthernet0/0",
+        "role": "inside"
+      },
+      "points": 5,
+      "label": {
+        "fr": "Gi0/0 côté intérieur (ip nat inside)",
+        "en": "Gi0/0 on the inside (ip nat inside)"
+      }
+    },
+    {
+      "id": "nat-out",
+      "type": "config",
+      "device": "R1",
+      "check": {
+        "kind": "nat-role",
+        "interface": "Serial0/0/0",
+        "role": "outside"
+      },
+      "points": 5,
+      "label": {
+        "fr": "S0/0/0 côté extérieur (ip nat outside)",
+        "en": "S0/0/0 on the outside (ip nat outside)"
+      }
+    },
+    {
+      "id": "web-pat",
+      "type": "tcp",
+      "to": "203.0.113.10",
+      "port": 80,
+      "expect": "open",
+      "points": 17,
+      "label": {
+        "fr": "PC1 ouvre le site web sur Internet (PAT)",
+        "en": "PC1 opens the website on the Internet (PAT)"
+      },
+      "hint": {
+        "fr": "access-list 1 permit 192.168.10.0 0.0.0.255, puis ip nat inside source list 1 interface s0/0/0 overload. Le FAI ignore nos adresses privées : sans traduction, la réponse se perd.",
+        "en": "access-list 1 permit 192.168.10.0 0.0.0.255, then ip nat inside source list 1 interface s0/0/0 overload. The ISP knows nothing of our private addresses: untranslated, the reply is lost."
+      },
+      "from": "PC1"
+    },
+    {
+      "id": "ping-ext",
+      "type": "ping",
+      "to": "203.0.113.10",
+      "expect": "success",
+      "points": 8,
+      "label": {
+        "fr": "PC1 joint le serveur Internet (ping)",
+        "en": "PC1 reaches the Internet server (ping)"
+      },
+      "from": "PC1"
+    },
+    {
+      "id": "srv-static",
+      "type": "tcp",
+      "to": "198.51.100.5",
+      "port": 80,
+      "expect": "open",
+      "points": 14,
+      "label": {
+        "fr": "Le site du club est visible depuis Internet (198.51.100.5)",
+        "en": "The club's site is reachable from the Internet (198.51.100.5)"
+      },
+      "hint": {
+        "fr": "NAT statique : ip nat inside source static 192.168.10.5 198.51.100.5. Une adresse publique fixe pour le serveur, dans le bloc loué.",
+        "en": "Static NAT: ip nat inside source static 192.168.10.5 198.51.100.5. One fixed public address for the server, from the rented block."
+      },
+      "from": "EXT"
+    },
+    {
+      "id": "saved-r1",
+      "type": "saved",
+      "device": "R1",
+      "points": 5,
+      "label": {
+        "fr": "Configuration de R1 sauvegardée",
+        "en": "R1's configuration saved"
+      },
+      "hint": {
+        "fr": "copy running-config startup-config",
+        "en": "copy running-config startup-config"
+      }
+    }
+  ],
+  "hints": [
+    {
+      "afterSeconds": 180,
+      "text": {
+        "fr": "Dans l'ordre : câbles et liaison série, puis la route par défaut (ping 198.51.100.1 depuis R1), puis DHCP, enfin NAT.",
+        "en": "In order: cables and the serial line, then the default route (ping 198.51.100.1 from R1), then DHCP, finally NAT."
+      }
+    },
+    {
+      "afterSeconds": 900,
+      "text": {
+        "fr": "show ip nat translations : une ligne par conversation traduite. Vide ? Vérifie inside/outside et la liste d'accès.",
+        "en": "show ip nat translations: one line per translated conversation. Empty? Check inside/outside and the access list."
+      }
+    }
+  ],
+  "solution": {
+    "cables": [
+      {
+        "type": "serial",
+        "a": "FAI:Serial0/0/0",
+        "b": "R1:Serial0/0/0"
+      },
+      {
+        "type": "straight",
+        "a": "S1:GigabitEthernet0/1",
+        "b": "R1:GigabitEthernet0/0"
+      },
+      {
+        "type": "straight",
+        "a": "PC1:FastEthernet0",
+        "b": "S1:FastEthernet0/1"
+      },
+      {
+        "type": "straight",
+        "a": "SRV:FastEthernet0",
+        "b": "S1:FastEthernet0/2"
+      }
+    ],
+    "commands": {
+      "R1": [
+        "configure terminal",
+        "interface s0/0/0",
+        "ip address 198.51.100.2 255.255.255.248",
+        "ip nat outside",
+        "no shutdown",
+        "interface g0/0",
+        "ip nat inside",
+        "exit",
+        "ip route 0.0.0.0 0.0.0.0 198.51.100.1",
+        "ip dhcp excluded-address 192.168.10.1 192.168.10.10",
+        "ip dhcp pool CLUB",
+        "network 192.168.10.0 255.255.255.0",
+        "default-router 192.168.10.1",
+        "dns-server 203.0.113.10",
+        "exit",
+        "access-list 1 permit 192.168.10.0 0.0.0.255",
+        "ip nat inside source list 1 interface s0/0/0 overload",
+        "ip nat inside source static 192.168.10.5 198.51.100.5",
+        "end",
+        "copy running-config startup-config",
+        ""
+      ]
+    },
+    "renew": [
+      "PC1"
+    ]
+  }
+}
