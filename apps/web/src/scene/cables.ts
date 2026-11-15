@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { Cable, CableEnd, CableType } from '@patchbay/sim-core';
 import type { PortView } from './devices.js';
 import { BENCH_TOP, MANAGER, RACK, roomOrigin } from './room.js';
+import { fillet, Rope } from './rope.js';
 import type { Stage } from './stage.js';
 
 /** Cable colours: the usual workshop habits (blue straight, amber crossover, light-blue console, dark serial). */
@@ -22,23 +23,6 @@ export function portFrame(port: PortView): { point: THREE.Vector3; normal: THREE
   return { point, normal: FORWARD.clone().applyQuaternion(q) };
 }
 
-/** A hanging path: out of each port, then a sag between them that never goes through the bench (cable in hand). */
-function curveBetween(a: THREE.Vector3, na: THREE.Vector3, b: THREE.Vector3, nb: THREE.Vector3, obstacles: THREE.Box3[]): THREE.CatmullRomCurve3 {
-  const lead = 0.07;
-  const a1 = a.clone().addScaledVector(na, lead);
-  const b1 = b.clone().addScaledVector(nb, lead);
-  const span = a1.distanceTo(b1);
-  const mid = a1.clone().lerp(b1, 0.5);
-  mid.y = Math.max(Math.min(a1.y, b1.y) - 0.04 - span * 0.18, BENCH_TOP + 0.015 + roomOrigin(a.y, a.z).y);
-  mid.z = Math.max(a1.z, b1.z) + 0.04 + span * 0.05;
-  // Held over whatever stands between the two ends, rather than through it.
-  const margin = 0.02;
-  for (const box of obstacles) {
-    if (segmentHitsRect(a1, b1, box.min.x - margin, box.max.x + margin, box.min.z - margin, box.max.z + margin) !== null) mid.y = Math.max(mid.y, box.max.y + 0.04);
-  }
-  return new THREE.CatmullRomCurve3([a, a1, mid, b1, b], false, 'centripetal', 0.5);
-}
-
 /** Space between two cables lying side by side on the bench. */
 const LANE = 0.016;
 
@@ -57,14 +41,18 @@ function routeBetween(a: THREE.Vector3, na: THREE.Vector3, b: THREE.Vector3, nb:
   const highB = b.y - BENCH_TOP > 0.1;
   const offset = lane * LANE;
 
-  if (highA && highB && a1.distanceTo(b1) < 0.6) {
-    // Patch cord: along the gear to the nearest cable manager, along the manager, and back along the other device.
-    const side = (a1.x + b1.x) / 2 < RACK.x ? -1 : 1;
-    // A soft bow towards the manager, staying inside the rack's width whatever the distance between the ports.
-    const x = RACK.x + side * Math.min(MANAGER.x - 0.05, Math.max(Math.abs(a1.x), Math.abs(b1.x)) + 0.03 + (lane % 4) * 0.005);
-    const z = frontZ + 0.03;
-    const drop = 0.016 + (lane % 4) * 0.004;
-    return new THREE.CatmullRomCurve3([a, a1, new THREE.Vector3(x - side * 0.03, a1.y - drop * 0.6, z), new THREE.Vector3(x, (a1.y + b1.y) / 2 - drop, z), new THREE.Vector3(x - side * 0.03, b1.y + drop * 0.6, z), b1, b], false, 'centripetal', 0.5);
+  if (highA && highB) {
+    // Patch cord, dressed as in an enterprise rack: straight out of the port, into the horizontal cable manager
+    // between the two units, along it, and out to the other port. It never hangs across other ports; its corners
+    // bend no tighter than a cable allows. Cords share the manager side by side, each in its own lane.
+    const z = frontZ + 0.03 + (lane % 4) * 0.006;
+    const low = Math.min(a1.y, b1.y);
+    const high = Math.max(a1.y, b1.y);
+    const y = (high - low > 0.05 ? (a1.y + b1.y) / 2 : low - 0.03) + ((lane % 3) - 1) * 0.004;
+    const outA = new THREE.Vector3(a1.x, a1.y, z);
+    const outB = new THREE.Vector3(b1.x, b1.y, z);
+    const path = [a, a1, outA, new THREE.Vector3(a1.x, y, z), new THREE.Vector3(b1.x, y, z), outB, b1, b];
+    return new THREE.CatmullRomCurve3(fillet(path, 0.014, 6), false, 'centripetal', 0.5);
   }
 
   // Touch-down points on the bench, just past each port, shifted into this cable's lane.
@@ -246,9 +234,6 @@ export class CableLayer {
     return curve;
   }
 
-  private preview: THREE.Mesh | null = null;
-  private previewPlug: THREE.Group | null = null;
-
   constructor(private readonly stage: Stage) {}
 
   /** Add the cables that appeared, remove those that are gone. New cables unroll from the first port. */
@@ -359,30 +344,59 @@ export class CableLayer {
 
   /** Draw the cable in hand from `from` to the pointer; null clears it. */
   showPreview(type: CableType, from: PortView | null, pointer: THREE.Vector3 | null): void {
-    if (this.preview) {
-      this.group.remove(this.preview);
-      this.preview.geometry.dispose();
-      this.preview = null;
-    }
     if (!from || !pointer) {
-      if (this.previewPlug) this.group.remove(this.previewPlug);
-      this.previewPlug = null;
+      this.dropHand();
       return;
     }
     const a = portFrame(from);
     // The hand stays above the bench, even when the pointer aims below it.
     const hand = pointer.clone();
-    hand.y = Math.max(hand.y, BENCH_TOP + 0.02 + roomOrigin(a.point.y, a.point.z).y);
-    const curve = curveBetween(a.point, a.normal, hand, new THREE.Vector3(0, 1, 0), []);
-    this.preview = new THREE.Mesh(
-      new THREE.TubeGeometry(curve, 32, CABLE_STYLE[type].radius, 6, false),
-      new THREE.MeshStandardMaterial({ color: CABLE_STYLE[type].colour, emissive: '#38bdf8', emissiveIntensity: 0.35, transparent: true, opacity: 0.85 }),
-    );
-    this.group.add(this.preview);
-    if (!this.previewPlug) {
-      this.previewPlug = plug(type);
-      placePlug(this.previewPlug, a.point, a.normal);
-      this.group.add(this.previewPlug);
+    const floor = BENCH_TOP + 0.02 + roomOrigin(a.point.y, a.point.z).y;
+    hand.y = Math.max(hand.y, floor);
+    const start = a.point.clone().addScaledVector(a.normal, 0.03);
+    if (!this.hand || this.hand.from !== from || this.hand.type !== type) {
+      this.dropHand();
+      const material = new THREE.MeshStandardMaterial({ color: CABLE_STYLE[type].colour, emissive: '#38bdf8', emissiveIntensity: 0.3, roughness: 0.45 });
+      const mesh = new THREE.Mesh(new THREE.BufferGeometry(), material);
+      const end = plug(type);
+      const fixed = plug(type);
+      placePlug(fixed, a.point, a.normal);
+      this.group.add(mesh, end, fixed);
+      const rope = new Rope(start, hand, 1.12, 28);
+      const rest = floor - 0.02 + CABLE_STYLE[type].radius;
+      const constrain = (p: THREE.Vector3): void => {
+        if (p.y < rest) p.y = rest;
+      };
+      const stop = this.stage.onFrame((dt) => {
+        if (!this.hand) return;
+        const h = this.hand;
+        // Cable comes off the reel as the hand moves away, and stays out (it does not shorten by itself).
+        const wanted = h.start.distanceTo(h.target) * 1.12;
+        if (wanted > h.rope.length) h.rope.setLength(wanted);
+        h.rope.step(Math.min(dt, 1 / 30), h.start, h.target, constrain);
+        h.mesh.geometry.dispose();
+        h.mesh.geometry = new THREE.TubeGeometry(new THREE.CatmullRomCurve3([a.point, ...h.rope.points], false, 'centripetal', 0.5), 48, CABLE_STYLE[h.type].radius, 6, false);
+        const last = h.rope.points[h.rope.points.length - 1] as THREE.Vector3;
+        const before = h.rope.points[h.rope.points.length - 2] as THREE.Vector3;
+        placePlug(h.end, last, before.clone().sub(last).normalize());
+        this.stage.wake();
+      });
+      this.hand = { from, type, rope, mesh, end, fixed, start, target: hand, stop };
     }
+    this.hand.start.copy(start);
+    this.hand.target.copy(hand);
+    this.stage.wake();
   }
+
+  private hand: { from: PortView; type: CableType; rope: Rope; mesh: THREE.Mesh; end: THREE.Group; fixed: THREE.Group; start: THREE.Vector3; target: THREE.Vector3; stop: () => void } | null = null;
+
+  /** Put down the cable in hand. */
+  private dropHand(): void {
+    if (!this.hand) return;
+    this.hand.stop();
+    this.group.remove(this.hand.mesh, this.hand.end, this.hand.fixed);
+    this.hand.mesh.geometry.dispose();
+    this.hand = null;
+  }
+
 }
