@@ -62,8 +62,9 @@ export const COLLEAGUES: Colleague[] = [
     model: 'm-kabore',
     name: 'M. Kaboré',
     role: 'Enseignant, réseaux et télécoms',
+    // He prepares his class, quietly, by his desk: no gestures to an empty room (talking only when spoken to).
     at: { x: -4.8, y: FLOOR_Y, z: -10.9, yaw: 0.3 },
-    motion: 'Idle_Talking_Loop',
+    motion: 'Idle_Loop',
     lines: [
       'Bonjour ! Le cours de cet après-midi porte sur le routage inter-VLAN. Vous avez vu le router-on-a-stick en TP ?',
       'Retenez ceci : une route statique, c’est l’adresse du réseau, son masque, et le prochain saut. Rien de plus.',

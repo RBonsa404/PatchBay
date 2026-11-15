@@ -196,6 +196,7 @@ const fr = {
   'settings.student': 'Jouer l’étudiante (sinon l’étudiant)',
   'people.thirdPerson': 'Vue de dos',
   'people.firstPerson': 'Vue à la première personne',
+  'people.focus': 'Mode focus : vue à la première personne',
   'people.talkHint': 'E — parler à {name}',
 } as const;
 

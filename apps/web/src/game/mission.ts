@@ -982,6 +982,7 @@ export class Mission {
 
   /** Every frame: the colleagues breathe, walk their rounds, turn to the player when spoken to. */
   private livePeople(dt: number): void {
+    const here = zoneOf(this.player.x, this.player.floorY + 0.1, this.player.z);
     let near: (typeof this.people)[number] | null = null;
     let best = Infinity;
     const turn = (root: THREE.Object3D, want: number): void => {
@@ -997,12 +998,9 @@ export class Mission {
       p.person.update(dt, d > 10 ? 20 : 0);
       if (p.talking > 0) {
         p.talking -= dt;
-        let want = Math.atan2(this.player.x - root.position.x, this.player.z - root.position.z);
-        // Someone seated turns on their chair, not off it: a quarter turn at most.
-        if (p.who.motion.startsWith('Sitting')) {
-          const off = Math.atan2(Math.sin(want - p.who.at.yaw), Math.cos(want - p.who.at.yaw));
-          want = p.who.at.yaw + Math.max(-0.6, Math.min(0.6, off));
-        }
+        // Someone seated stays as they sit (turning the body would put their legs through the chair): only their
+        // talking shows they answer. Someone standing turns to the player.
+        const want = p.who.motion.startsWith('Sitting') ? p.who.at.yaw : Math.atan2(this.player.x - root.position.x, this.player.z - root.position.z);
         turn(root, want);
         if (p.talking <= 0) p.person.play(p.who.motion);
       } else if (!p.who.walk) {
@@ -1025,7 +1023,9 @@ export class Mission {
       const toward = Math.atan2(root.position.x - this.player.x, root.position.z - this.player.z);
       const off = Math.abs(Math.atan2(Math.sin(toward - this.player.yaw), Math.cos(toward - this.player.yaw)));
       const score = d + off * 1.5;
-      if (d < 2.2 && off < 0.9 && score < best) {
+      // Only someone in the same room: never through a wall (the lounge from the toilets).
+      const sameRoom = zoneOf(root.position.x, root.position.y + 0.1, root.position.z) === here;
+      if (sameRoom && d < 2.2 && off < 0.9 && score < best) {
         best = score;
         near = p;
       }
@@ -1052,6 +1052,27 @@ export class Mission {
     sound.play('click');
   }
 
+  /**
+   * Focus: while the player works (a cable in hand, one end already plugged, a device looked at closely, a console or a
+   * panel open), the view goes through the student's eyes so that their body never hides a port; back to the view from
+   * behind as soon as the work is put down.
+   */
+  private get focused(): boolean {
+    return this.selected !== null || this.firstEnd !== null || this.anchor !== null || document.querySelector('.terminal, .host-settings') !== null;
+  }
+
+  private wasFocused = false;
+
+  /** Whether the camera is behind the student's shoulder this frame. */
+  private backView(): boolean {
+    const focus = this.focused;
+    if (focus !== this.wasFocused && settings.thirdPerson && !this.tour) {
+      this.wasFocused = focus;
+      this.hud.toast(t(focus ? 'people.focus' : 'people.thirdPerson'));
+    }
+    return settings.thirdPerson && !focus && !this.seated && !this.tour;
+  }
+
   /** The player's student follows the player: where they stand, the way they face, walking or standing still. */
   private moveAvatar(dt: number): void {
     const a = this.avatar;
@@ -1063,7 +1084,7 @@ export class Mission {
     this.lastFoot.copy(foot);
     a.root.position.copy(foot);
     a.root.rotation.y = p.yaw;
-    const view = settings.thirdPerson && !this.anchor && !this.seated && !this.tour;
+    const view = this.backView();
     a.root.visible = view;
     if (this.seated) a.play('Sitting_Idle_Loop');
     else if (speed > 2.4) a.play('Jog_Fwd_Loop', 0.2);
@@ -1226,11 +1247,12 @@ export class Mission {
     // Leaving: the rooms not yet built are built now, while the screen is dark (the façade's windows look into them).
     if (from === 'campus') while (this.later.length) (this.later.shift() as () => void)();
     if (!quick) {
+      // At eye level only: the town around is a photograph taken at a person's height, which a camera in the air would
+      // stretch. A few steps out of the door into the street, looking down it.
       const { door, out, side } = this.goOutside(from, true);
-      const up = new THREE.Vector3(0, 1, 0);
-      const centre = door.clone().addScaledVector(out, -6).addScaledVector(up, 3.2);
+      const eye = (v: THREE.Vector3, h = 1.65): THREE.Vector3 => v.setY(h);
       await this.blackout(false);
-      await this.shot(3.4, door.clone().addScaledVector(out, 2.4).addScaledVector(up, 1.65), door.clone().addScaledVector(up, 1.5), door.clone().addScaledVector(out, 18).addScaledVector(side, 7).addScaledVector(up, 12), centre);
+      await this.shot(3.2, eye(door.clone().addScaledVector(out, 0.9)), eye(door.clone().addScaledVector(out, 14), 1.55), eye(door.clone().addScaledVector(out, 6).addScaledVector(side, 1.4)), eye(door.clone().addScaledVector(out, 12).addScaledVector(side, 9), 1.6));
       await this.blackout(true);
       this.goOutside(from, false);
     }
@@ -1244,13 +1266,14 @@ export class Mission {
       await this.flyOver(from, to);
       const { door, out, side } = this.goOutside(to, true);
       const camera = this.stage.camera;
-      camera.position.copy(door).addScaledVector(out, 20).addScaledVector(side, -8).setY(9);
-      camera.lookAt(door.clone().addScaledVector(out, -6).setY(3));
+      camera.position.copy(door).addScaledVector(out, 10).addScaledVector(side, -2.5).setY(1.65);
+      camera.lookAt(door.clone().setY(1.6));
       await this.blackout(false);
     }
     if (!quick) {
+      // Arriving on foot, from across the street up to the door, at eye level.
       const { door, out, side } = this.goOutside(to, true);
-      await this.shot(3.2, door.clone().addScaledVector(out, 20).addScaledVector(side, -8).setY(9), door.clone().addScaledVector(out, -6).setY(3), door.clone().addScaledVector(out, 2.6).setY(1.65), door.clone().setY(1.5));
+      await this.shot(3.4, door.clone().addScaledVector(out, 10).addScaledVector(side, -2.5).setY(1.65), door.clone().setY(1.6), door.clone().addScaledVector(out, 2.2).setY(1.65), door.clone().setY(1.55));
       await this.blackout(true);
       this.goOutside(to, false);
     }
@@ -1664,7 +1687,7 @@ export class Mission {
       const ease = 1 - Math.exp(-dt * 20);
       this.viewYaw += (this.player.yaw - this.viewYaw) * ease;
       this.viewPitch += (this.player.pitch - this.viewPitch) * ease;
-      if (PEOPLE && settings.thirdPerson && !this.anchor && !this.seated) this.thirdPersonCamera(this.stage.controls.target);
+      if (PEOPLE && this.backView()) this.thirdPersonCamera(this.stage.controls.target);
       else {
         camera.position.copy(this.anchor ?? this.player.eye);
         const c = Math.cos(this.viewPitch);

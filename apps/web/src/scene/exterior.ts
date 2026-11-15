@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { FLOOR_Y, inside, ROOM_HEIGHT, SITE_EXIT_X, SITE_Z, siteOf, WALL, WALLS, wallPieces, WINDOWS, ZONES, type Rect, type SiteName } from './building.js';
-import { photoRelief } from './materials.js';
+import { photo, photoRelief } from './materials.js';
 import { placeMany, placeProp, type Placement } from './props.js';
 import { textTexture } from './textures.js';
 
@@ -197,13 +197,63 @@ function entrance(site: SiteName): THREE.Group {
   return g;
 }
 
+/** The street's ends fade out the same way, along its length. */
+const roadEdges = new Map<boolean, THREE.Texture>();
+function roadEdge(along: boolean): THREE.Texture {
+  let t = roadEdges.get(along);
+  if (t) return t;
+  const c = document.createElement('canvas');
+  c.width = along ? 256 : 4;
+  c.height = along ? 4 : 256;
+  const g = c.getContext('2d') as CanvasRenderingContext2D;
+  const r = along ? g.createLinearGradient(0, 0, 256, 0) : g.createLinearGradient(0, 0, 0, 256);
+  r.addColorStop(0, '#000');
+  r.addColorStop(0.3, '#fff');
+  r.addColorStop(0.7, '#fff');
+  r.addColorStop(1, '#000');
+  g.fillStyle = r;
+  g.fillRect(0, 0, c.width, c.height);
+  t = new THREE.CanvasTexture(c);
+  roadEdges.set(along, t);
+  return t;
+}
+
+/** A soft edge for the ground: opaque in the middle, fading out towards the photographed town around. */
+let fadeEdge: THREE.Texture | null = null;
+function edge(): THREE.Texture {
+  if (fadeEdge) return fadeEdge;
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const g = c.getContext('2d') as CanvasRenderingContext2D;
+  const r = g.createRadialGradient(128, 128, 60, 128, 128, 128);
+  r.addColorStop(0, '#fff');
+  r.addColorStop(1, '#000');
+  g.fillStyle = r;
+  g.fillRect(0, 0, 256, 256);
+  fadeEdge = new THREE.CanvasTexture(c);
+  return fadeEdge;
+}
+
+/** Ground photographed (Poly Haven, CC0), `size` metres per tile, fading at its edges when `fade` is given. */
+function ground(name: string, tilesX: number, tilesY: number, fade?: THREE.Texture): THREE.MeshStandardMaterial {
+  const m = new THREE.MeshStandardMaterial({ ...photo(name, tilesX, tilesY), roughness: 1 });
+  if (fade) {
+    m.alphaMap = fade;
+    m.transparent = true;
+    m.depthWrite = false;
+  }
+  return m;
+}
+
 /** The ground around a building: pavement round its walls, the street in front of the door, red earth beyond. */
 export function buildStreet(site: SiteName, footprint: Rect): THREE.Group {
   const g = new THREE.Group();
   g.name = `street-${site}`;
   const cx = (footprint.x0 + footprint.x1) / 2;
   const cz = (footprint.z0 + footprint.z1) / 2;
-  const earth = new THREE.Mesh(new THREE.CircleGeometry(42, 48), lit('#a87b5c', 0.97));
+  // Red laterite, as round every building of the country, fading into the photographed town (no edge to the ground).
+  const earth = new THREE.Mesh(new THREE.CircleGeometry(42, 48), ground('red_laterite_soil_stones', 21, 21, edge()));
+  earth.renderOrder = -5;
   earth.rotation.x = -Math.PI / 2;
   earth.position.set(cx, -0.02, cz);
   earth.receiveShadow = true;
@@ -214,11 +264,18 @@ export function buildStreet(site: SiteName, footprint: Rect): THREE.Group {
   g.add(earth, pave);
   // The street, along the façade with the door.
   const e = ENTRANCES[site];
-  const road = new THREE.Mesh(new THREE.PlaneGeometry(e.out[0] === 0 ? 80 : 8, e.out[0] === 0 ? 8 : 80), lit('#3a3b3d', 0.9));
+  const along = e.out[0] === 0;
+  const road = new THREE.Mesh(new THREE.PlaneGeometry(along ? 80 : 8, along ? 8 : 80), ground('asphalt_02', along ? 20 : 2, along ? 2 : 20, roadEdge(along)));
+  road.renderOrder = -4;
   road.rotation.x = -Math.PI / 2;
   road.position.set(e.out[0] === 0 ? cx : e.x + e.out[0] * 9, -0.008, e.out[0] === 0 ? e.z + e.out[1] * 9 : cz);
   road.receiveShadow = true;
-  const line = new THREE.Mesh(new THREE.PlaneGeometry(e.out[0] === 0 ? 80 : 0.12, e.out[0] === 0 ? 0.12 : 80), lit('#f1f1ee', 0.6));
+  const lineMat = lit('#e9e7df', 0.6);
+  lineMat.alphaMap = roadEdge(along);
+  lineMat.transparent = true;
+  lineMat.depthWrite = false;
+  const line = new THREE.Mesh(new THREE.PlaneGeometry(along ? 80 : 0.12, along ? 0.12 : 80), lineMat);
+  line.renderOrder = -3;
   line.rotation.x = -Math.PI / 2;
   line.position.set(road.position.x, -0.006, road.position.z);
   g.add(road, line);
