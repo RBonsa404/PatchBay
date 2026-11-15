@@ -143,6 +143,15 @@ const fr = {
   'quality.low': 'basse',
   'quality.medium': 'moyenne',
   'quality.high': 'haute',
+  'voice.toggle': 'Voix d’Aïcha',
+  'voice.on': 'Aïcha parle à voix haute',
+  'voice.off': 'Aïcha ne parle plus',
+  'voice.listen': 'Commande vocale (V)',
+  'voice.listening': 'Je t’écoute…',
+  'voice.unsupported': 'Les commandes vocales demandent Chrome ou Edge.',
+  'voice.denied': 'Le micro est bloqué : autorise-le dans le navigateur.',
+  'voice.offline': 'Les commandes vocales demandent une connexion.',
+  'voice.nothing': 'Je n’ai rien entendu.',
 } as const;
 
 export type Key = keyof typeof fr;

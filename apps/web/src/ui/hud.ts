@@ -1,10 +1,11 @@
-import { BookOpen, Check, CircleCheckBig, CircleHelp, Gauge, Keyboard, Lightbulb, Menu, MessageCircleQuestion, Scan, Timer, Volume2, VolumeX, type IconNode } from 'lucide';
+import { BookOpen, Check, CircleCheckBig, CircleHelp, Gauge, Keyboard, Lightbulb, Menu, MessageCircleQuestion, Mic, Scan, Speech, Timer, Volume2, VolumeX, type IconNode } from 'lucide';
 import type { CableType, Level, ObjectiveResult } from '@patchbay/sim-core';
 import { t, tx, type Key } from '../i18n.js';
 import { CABLE_STYLE } from '../scene/cables.js';
 import { clock } from '../game/scoring.js';
 import type { Quality } from '../scene/stage.js';
 import { sound } from '../audio.js';
+import { canListen, voice } from '../voice.js';
 import { icon } from './brand.js';
 import { h, ui } from './dom.js';
 
@@ -18,6 +19,7 @@ export interface HudActions {
   help(): void;
   ports(): void;
   cycleQuality(): Quality;
+  listen(): void;
   selectCable(type: CableType | null): void;
 }
 
@@ -57,6 +59,7 @@ export class Hud {
   private shownSecond = -1;
 
   private readonly qualityButton: HTMLElement;
+  private readonly micButton: HTMLButtonElement | null;
 
   constructor(private readonly level: Level, private readonly actions: HudActions, quality: Quality, index = 0, private readonly exam = false) {
     this.objectivesList = h('ol', { class: 'objective-list' });
@@ -76,6 +79,17 @@ export class Hud {
       soundButton.replaceChildren(icon(muted ? VolumeX : Volume2, 18));
       soundButton.title = muted ? t('hud.soundOff') : t('hud.sound');
     });
+
+    // Aïcha's voice on or off, and the microphone for voice commands (where the browser can hear).
+    const voiceButton = voice.canSpeak
+      ? toolButton(t('voice.toggle'), Speech, () => {
+          const on = voice.toggle();
+          voiceButton?.classList.toggle('off', !on);
+          this.toast(on ? t('voice.on') : t('voice.off'));
+        })
+      : null;
+    voiceButton?.classList.toggle('off', !voice.enabled);
+    this.micButton = canListen ? toolButton(t('voice.listen'), Mic, () => actions.listen()) : null;
 
     const root = h(
       'div',
@@ -97,6 +111,8 @@ export class Hud {
           h('i', { class: 'tool-sep' }),
           qualityButton,
           soundButton,
+          voiceButton,
+          this.micButton,
           toolButton(t('hud.menu'), Menu, () => actions.menu()),
           h('button', { class: 'btn primary small', onclick: () => actions.check() }, icon(CircleCheckBig, 16), h('span', {}, exam ? t('exam.hand') : t('hud.check'))),
         ),
@@ -188,6 +204,11 @@ export class Hud {
     this.firstObjectives = false;
     // The next thing to do stays in view, however long the list.
     this.objectivesList.querySelector('.current')?.scrollIntoView({ block: 'nearest' });
+  }
+
+  /** The microphone glows while the game is listening. */
+  setListening(on: boolean): void {
+    this.micButton?.classList.toggle('listening', on);
   }
 
   toggleObjectives(): void {

@@ -489,3 +489,7 @@ body.time-low::after { content: ''; position: fixed; inset: 0; pointer-events: n
 .brand .wordmark b { margin-right: 0.12em; }
 .brand .wordmark { white-space: nowrap; }
 .brand-large .wordmark { font-size: 44px; }
+
+/* Voice: Aïcha's voice switched off, and the microphone while it listens. */
+.tool.off { opacity: 0.45; }
+.tool.listening { color: #f8fafc; background: #b91c1c; box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.35); animation: pulse-ui 1.2s ease-in-out infinite; }

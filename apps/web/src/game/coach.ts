@@ -5,6 +5,7 @@ import { t, type Key } from '../i18n.js';
 import type { Stage } from '../scene/stage.js';
 import { MENTOR, mentorPortrait } from '../ui/brand.js';
 import { h, ui } from '../ui/dom.js';
+import { voice } from '../voice.js';
 
 /** What the coach can see of the mission to decide whether a step is done. */
 export interface CoachView {
@@ -144,6 +145,7 @@ export class Coach {
   /** Aïcha "speaks": the line appears a few letters at a time (instantly when motion is reduced). */
   private type(el: HTMLElement, line: string): void {
     if (this.typing) clearInterval(this.typing);
+    if (line !== this.lastLine) voice.say(line);
     if (line === this.lastLine || matchMedia('(prefers-reduced-motion: reduce)').matches) {
       el.textContent = line;
       this.lastLine = line;

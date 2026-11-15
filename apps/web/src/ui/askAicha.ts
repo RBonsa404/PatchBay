@@ -3,6 +3,7 @@ import { t } from '../i18n.js';
 import { MENTOR, mentorPortrait } from './brand.js';
 import { h } from './dom.js';
 import { panel } from './panels.js';
+import { voice } from '../voice.js';
 
 /** The conversation with Aïcha, kept for the length of a mission. */
 export class AskAicha {
@@ -12,7 +13,8 @@ export class AskAicha {
 
   constructor(private readonly context: () => AssistantContext) {}
 
-  open(): void {
+  /** Open the conversation; with a `question` (asked aloud, say), ask it at once. */
+  open(question?: string): void {
     const log = h('div', { class: 'chat-log', role: 'log', 'aria-live': 'polite' });
     const render = (): void => {
       log.replaceChildren(
@@ -24,8 +26,10 @@ export class AskAicha {
       if (!question.trim() || this.busy) return;
       const context = this.context();
       if (!needsOnline(question, context)) {
-        this.lines.push({ from: 'me', text: question }, { from: 'her', text: answer(question, context) });
+        const reply = answer(question, context);
+        this.lines.push({ from: 'me', text: question }, { from: 'her', text: reply });
         render();
+        voice.say(reply);
         return;
       }
       // What was said just before, so that a follow-up question makes sense.
@@ -40,6 +44,7 @@ export class AskAicha {
       else if ('blocked' in reply) pending.text = t('assistant.blocked');
       else if ('limited' in reply) pending.text = t('assistant.limited');
       else pending.text = answer(question, context);
+      voice.say(pending.text);
       // The panel may have been closed meanwhile: this only redraws what is still on screen.
       render();
     };
@@ -65,5 +70,6 @@ export class AskAicha {
     ], 'assistant');
     render();
     input.focus();
+    if (question) void ask(question);
   }
 }

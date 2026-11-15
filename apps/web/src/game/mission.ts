@@ -15,6 +15,8 @@ import { AskAicha } from '../ui/askAicha.js';
 import { CABLE_ORDER, Hud } from '../ui/hud.js';
 import { closePanel, Consoles, openPanelKey, resetHostShells, showHostPanel, showBriefPanel, showConfirm, showHelp, showNotice, showPortList } from '../ui/panels.js';
 import { clock, grade, type Grade } from './scoring.js';
+import { canListen, listenOnce, voice } from '../voice.js';
+import { understand, type VoiceCommand } from '../voice-commands.js';
 
 const HOME = { position: new THREE.Vector3(0, 1.78, 2.45), target: new THREE.Vector3(0, 0.86, 0.02) };
 /** How far the player can reach a device from, in metres (seen from above). */
@@ -225,6 +227,7 @@ export class Mission {
       brief: () => this.showBrief(),
       help: () => showHelp(),
       cycleQuality: () => this.cycleQuality(),
+      listen: () => this.listenVoice(),
       selectCable: (type) => this.select(type),
     }, stage.currentQuality, index, exam);
     setTimeout(() => this.hud.banner(`${t('briefing.mission')} ${String(index + 1).padStart(2, '0')}`, exam ? t('exam.start') : this.coach?.active ? t('timer.tutorial') : t('timer.start')), this.entrance * 1000);
@@ -280,6 +283,8 @@ export class Mission {
 
   dispose(): void {
     for (const fn of this.cleanup) fn();
+    this.stopListening?.();
+    voice.stop();
     this.coach?.dispose();
     this.cables.showPreview('straight', null, null);
     this.hud.destroy();
@@ -416,6 +421,7 @@ export class Mission {
         if (this.anchor) this.overview(0.7);
       }
       if (e.code === 'KeyT' && !typing) this.toggleBoard();
+      if (e.code === 'KeyV' && !typing) this.listenVoice();
       if (e.code === 'KeyH' && !typing && !this.exam) this.aicha.open();
       if (e.code === 'KeyP' && !typing) this.showPorts();
       if (e.code === 'KeyB' && !typing) this.showBrief();
@@ -1120,6 +1126,62 @@ export class Mission {
     if (failing) {
       this.hud.revealHints([failing.id]);
       this.afterChange();
+    }
+  }
+
+  private stopListening: (() => void) | null = null;
+
+  /** Hear one spoken sentence and do what it asks; a second press stops listening. */
+  private listenVoice(): void {
+    if (this.stopListening) {
+      this.stopListening();
+      return;
+    }
+    if (!canListen) {
+      this.hud.toast(t('voice.unsupported'), 'bad');
+      return;
+    }
+    this.hud.setListening(true);
+    this.hud.toast(t('voice.listening'));
+    this.stopListening = listenOnce(
+      (guesses) => {
+        const said = guesses[0] ?? '';
+        this.hud.toast(`« ${said} »`);
+        this.obey(understand(said, [...this.devices.keys(), ...this.panels.keys()]));
+      },
+      (reason) => this.hud.toast(t(`voice.${reason}`), reason === 'nothing' ? undefined : 'bad'),
+      () => {
+        this.hud.setListening(false);
+        this.stopListening = null;
+      },
+    );
+  }
+
+  private obey(command: VoiceCommand): void {
+    switch (command.kind) {
+      case 'cable':
+        return this.select(command.cable);
+      case 'check':
+        return this.check();
+      case 'hint':
+        if (!this.exam) this.hint();
+        return;
+      case 'brief':
+        return this.showBrief();
+      case 'overview':
+        return this.overview();
+      case 'ports':
+        return this.showPorts();
+      case 'menu':
+        return this.leave();
+      case 'help':
+        return showHelp();
+      case 'open':
+        if (this.inReach(command.device)) this.openDevice(command.device);
+        return;
+      case 'ask':
+        if (!this.exam) this.aicha.open(command.question);
+        return;
     }
   }
 
