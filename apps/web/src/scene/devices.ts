@@ -4,6 +4,7 @@ import { bake, freeze } from './bake.js';
 import { brushedTexture, contactShadow, keyboardTexture, rj45Texture } from './materials.js';
 import { BENCH_TOP, RACK } from './room.js';
 import { addFeet, addRackEars, addVents, powerButton, roundedChassis } from './details.js';
+import { gearModel, type GearName } from './gear.js';
 import { atlasLabel, screenTexture } from './textures.js';
 
 export type LedState = 'off' | 'green' | 'amber';
@@ -298,7 +299,59 @@ function buildRouter(id: string, model: DeviceModel, m: Materials, view: DeviceV
   view.width = w;
 }
 
+/** A socket that is part of a Blender model: only what the game adds to it (its light, its pick box, its mouth). */
+function modelSocket(parent: THREE.Object3D, m: Materials, device: string, spec: PortSpec, at: THREE.Vector3, led: THREE.Vector3 | null): PortView {
+  const [w, h] = [0.0117, 0.01];
+  const plain = spec.kind === 'serial' || spec.kind === 'rs232';
+  // The marker stands 4 mm in front of the socket's face.
+  const socket = new THREE.Mesh(new THREE.PlaneGeometry(w, h), socketLight('hover', plain));
+  socket.position.set(at.x, at.y, at.z - 0.0035);
+  socket.visible = false;
+  socket.userData.plain = plain;
+  const hit = new THREE.Mesh(new THREE.BoxGeometry(w + 0.0015, h + 0.004, 0.04), m.pick);
+  hit.position.set(at.x, at.y, at.z + 0.006);
+  const mouth = new THREE.Object3D();
+  mouth.position.copy(at);
+  parent.add(socket, hit, mouth);
+  const view: PortView = { device, port: spec.name, spec, hit, socket, mouth };
+  if (led) pendingLeds.push({ view, x: led.x, y: led.y, z: led.z + 0.0004 });
+  hit.userData.port = view;
+  return view;
+}
+
+/** Build a device from its Blender model: its meshes, then a socket at each `port:` marker. False if there is none. */
+function buildFromGear(name: GearName, id: string, model: DeviceModel, m: Materials, view: DeviceView, tag: string): boolean {
+  const source = gearModel(name);
+  if (!source) return false;
+  const copy = source.clone(true);
+  view.root.add(copy);
+  view.root.updateMatrixWorld(true);
+  const size = new THREE.Box3().setFromObject(copy).getSize(new THREE.Vector3());
+  [view.width, view.height, view.depth] = [size.x, size.y, size.z];
+  const markers = new Map<string, THREE.Object3D>();
+  copy.traverse((o) => {
+    const label = (o.userData.name as string | undefined) ?? o.name;
+    if (label.startsWith('port:') || label.startsWith('led:')) markers.set(label, o);
+    else if ((o as THREE.Mesh).isMesh) {
+      o.castShadow = true;
+      o.receiveShadow = true;
+      view.body.push(o);
+    }
+  });
+  const local = (o: THREE.Object3D): THREE.Vector3 => view.root.worldToLocal(o.getWorldPosition(new THREE.Vector3()));
+  for (const spec of model.ports) {
+    const at = markers.get(`port:${spec.name}`);
+    if (!at) continue;
+    const led = markers.get(`led:${spec.name}`);
+    view.ports.set(spec.name, modelSocket(view.root, m, id, spec, local(at), led ? local(led) : null));
+  }
+  // The hostname on a printed tag, in the blank space between the console and the ports.
+  label(view.root, tag, -view.width / 2 + 0.13, view.height * 0.62, view.depth / 2, 0.07, 0.012, '#0f172a');
+  return true;
+}
+
 function buildSwitch(id: string, model: DeviceModel, m: Materials, view: DeviceView): void {
+  if (buildFromGear('switch-2960', id, model, m, view, `${id} · 2960`)) return;
   const [w, h, d] = [0.445, 0.044, 0.236];
   const chassis = roundedChassis(w, h, d, m.chassis);
   chassis.position.y = h / 2;

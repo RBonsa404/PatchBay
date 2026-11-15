@@ -116,7 +116,7 @@ export function screenTexture(lines: string[], accent = '#38bdf8'): THREE.Canvas
   g.fillRect(0, 0, 512, 26);
   g.fillStyle = '#050a17';
   g.font = '600 15px "JetBrains Mono", monospace';
-  g.fillText('PatchBay', 12, 18);
+  g.fillText('IST Network Lab', 12, 18);
   g.fillStyle = '#cbd5e1';
   g.font = '18px "JetBrains Mono", monospace';
   lines.forEach((line, i) => g.fillText(line, 16, 64 + i * 28));

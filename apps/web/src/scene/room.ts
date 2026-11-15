@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import clubLogoUrl from '../assets/club-logo-512.webp';
+import dedsecLogoUrl from '../assets/dedsec/dedsec-logo-sombre.svg';
 import { bake } from './bake.js';
 import { buildDecor } from './decor.js';
 import { ceilingTexture, contactShadow, esdMatNormal, esdMatTexture, paintTexture, perforatedTexture, photo, photoRelief, rackRailTexture, raisedFloorNormal, raisedFloorTexture } from './materials.js';
@@ -443,6 +444,23 @@ function cableTray(): THREE.Group {
   return g;
 }
 
+/** An SVG drawn once into a canvas texture, at a size that stays sharp on a wall. */
+function svgTexture(url: string, w: number, h: number): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  const image = new Image();
+  image.onload = () => {
+    canvas.getContext('2d')?.drawImage(image, 0, 0, w, h);
+    texture.needsUpdate = true;
+  };
+  image.src = url;
+  return texture;
+}
+
 /** Club logo, painted lettering, a door, an air conditioner and a fire extinguisher. */
 function wallItems(): THREE.Group {
   const g = new THREE.Group();
@@ -457,6 +475,12 @@ function wallItems(): THREE.Group {
   const logo = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.6), new THREE.MeshStandardMaterial({ map: logoTex, color: '#b4b4b4', roughness: 0.9, envMapIntensity: 0 }));
   logo.position.set(1.3, 1.72, z + 0.021);
   g.add(frame, logo);
+  // DEDSEC TECHNOLOGIES, who built the room: its dark logo on a night-blue plaque, as its charter asks.
+  const plaque = box(0.44, 0.56, 0.02, new THREE.MeshStandardMaterial({ color: '#050a18', roughness: 0.5 }));
+  plaque.position.set(-2.05, 1.66, z + 0.01);
+  const dedsec = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.507), new THREE.MeshStandardMaterial({ map: svgTexture(dedsecLogoUrl, 560, 710), roughness: 0.8, envMapIntensity: 0 }));
+  dedsec.position.set(-2.05, 1.66, z + 0.021);
+  g.add(plaque, dedsec);
 
   const name = new THREE.Mesh(
     new THREE.PlaneGeometry(2.4, 0.22),

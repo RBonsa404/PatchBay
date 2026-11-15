@@ -11,6 +11,7 @@ import { sound } from './audio.js';
 import { startGamepad } from './game/gamepad.js';
 import { Mission } from './game/mission.js';
 import { buildDevice, rackOccupied } from './scene/devices.js';
+import { loadGear } from './scene/gear.js';
 import { onPropAppeared } from './scene/props.js';
 import { buildRoom, rackFillers } from './scene/room.js';
 import { detectQuality, Stage } from './scene/stage.js';
@@ -25,7 +26,7 @@ document.addEventListener('click', (e) => {
 // Without WebGL there is no room to walk in: say so, rather than leaving a black page.
 if (!document.createElement('canvas').getContext('webgl2')) {
   const boot = document.getElementById('boot');
-  if (boot) boot.textContent = 'PatchBay a besoin de WebGL 2. Active l’accélération matérielle du navigateur, ou essaie Chrome ou Edge à jour.';
+  if (boot) boot.textContent = 'IST Network Lab a besoin de WebGL 2. Active l’accélération matérielle du navigateur, ou essaie Chrome ou Edge à jour.';
   throw new Error('WebGL 2 is not available');
 }
 
@@ -153,5 +154,8 @@ if (import.meta.env.DEV) {
   };
 }
 
-title();
-void stage.prepare().then(() => bootScreen.remove());
+// The equipment's models come first: every room built afterwards uses them.
+void loadGear().finally(() => {
+  title();
+  void stage.prepare().then(() => bootScreen.remove());
+});

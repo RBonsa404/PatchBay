@@ -1,9 +1,11 @@
 import { createElement, type IconNode } from 'lucide';
 import clubLogo160 from '../assets/club-logo-160.webp';
+import dedsecIcon from '../assets/dedsec/dedsec-icone.svg';
 import { h } from './dom.js';
 
 /**
- * Visual identity: the PatchBay mark (a network socket with its link LED, in the club's colours), the club badge,
+ * Visual identity: the IST Network Lab mark (a network socket with its link LED, in the club's colours), the club badge,
+ * the DEDSEC TECHNOLOGIES credit (the company behind the game; its charter writes the name in capitals, in Orbitron),
  * the mentor's portrait, and icons from Lucide (ISC licence, see ASSETS.md). SVG sources are constants of this file,
  * never user data.
  */
@@ -13,8 +15,8 @@ const svg = (source: string): SVGElement => {
   return document.importNode(doc.documentElement, true) as unknown as SVGElement;
 };
 
-/** The PatchBay mark: a royal-blue tile holding an RJ45 socket, gold contacts and a green link LED. */
-export const MARK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="PatchBay">
+/** The IST Network Lab mark: a royal-blue tile holding an RJ45 socket, gold contacts and a green link LED. */
+export const MARK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="IST Network Lab">
   <rect width="64" height="64" rx="14" fill="#1D4ED8"/>
   <rect x="12" y="14" width="40" height="36" rx="5" fill="#F8FAFC"/>
   <path d="M19 21h26v17h-6v6H25v-6h-6z" fill="#0B1E3F"/>
@@ -23,11 +25,21 @@ export const MARK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64
 </svg>`;
 
 export function logo(size: 'large' | 'small' = 'large'): HTMLElement {
-  return h('div', { class: `brand brand-${size}` }, svg(MARK_SVG), h('span', { class: 'wordmark' }, 'Patch', h('b', {}, 'Bay')));
+  return h('div', { class: `brand brand-${size}` }, svg(MARK_SVG), h('span', { class: 'wordmark' }, h('b', {}, 'IST'), ' Network Lab'));
 }
 
 export function clubBadge(): HTMLElement {
   return h('img', { class: 'club-badge', src: clubLogo160, alt: "Logo du Club Informatique de l'IST", width: '64', height: '64' });
+}
+
+/** « Une production DEDSEC TECHNOLOGIES », with the company's square icon. */
+export function dedsecCredit(): HTMLElement {
+  return h(
+    'div',
+    { class: 'dedsec-credit' },
+    h('img', { src: dedsecIcon, alt: '', width: '40', height: '40' }),
+    h('div', {}, h('small', {}, 'Une production'), h('strong', {}, 'DEDSEC'), h('span', {}, 'TECHNOLOGIES')),
+  );
 }
 
 /** The club's network trainer who briefs the player and runs the tutorial. */

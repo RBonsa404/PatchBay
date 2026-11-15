@@ -112,7 +112,7 @@ const fr = {
   'host.apply': 'Appliquer',
   'host.applied': 'Paramètres appliqués.',
   'host.ping': 'Ping',
-  'host.shellBanner': 'Microsoft Windows · Invite de commandes (simulée par PatchBay). Tape help pour la liste des commandes.',
+  'host.shellBanner': 'Microsoft Windows · Invite de commandes (simulée par IST Network Lab). Tape help pour la liste des commandes.',
   'host.shellHelp': 'ipconfig · ping 192.168.1.1 · tracert · arp -a · cls · ↑ ↓ : historique',
   'host.pingTo': 'Ping vers',
   'host.openConsole': 'Ouvrir la console',

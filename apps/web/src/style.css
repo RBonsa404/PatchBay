@@ -1,5 +1,5 @@
 /*
- * PatchBay interface. Colours from the Club Informatique de l'IST charter (docs/06-charte-club-ist.md), used with
+ * IST Network Lab interface. Colours from the Club Informatique de l'IST charter (docs/06-charte-club-ist.md), used with
  * restraint: solid dark panels with fine borders (no blur, no glow), amber only for the main action, royal blue for
  * progress and selection, cyan for terminals. Icons: Lucide.
  */
@@ -476,3 +476,16 @@ body.time-low::after { content: ''; position: fixed; inset: 0; pointer-events: n
 .panel:has(.controls), .panel:has(.notice) { bottom: auto; }
 .title-note { margin: auto 0 0; font-size: 12.5px; max-width: 348px; }
 .title-note + .club { margin-top: 0; }
+
+/* DEDSEC TECHNOLOGIES, the company behind the game: its name in Orbitron capitals, as its charter asks. */
+@font-face { font-family: Orbitron; font-weight: 900; font-display: swap; src: url('./assets/dedsec/orbitron-latin-900-normal.woff2') format('woff2'); }
+@font-face { font-family: Orbitron; font-weight: 500; font-display: swap; src: url('./assets/dedsec/orbitron-latin-500-normal.woff2') format('woff2'); }
+.dedsec-credit { display: flex; align-items: center; gap: 12px; margin-top: 14px; color: #f8fafc; }
+.dedsec-credit img { width: 40px; height: 40px; border-radius: 10px; flex: none; }
+.dedsec-credit div { display: grid; line-height: 1.15; }
+.dedsec-credit small { font: 500 11px/1.4 var(--font-body, Inter, sans-serif); color: #94a3b8; letter-spacing: 0.04em; }
+.dedsec-credit strong { font: 900 17px/1.2 Orbitron, 'Segoe UI', sans-serif; letter-spacing: 0.28em; }
+.dedsec-credit span { font: 500 9px/1.3 Orbitron, 'Segoe UI', sans-serif; letter-spacing: 0.3em; color: #94a3b8; }
+.brand .wordmark b { margin-right: 0.12em; }
+.brand .wordmark { white-space: nowrap; }
+.brand-large .wordmark { font-size: 44px; }

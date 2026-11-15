@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowRight, ChevronRight, GraduationCap, LayoutList, Play, R
 import type { Level } from '@patchbay/sim-core';
 import { clock, type Grade } from '../game/scoring.js';
 import { t, tx } from '../i18n.js';
-import { clubBadge, icon, logo, MENTOR, mentorPortrait } from './brand.js';
+import { clubBadge, dedsecCredit, icon, logo, MENTOR, mentorPortrait } from './brand.js';
 import { h, leave, starCount, ui } from './dom.js';
 
 /** Best score per level, kept in this browser only (a convenience, not a source of truth). */
@@ -72,6 +72,7 @@ export function showTitle(onPlay: () => void, onMissions: () => void): void {
       ),
       h('p', { class: 'muted title-note' }, t('title.network')),
       h('footer', { class: 'club' }, clubBadge(), h('div', {}, h('strong', {}, t('app.club')), h('span', {}, t('title.credit')))),
+      dedsecCredit(),
     ),
   );
   ui().append(screen);

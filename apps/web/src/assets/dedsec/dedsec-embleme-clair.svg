@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-30 -30 1060 1060" width="1060" height="1060"><rect x="-30" y="-30" width="1060" height="1060" fill="#FFFFFF"></rect><g id="calque-anneau">
+<path d="M567.3,75.3 A430,430 0 0 1 924.7,432.7" fill="none" stroke="#0B1E3F" stroke-width="34" stroke-linecap="butt"></path>
+<path d="M924.7,567.3 A430,430 0 0 1 567.3,924.7" fill="none" stroke="#0B1E3F" stroke-width="34" stroke-linecap="butt"></path>
+<path d="M432.7,924.7 A430,430 0 0 1 75.3,567.3" fill="none" stroke="#0B1E3F" stroke-width="34" stroke-linecap="butt"></path>
+<path d="M75.3,432.7 A430,430 0 0 1 432.7,75.3" fill="none" stroke="#0B1E3F" stroke-width="34" stroke-linecap="butt"></path>
+</g><g id="calque-graduations">
+<line x1="865.2" y1="618.7" x2="882.3" y2="624.2" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="850.8" y1="656.2" x2="867.2" y2="663.5" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="832.6" y1="692" x2="848.1" y2="701" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="810.7" y1="725.7" x2="825.2" y2="736.3" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="785.4" y1="756.9" x2="798.7" y2="769" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="756.9" y1="785.4" x2="769" y2="798.7" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="725.7" y1="810.7" x2="736.3" y2="825.2" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="692" y1="832.6" x2="701" y2="848.1" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="656.2" y1="850.8" x2="663.5" y2="867.2" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="618.7" y1="865.2" x2="624.2" y2="882.3" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="381.3" y1="865.2" x2="375.8" y2="882.3" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="343.8" y1="850.8" x2="336.5" y2="867.2" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="308" y1="832.6" x2="299" y2="848.1" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="274.3" y1="810.7" x2="263.7" y2="825.2" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="243.1" y1="785.4" x2="231" y2="798.7" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="214.6" y1="756.9" x2="201.3" y2="769" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="189.3" y1="725.7" x2="174.8" y2="736.3" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="167.4" y1="692" x2="151.9" y2="701" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="149.2" y1="656.2" x2="132.8" y2="663.5" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="134.8" y1="618.7" x2="117.7" y2="624.2" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="134.8" y1="381.3" x2="117.7" y2="375.8" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="149.2" y1="343.8" x2="132.8" y2="336.5" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="167.4" y1="308" x2="151.9" y2="299" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="189.3" y1="274.3" x2="174.8" y2="263.7" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="214.6" y1="243.1" x2="201.3" y2="231" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="243.1" y1="214.6" x2="231" y2="201.3" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="274.3" y1="189.3" x2="263.7" y2="174.8" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="308" y1="167.4" x2="299" y2="151.9" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="343.8" y1="149.2" x2="336.5" y2="132.8" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="381.3" y1="134.8" x2="375.8" y2="117.7" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="618.7" y1="134.8" x2="624.2" y2="117.7" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="656.2" y1="149.2" x2="663.5" y2="132.8" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="692" y1="167.4" x2="701" y2="151.9" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="725.7" y1="189.3" x2="736.3" y2="174.8" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="756.9" y1="214.6" x2="769" y2="201.3" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="785.4" y1="243.1" x2="798.7" y2="231" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="810.7" y1="274.3" x2="825.2" y2="263.7" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="832.6" y1="308" x2="848.1" y2="299" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="850.8" y1="343.8" x2="867.2" y2="336.5" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+<line x1="865.2" y1="381.3" x2="882.3" y2="375.8" stroke="#38BDF8" stroke-width="5" stroke-linecap="round"></line>
+</g><g id="calque-pistes">
+<g><polyline points="571.6,285.9 595.6,244.4 595.6,182" fill="none" stroke="#1D4ED8" stroke-width="7" stroke-linejoin="miter" stroke-linecap="butt"></polyline><circle cx="595.6" cy="182" r="11" fill="#FFFFFF" stroke="#1D4ED8" stroke-width="6"></circle><polyline points="610.6,308.4 638.6,260 722,260" fill="none" stroke="#1D4ED8" stroke-width="7" stroke-linejoin="miter" stroke-linecap="butt"></polyline><circle cx="722" cy="260" r="11" fill="#FFFFFF" stroke="#1D4ED8" stroke-width="6"></circle><polyline points="649.6,330.9 667.6,299.8 735,299.8 768,266.8" fill="none" stroke="#1D4ED8" stroke-width="7" stroke-linejoin="miter" stroke-linecap="butt"></polyline><circle cx="768" cy="266.8" r="11" fill="#FFFFFF" stroke="#1D4ED8" stroke-width="6"></circle><polyline points="721,455 778,455 826,407" fill="none" stroke="#1D4ED8" stroke-width="7" stroke-linejoin="miter" stroke-linecap="butt"></polyline><circle cx="826" cy="407" r="11" fill="#FFFFFF" stroke="#1D4ED8" stroke-width="6"></circle></g>
+<g transform="translate(1000,0) scale(-1,1)"><polyline points="571.6,285.9 595.6,244.4 595.6,182" fill="none" stroke="#1D4ED8" stroke-width="7" stroke-linejoin="miter" stroke-linecap="butt"></polyline><circle cx="595.6" cy="182" r="11" fill="#FFFFFF" stroke="#1D4ED8" stroke-width="6"></circle><polyline points="610.6,308.4 638.6,260 722,260" fill="none" stroke="#1D4ED8" stroke-width="7" stroke-linejoin="miter" stroke-linecap="butt"></polyline><circle cx="722" cy="260" r="11" fill="#FFFFFF" stroke="#1D4ED8" stroke-width="6"></circle><polyline points="649.6,330.9 667.6,299.8 735,299.8 768,266.8" fill="none" stroke="#1D4ED8" stroke-width="7" stroke-linejoin="miter" stroke-linecap="butt"></polyline><circle cx="768" cy="266.8" r="11" fill="#FFFFFF" stroke="#1D4ED8" stroke-width="6"></circle><polyline points="721,455 778,455 826,407" fill="none" stroke="#1D4ED8" stroke-width="7" stroke-linejoin="miter" stroke-linecap="butt"></polyline><circle cx="826" cy="407" r="11" fill="#FFFFFF" stroke="#1D4ED8" stroke-width="6"></circle></g>
+<g transform="translate(0,1000) scale(1,-1)"><polyline points="571.6,285.9 595.6,244.4 595.6,182" fill="none" stroke="#1D4ED8" stroke-width="7" stroke-linejoin="miter" stroke-linecap="butt"></polyline><circle cx="595.6" cy="182" r="11" fill="#FFFFFF" stroke="#1D4ED8" stroke-width="6"></circle><polyline points="610.6,308.4 638.6,260 722,260" fill="none" stroke="#1D4ED8" stroke-width="7" stroke-linejoin="miter" stroke-linecap="butt"></polyline><circle cx="722" cy="260" r="11" fill="#FFFFFF" stroke="#1D4ED8" stroke-width="6"></circle><polyline points="649.6,330.9 667.6,299.8 735,299.8 768,266.8" fill="none" stroke="#1D4ED8" stroke-width="7" stroke-linejoin="miter" stroke-linecap="butt"></polyline><circle cx="768" cy="266.8" r="11" fill="#FFFFFF" stroke="#1D4ED8" stroke-width="6"></circle><polyline points="721,455 778,455 826,407" fill="none" stroke="#1D4ED8" stroke-width="7" stroke-linejoin="miter" stroke-linecap="butt"></polyline><circle cx="826" cy="407" r="11" fill="#FFFFFF" stroke="#1D4ED8" stroke-width="6"></circle></g>
+<g transform="translate(1000,1000) scale(-1,-1)"><polyline points="571.6,285.9 595.6,244.4 595.6,182" fill="none" stroke="#1D4ED8" stroke-width="7" stroke-linejoin="miter" stroke-linecap="butt"></polyline><circle cx="595.6" cy="182" r="11" fill="#FFFFFF" stroke="#1D4ED8" stroke-width="6"></circle><polyline points="610.6,308.4 638.6,260 722,260" fill="none" stroke="#1D4ED8" stroke-width="7" stroke-linejoin="miter" stroke-linecap="butt"></polyline><circle cx="722" cy="260" r="11" fill="#FFFFFF" stroke="#1D4ED8" stroke-width="6"></circle><polyline points="649.6,330.9 667.6,299.8 735,299.8 768,266.8" fill="none" stroke="#1D4ED8" stroke-width="7" stroke-linejoin="miter" stroke-linecap="butt"></polyline><circle cx="768" cy="266.8" r="11" fill="#FFFFFF" stroke="#1D4ED8" stroke-width="6"></circle><polyline points="721,455 778,455 826,407" fill="none" stroke="#1D4ED8" stroke-width="7" stroke-linejoin="miter" stroke-linecap="butt"></polyline><circle cx="826" cy="407" r="11" fill="#FFFFFF" stroke="#1D4ED8" stroke-width="6"></circle></g>
+<polyline points="721,500 948,500" fill="none" stroke="#1D4ED8" stroke-width="7" stroke-linejoin="miter" stroke-linecap="butt"></polyline>
+<circle cx="948" cy="500" r="13" fill="#1D4ED8"></circle>
+<polyline points="279,500 52,500" fill="none" stroke="#1D4ED8" stroke-width="7" stroke-linejoin="miter" stroke-linecap="butt"></polyline>
+<circle cx="52" cy="500" r="13" fill="#1D4ED8"></circle>
+<polyline points="500,740 500,948" fill="none" stroke="#1D4ED8" stroke-width="7" stroke-linejoin="miter" stroke-linecap="butt"></polyline>
+<circle cx="500" cy="948" r="13" fill="#1D4ED8"></circle>
+<polyline points="500,260 500,98" fill="none" stroke="#1D4ED8" stroke-width="7" stroke-linejoin="miter" stroke-linecap="butt"></polyline>
+</g><g id="calque-losange">
+<rect x="476" y="46" width="48" height="48" transform="rotate(45 500 70)" fill="#FBBF24"></rect>
+</g><g id="calque-puce">
+<line x1="563.6" y1="299.8" x2="573.6" y2="282.5" stroke="#0B1E3F" stroke-width="14"></line>
+<line x1="602.6" y1="322.3" x2="612.6" y2="305" stroke="#0B1E3F" stroke-width="14"></line>
+<line x1="641.6" y1="344.8" x2="651.6" y2="327.5" stroke="#0B1E3F" stroke-width="14"></line>
+<line x1="705.2" y1="455" x2="725.2" y2="455" stroke="#0B1E3F" stroke-width="14"></line>
+<line x1="705.2" y1="500" x2="725.2" y2="500" stroke="#0B1E3F" stroke-width="14"></line>
+<line x1="705.2" y1="545" x2="725.2" y2="545" stroke="#0B1E3F" stroke-width="14"></line>
+<line x1="641.6" y1="655.2" x2="651.6" y2="672.5" stroke="#0B1E3F" stroke-width="14"></line>
+<line x1="602.6" y1="677.7" x2="612.6" y2="695" stroke="#0B1E3F" stroke-width="14"></line>
+<line x1="563.6" y1="700.2" x2="573.6" y2="717.5" stroke="#0B1E3F" stroke-width="14"></line>
+<line x1="436.4" y1="700.2" x2="426.4" y2="717.5" stroke="#0B1E3F" stroke-width="14"></line>
+<line x1="397.4" y1="677.7" x2="387.4" y2="695" stroke="#0B1E3F" stroke-width="14"></line>
+<line x1="358.4" y1="655.2" x2="348.4" y2="672.5" stroke="#0B1E3F" stroke-width="14"></line>
+<line x1="294.8" y1="545" x2="274.8" y2="545" stroke="#0B1E3F" stroke-width="14"></line>
+<line x1="294.8" y1="500" x2="274.8" y2="500" stroke="#0B1E3F" stroke-width="14"></line>
+<line x1="294.8" y1="455" x2="274.8" y2="455" stroke="#0B1E3F" stroke-width="14"></line>
+<line x1="358.4" y1="344.8" x2="348.4" y2="327.5" stroke="#0B1E3F" stroke-width="14"></line>
+<line x1="397.4" y1="322.3" x2="387.4" y2="305" stroke="#0B1E3F" stroke-width="14"></line>
+<line x1="436.4" y1="299.8" x2="426.4" y2="282.5" stroke="#0B1E3F" stroke-width="14"></line>
+<polygon points="500,270 699.2,385 699.2,615 500,730 300.8,615 300.8,385" fill="#FFFFFF" stroke="#0B1E3F" stroke-width="22" stroke-linejoin="miter"></polygon>
+<polygon points="500,304 669.7,402 669.7,598 500,696 330.3,598 330.3,402" fill="none" stroke="#0B1E3F" stroke-width="8"></polygon>
+</g><g id="calque-bouclier">
+<path d="M392,392 H608 V528 C608,566 560,600 500,632 C440,600 392,566 392,528 Z" fill="#1D4ED8"></path>
+</g><g id="calque-chevrons">
+<polyline points="436,584 500,540 564,584" fill="none" stroke="#60A5FA" stroke-width="24" stroke-linejoin="miter" stroke-linecap="butt"></polyline>
+<polyline points="436,536 500,492 564,536" fill="none" stroke="#38BDF8" stroke-width="24" stroke-linejoin="miter" stroke-linecap="butt"></polyline>
+<polyline points="436,488 500,444 564,488" fill="none" stroke="#FFFFFF" stroke-width="24" stroke-linejoin="miter" stroke-linecap="butt"></polyline>
+</g></svg>
