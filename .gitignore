@@ -17,3 +17,6 @@ art/refs/
 # Témoin de la session qui travaille sur le plan
 art/.travail-en-cours
 __pycache__/
+
+# Scène exportée pour le précalcul de la lumière (régénérée par tools/bake)
+art/bake/

@@ -9,6 +9,7 @@ import { CableLayer, portFrame } from '../scene/cables.js';
 import { buildDevice, buildPatchPanel, flickerLed, highlightSocket, rackOccupied, setLed, type DeviceView, type PortView } from '../scene/devices.js';
 import { buildWhiteboard } from '../scene/details.js';
 import { buildAnnex } from '../scene/annex.js';
+import { applyLightmap } from '../scene/lightmaps.js';
 import { BUILDING, rackFillers, setMainDoorOpen } from '../scene/room.js';
 import type { Quality, Stage } from '../scene/stage.js';
 import { AskAicha } from '../ui/askAicha.js';
@@ -198,6 +199,7 @@ export class Mission {
     if (this.building) {
       this.player.enterBuilding(floors);
       const annex = buildAnnex(floors);
+      for (const part of annex.children) applyLightmap(part);
       stage.level.add(annex);
       for (const [key, name] of [['lab', 'part-lab'], ['lower', 'part-lower'], ['stairs', 'part-stairs'], ['office', 'part-office'], ['upper', 'part-upper']] as const) {
         const object = annex.getObjectByName(name);

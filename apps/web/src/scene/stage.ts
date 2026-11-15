@@ -9,6 +9,7 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { VignetteShader } from 'three/examples/jsm/shaders/VignetteShader.js';
+import { bakedOnly } from './lightmaps.js';
 
 export type Quality = 'low' | 'medium' | 'high';
 
@@ -112,6 +113,8 @@ export class Stage {
   private readonly extraLights: THREE.SpotLight[] = [];
   private readonly accents: THREE.Light[] = [];
   private readonly frontKey: THREE.SpotLight;
+  /** The rooms carry their baked light: see `useBakedLight`. */
+  private baked = false;
   private readonly ao: GTAOPass;
   private readonly vignette: ShaderPass;
   private readonly grade: ShaderPass;
@@ -199,6 +202,7 @@ export class Stage {
     ] as const) {
       const glow = new THREE.PointLight(colour, power, reach, 1.6);
       glow.position.set(x, y, z);
+      glow.userData.baked = true;
       this.scene.add(glow);
       this.accents.push(glow);
     }
@@ -294,14 +298,26 @@ export class Stage {
     }
     this.setSimple(q === 'low');
     // Fewer lights, the sky making up for them: a light costs on every pixel of the screen.
-    for (const light of this.extraLights) light.visible = full;
-    for (const light of this.accents) light.visible = full;
+    for (const light of this.extraLights) light.visible = full && !this.baked;
+    for (const light of this.accents) light.visible = full && !this.baked;
     this.sky.intensity = full ? 0.74 : q === 'medium' ? 0.74 : 1.2;
     this.scene.traverse((o) => {
       const m = (o as THREE.Mesh).material as THREE.Material | undefined;
       if (m && !Array.isArray(m)) m.needsUpdate = true;
     });
     this.resize();
+  }
+
+  /**
+   * The rooms' light is baked (see `lightmaps.ts`): the ceiling panels other than the two above the bench, the coloured
+   * glows of the machines and the light bouncing around are already in the walls, the floor and the furniture, which
+   * no longer take the sky or the lamps either (see `lightmaps.ts`). The other lights stay for the equipment the player
+   * moves: the two panels over the bench with their shadows, the sky, and the two lamps that follow the player.
+   */
+  useBakedLight(): void {
+    if (this.baked) return;
+    this.baked = true;
+    for (const light of [...this.extraLights, ...this.accents]) light.visible = false;
   }
 
   /** Where the two lamps go, and how strong they are: [x, y, z, power]. By default, over the technical room. */
@@ -345,6 +361,8 @@ export class Stage {
     if (!plain) {
       plain = new THREE.MeshLambertMaterial({
         map: full.map,
+        lightMap: full.lightMap,
+        lightMapIntensity: full.lightMapIntensity,
         color: full.color,
         emissive: full.emissive,
         emissiveMap: full.emissiveMap,
@@ -355,6 +373,7 @@ export class Stage {
         alphaTest: full.alphaTest,
         depthWrite: full.depthWrite,
       });
+      if (full.lightMap) bakedOnly(plain);
       this.simplified.set(full, plain);
     }
     mesh.userData.fullMaterial = full;

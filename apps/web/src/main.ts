@@ -12,6 +12,7 @@ import { startGamepad } from './game/gamepad.js';
 import { Mission } from './game/mission.js';
 import { buildDevice, rackOccupied } from './scene/devices.js';
 import { loadGear } from './scene/gear.js';
+import { applyLightmap, preloadLightmaps } from './scene/lightmaps.js';
 import { onPropAppeared } from './scene/props.js';
 import { buildRoom, rackFillers } from './scene/room.js';
 import { detectQuality, Stage } from './scene/stage.js';
@@ -31,7 +32,12 @@ if (!document.createElement('canvas').getContext('webgl2')) {
 }
 
 const stage = new Stage(document.getElementById('stage') as HTMLElement, detectQuality());
-stage.scene.add(buildRoom());
+const room = buildRoom();
+stage.scene.add(room);
+// The room's baked light, fetched while the equipment loads.
+const lightmaps = preloadLightmaps().then((found) => {
+  if (found && applyLightmap(room) > 0) stage.useBakedLight();
+});
 onPropAppeared(() => stage.refreshShadows(1));
 if (stage.currentQuality === 'high') {
   stage.captureEnvironment();
@@ -140,6 +146,7 @@ if (import.meta.env.DEV) {
     stage,
     sound,
     mission: () => mission,
+    exportStatic: async () => (await import('./scene/lightmap-export.js')).exportStatic(stage.scene),
     portOnScreen(device: string, port: string): [number, number] | null {
       let found: THREE.Object3D | undefined;
       stage.level.traverse((o) => {
@@ -155,7 +162,7 @@ if (import.meta.env.DEV) {
 }
 
 // The equipment's models come first: every room built afterwards uses them.
-void loadGear().finally(() => {
+void Promise.all([loadGear(), lightmaps]).finally(() => {
   title();
   void stage.prepare().then(() => bootScreen.remove());
 });

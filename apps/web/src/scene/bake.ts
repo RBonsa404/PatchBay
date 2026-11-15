@@ -38,6 +38,7 @@ export function bake(group: THREE.Group): void {
     mesh.geometry.dispose();
     mesh.parent?.remove(mesh);
   }
+  let index = 0;
   for (const { material, mesh, geometries } of buckets.values()) {
     const merged = mergeGeometries(geometries, false);
     for (const g of geometries) g.dispose();
@@ -46,8 +47,22 @@ export function bake(group: THREE.Group): void {
     out.castShadow = mesh.castShadow;
     out.receiveShadow = mesh.receiveShadow;
     out.renderOrder = mesh.renderOrder;
+    // Named and fingerprinted, so that the light baked for it in Blender finds it again (see `lightmaps.ts`).
+    out.name = `${group.name || 'group'}#${index++}`;
+    out.userData.signature = signature(merged);
     group.add(out);
   }
+}
+
+/** A fingerprint of a geometry's vertices: it changes as soon as anything in the room moves, is added or removed. */
+export function signature(geometry: THREE.BufferGeometry): string {
+  const p = geometry.attributes.position as THREE.BufferAttribute;
+  let h = 0x811c9dc5;
+  for (let i = 0; i < p.array.length; i++) {
+    h ^= Math.round((p.array[i] as number) * 1000);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return `${p.count}-${h.toString(16)}`;
 }
 
 /** For what never moves: its position is worked out once, and no longer on every frame. */
