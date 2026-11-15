@@ -184,7 +184,8 @@ function cabinetRow(): THREE.Group {
 function desk(): THREE.Group {
   const g = new THREE.Group();
   // Against the front wall, under the window (as `building.ts` stops the player around it).
-  const [x, z, top] = [-0.9, 5.5, 0.74];
+  // In the front left corner, clear of the second row of racks, under its window.
+  const [x, z, top] = [-4.5, 5.5, 0.74];
   g.add(box(1.5, 0.035, 0.7, M.wood, x, top, z));
   for (const dx of [-0.7, 0.7]) g.add(box(0.04, top, 0.62, M.steel, x + dx, top / 2, z));
   g.add(box(0.42, 0.56, 0.55, M.paintedGrey, x + 0.48, 0.3, z));
@@ -303,10 +304,10 @@ function walls(): THREE.Group {
 function floor(): THREE.Group {
   const g = new THREE.Group();
   const bin = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.12, 0.38, 20), M.darkSteel);
-  bin.position.set(0.25, 0.19, FACE.front - 0.3);
+  bin.position.set(-3.35, 0.19, FACE.front - 0.3);
   bin.castShadow = true;
   const binShadow = contactShadow(0.5, 0.5, 0.5);
-  binShadow.position.set(0.25, 0.003, FACE.front - 0.3);
+  binShadow.position.set(-3.35, 0.003, FACE.front - 0.3);
   g.add(bin, binShadow);
 
   // Yellow floor tape marking the clearance in front of the cabinets.

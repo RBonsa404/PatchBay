@@ -26,6 +26,8 @@ import { settings } from '../settings.js';
 import { Minimap } from '../ui/minimap.js';
 import { playTrip, showSiteChooser } from '../ui/travel.js';
 import { buildExterior, buildStreet, ENTRANCES } from '../scene/exterior.js';
+import { journeyMap, journeyPath, journeyTrail, JOURNEY_ORIGIN } from '../scene/journey.js';
+import { distanceKm, SITES } from '../ui/travel.js';
 import { pauseOpen, showPause } from '../ui/pause.js';
 import { understand, type VoiceCommand } from '../voice-commands.js';
 
@@ -963,6 +965,61 @@ export class Mission {
     return { door, out, side };
   }
 
+  /**
+   * The flight over Burkina Faso: the camera comes down out of the sky over the departure town, follows the line of
+   * light as it draws the road to the other site, and the distance counts up. The far building waits at the end.
+   */
+  private async flyOver(from: SiteName, to: SiteName): Promise<void> {
+    const stage = this.stage;
+    const camera = stage.camera;
+    const map = journeyMap();
+    if (!map.parent) stage.scene.add(map);
+    const curve = journeyPath(from, to);
+    const trail = journeyTrail(curve);
+    map.add(trail.group);
+    map.visible = true;
+    const km = distanceKm(from, to);
+    const far = km > 50;
+    const card = h('div', { class: 'journey-card' }, h('span', { class: 'label' }, 'En route'), h('strong', {}, `${SITES[from].city.split(',')[0]} → ${SITES[to].city.split(',')[0]}`), h('b', { class: 'journey-km' }, '0 km'), h('small', {}, far ? 'Une seule liaison entre les deux sites : la ligne louée de l’opérateur.' : 'Le fournisseur d’accès est dans la même ville.'));
+    document.body.append(card);
+    const oldFar = camera.far;
+    camera.far = 2600;
+    camera.updateProjectionMatrix();
+    stage.scene.fog = new THREE.Fog('#dfe6ee', far ? 520 : 220, far ? 2300 : 1100);
+    stage.setOutdoors(true, JOURNEY_ORIGIN, new THREE.Vector3(-0.4, 1, 0.5));
+    camera.far = 2600;
+    camera.updateProjectionMatrix();
+    const tangent = new THREE.Vector3();
+    const look = new THREE.Vector3();
+    const [height, back] = far ? [46, 58] : [9, 14];
+    const clouds = map.children.filter((c) => c.name === 'cloud');
+    await this.blackout(false);
+    let last = 0;
+    await stage.animate(far ? 6.5 : 4.2, (t) => {
+      const p = trail.draw(t);
+      curve.getTangentAt(Math.min(0.999, Math.max(0.001, t)), tangent);
+      tangent.y = 0;
+      tangent.normalize();
+      // Out of the sky at the start, low over the land at the end.
+      const fall = 1 - t;
+      camera.position.copy(p).addScaledVector(tangent, -back * (0.7 + fall * 0.6)).setY(p.y + height * (0.55 + fall * 1.1));
+      look.copy(p).addScaledVector(tangent, back * 0.35);
+      camera.lookAt(look);
+      (card.querySelector('.journey-km') as HTMLElement).textContent = `${Math.round(km * t)} km`;
+      for (const c of clouds) c.position.x += (t - last) * 30 * (c.userData.drift as number);
+      last = t;
+    });
+    await new Promise((r) => setTimeout(r, 300));
+    await this.blackout(true);
+    card.remove();
+    map.remove(trail.group);
+    trail.group.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
+    map.visible = false;
+    stage.scene.fog = null;
+    camera.far = oldFar;
+    camera.updateProjectionMatrix();
+  }
+
   /** A camera move over `seconds`, from one point looking at one target to another. */
   private shot(seconds: number, from: THREE.Vector3, fromLook: THREE.Vector3, to: THREE.Vector3, toLook: THREE.Vector3): Promise<void> {
     const camera = this.stage.camera;
@@ -984,6 +1041,8 @@ export class Mission {
     document.body.classList.add('cinematic');
     const quick = reducedMotion();
     await this.blackout(true);
+    // Between the shots of the trip, a light haze rather than black: as if passing through cloud.
+    this.fade?.classList.add('haze');
     // Leaving: the rooms not yet built are built now, while the screen is dark (the façade's windows look into them).
     if (from === 'campus') while (this.later.length) (this.later.shift() as () => void)();
     if (!quick) {
@@ -991,29 +1050,24 @@ export class Mission {
       const up = new THREE.Vector3(0, 1, 0);
       const centre = door.clone().addScaledVector(out, -6).addScaledVector(up, 3.2);
       await this.blackout(false);
-      await this.shot(3.4, door.clone().addScaledVector(out, 2.4).addScaledVector(up, 1.65), door.clone().addScaledVector(up, 1.5), door.clone().addScaledVector(out, 17).addScaledVector(side, 7).addScaledVector(up, 7.5), centre);
+      await this.shot(3.4, door.clone().addScaledVector(out, 2.4).addScaledVector(up, 1.65), door.clone().addScaledVector(up, 1.5), door.clone().addScaledVector(out, 18).addScaledVector(side, 7).addScaledVector(up, 12), centre);
       await this.blackout(true);
       this.goOutside(from, false);
     }
     sound.play('click');
-    await new Promise<void>((resolve) =>
-      playTrip(
-        from,
-        to,
-        () => {
-          this.buildSiteOnce(to);
-          if (!quick) {
-            const { door, out, side } = this.goOutside(to, true);
-            const camera = this.stage.camera;
-            camera.position.copy(door).addScaledVector(out, 20).addScaledVector(side, -8).setY(9);
-            camera.lookAt(door.clone().addScaledVector(out, -6).setY(3));
-            this.stage.wake();
-          }
-          if (this.fade) this.fade.classList.remove('on');
-        },
-        resolve,
-      ),
-    );
+    if (quick) {
+      await new Promise<void>((resolve) => playTrip(from, to, () => this.buildSiteOnce(to), resolve));
+    } else {
+      // The far building is built while the screen is still dark, then the flight over the map.
+      this.buildSiteOnce(to);
+      this.outsideOf(to);
+      await this.flyOver(from, to);
+      const { door, out, side } = this.goOutside(to, true);
+      const camera = this.stage.camera;
+      camera.position.copy(door).addScaledVector(out, 20).addScaledVector(side, -8).setY(9);
+      camera.lookAt(door.clone().addScaledVector(out, -6).setY(3));
+      await this.blackout(false);
+    }
     if (!quick) {
       const { door, out, side } = this.goOutside(to, true);
       await this.shot(3.2, door.clone().addScaledVector(out, 20).addScaledVector(side, -8).setY(9), door.clone().addScaledVector(out, -6).setY(3), door.clone().addScaledVector(out, 2.6).setY(1.65), door.clone().setY(1.5));
@@ -1033,6 +1087,7 @@ export class Mission {
     this.cull();
     this.stage.camera.position.copy(this.player.eye);
     document.body.classList.remove('cinematic');
+    this.fade?.classList.remove('haze');
     this.travelling = false;
     this.paused = false;
     this.clockAt = performance.now();
@@ -1293,36 +1348,29 @@ export class Mission {
   private cull(): void {
     if (!this.building) return;
     const zone = zoneOf(this.player.x, this.player.floorY + 0.1, this.player.z);
-    // Through the two aligned doors, the far room shows only from the doors' side of the room.
-    const nearDoors = this.player.x < (DOORS[0] as { x: number }).x + 1.4;
-    const seen: Record<Zone, string[]> = {
-      room: ['room', 'lower', ...(nearDoors ? ['lab'] : [])],
-      corridor: ['room', 'lower', 'lab', 'stairs', 'west'],
-      lab: ['lab', 'lower', ...(nearDoors ? ['room'] : [])],
-      stairs: ['lower', 'upper', 'stairs'],
-      corridor1: ['upper', 'office', 'stairs', 'classes'],
-      office: ['office', 'upper'],
-      classroom0: ['west', 'lower'],
-      toilets: ['west', 'lower'],
-      lounge: ['west', 'lower'],
-      classroom1: ['classes', 'upper'],
-      classroom2: ['classes', 'upper'],
-      agence: ['agence', 'agence-wing'],
-      datacenter: ['datacenter', 'datacenter-wing'],
-      ...Object.fromEntries((['agence', 'datacenter'] as const).flatMap((site) => (['corridor', 'hall', 'office', 'meeting', 'toilets'] as const).map((room) => [`${site}-${room}`, [`${site}-wing`, site]]))),
-    } as Record<Zone, string[]>;
-    // A room beyond a door is drawn only while that doorway is in sight (or the player stands in it): from the
-    // corridor, the rooms behind the player's back cost nothing.
+    // What can be seen: the room the player is in, then through each doorway in sight the room beyond, and through
+    // that room's doorways in sight the next, three doors deep. A room seen across a corridor is drawn; one behind
+    // the player's back is not.
     const camera = this.stage.camera;
     camera.updateMatrixWorld();
     this.frustum.setFromProjectionMatrix(this.viewMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
-    const own = partOf(zone);
-    const shown = seen[zone].filter((part) => {
-      if (part === own) return true;
-      const doors = this.portalList().filter((d) => (d.a === zone && partOf(d.b) === part) || (d.b === zone && partOf(d.a) === part));
-      if (!doors.length) return true;
-      return doors.some((d) => this.frustum.intersectsBox(d.box) || d.centre.distanceTo(this.player.eye) < 1.6);
-    });
+    const eye = this.player.eye;
+    const seenZones = new Set<Zone>([zone]);
+    let frontier: Zone[] = [zone];
+    for (let depth = 0; depth < 3 && frontier.length; depth++) {
+      const next: Zone[] = [];
+      for (const here of frontier) {
+        for (const d of this.portalList()) {
+          const other = d.a === here ? d.b : d.b === here ? d.a : null;
+          if (!other || seenZones.has(other)) continue;
+          if (!this.frustum.intersectsBox(d.box) && d.centre.distanceTo(eye) > 1.6) continue;
+          seenZones.add(other);
+          next.push(other);
+        }
+      }
+      frontier = next;
+    }
+    const shown = [...new Set([...seenZones].map(partOf))].sort();
     const key = shown.join();
     if (key === this.shown) return;
     this.shown = key;

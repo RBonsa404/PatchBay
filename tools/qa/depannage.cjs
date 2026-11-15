@@ -17,7 +17,7 @@ const OUT = process.argv[2];
   }
   const report = await page.evaluate(() => {
     const m = window.__patchbay.mission();
-    const end = (d, p) => m.devices.get(d)?.ports.get(p);
+    const end = (d, p) => (m.devices.get(d) ?? m.panels.get(d))?.ports.get(p);
     const link = () => m.net.hostLinkUp({ device: 'PC1', port: 'FastEthernet0' });
     const before = link();
     m.unplug(end('PC1', 'FastEthernet0'));

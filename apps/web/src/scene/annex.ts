@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { bake, freeze } from './bake.js';
-import { CLASS0_DESKS, CLASS_UP_DESKS, DOORS, SITE_EXIT_X, SITE_WINGS, SITE_Z, FLOOR_Y, LAB_DESK_ROWS, LAB_Z, ROOMS, WALL as WALL_T, type Door, type Rect } from './building.js';
+import { CLASS0_SPOTS, classUpSpots, DOORS, SITE_EXIT_X, SITE_WINGS, SITE_Z, FLOOR_Y, LAB_DESK_ROWS, LAB_Z, ROOMS, WALL as WALL_T, type Door, type Rect } from './building.js';
 import { contactShadow, keyboardTexture, photo } from './materials.js';
 import { placeAll, placeMany, placeProp } from './props.js';
 import { gearModel } from './gear.js';
@@ -343,8 +343,7 @@ function westWing(props: Placed[]): THREE.Group {
   const g = new THREE.Group();
   const c = ROOMS.classroom0;
   const desks: { x: number; z: number }[] = [];
-  for (const x of [-11.3, -10.0, -8.7, -7.4]) for (const z of [-0.2, 0.9, 2.0, 3.1, 4.2]) desks.push({ x, z });
-  void CLASS0_DESKS;
+  desks.push(...CLASS0_SPOTS);
   g.add(
     classroom(c, 0, { x: c.x0 + WALL_T / 2 + 0.01, z: 2.1, turn: Math.PI / 2 }, desks, -Math.PI / 2, [0.55, 0], { x: -12.9, z: 2.0, turn: Math.PI / 2 }, [], props),
   );
@@ -378,11 +377,10 @@ function upperClasses(props: Placed[]): THREE.Group {
   const g = new THREE.Group();
   for (const [r, side] of [[ROOMS.classroom1, -1], [ROOMS.classroom2, 1]] as const) {
     const desks: { x: number; z: number }[] = [];
-    for (let i = 0; i < 4; i++) for (const z of [-9.6, -8.4, -7.2, -6.0]) desks.push({ x: r.x0 + 1.55 + i * 1.3, z });
+    desks.push(...classUpSpots(r));
     const middle = (r.x0 + r.x1) / 2;
     g.add(classroom(r, FLOOR_Y, { x: middle, z: r.z0 + WALL_T / 2 + 0.01, turn: 0 }, desks, Math.PI, [0, 0.55], { x: middle + side * 2.2, z: -10.75, turn: 0 }, [], props));
   }
-  void CLASS_UP_DESKS;
   return g;
 }
 

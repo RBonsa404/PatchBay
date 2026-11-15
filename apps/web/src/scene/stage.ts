@@ -237,7 +237,8 @@ export class Stage {
       hideForAo();
       this.scene.traverseVisible((o) => {
         const material = (o as THREE.Mesh).material as THREE.Material | undefined;
-        if ((o as THREE.Mesh).isMesh && material && !Array.isArray(material) && !material.depthWrite) o.visible = false;
+        if ((o as THREE.Sprite).isSprite) o.visible = false;
+        else if ((o as THREE.Mesh).isMesh && material && !Array.isArray(material) && !material.depthWrite) o.visible = false;
       });
     };
     this.composer.addPass(this.ao);

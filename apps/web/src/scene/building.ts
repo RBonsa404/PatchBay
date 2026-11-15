@@ -334,7 +334,7 @@ export const WINDOWS: Window[] = [
   // The lab's outside wall, east, in the morning sun.
   ...[1.0, 3.2, 5.0].map((z) => win(ROOMS.lab.x1, LAB_Z + z, 'z', -1, 0, 1.5, true)),
   // The technical room, over its desk; the administration above it, three windows.
-  win(1.85, ROOMS.room.z1, 'x', -1, 0, 1.4),
+  win(-4.5, ROOMS.room.z1, 'x', -1, 0, 1.4),
   ...[-3.0, 0, 3.0].map((x) => win(x, ROOMS.room.z1, 'x', -1, FLOOR_Y, 1.8)),
   // Classroom 001, south; the lounge, north.
   ...[-12.4, -9.9, -7.4].map((x) => win(x, ROOMS.classroom0.z1, 'x', -1, 0, 1.5)),
@@ -441,8 +441,15 @@ function roomFurniture(z: number, y: number): Obstacle[] {
 }
 const LAB_ROWS = [2.0, 3.45, 4.9];
 /** Where the classrooms' student desks stand (`annex.ts` lays them out in these blocks). */
-export const CLASS0_DESKS = { x0: -11.75, x1: -6.75, z0: -0.6, z1: 4.6 } as const;
-export const CLASS_UP_DESKS = { z0: -9.95, z1: -5.1 } as const;
+/**
+ * The classrooms' student desks, with aisles a person walks down: in classroom 001 (students facing the board on the
+ * west wall) three columns a good metre apart; upstairs, two pairs of columns either side of a central aisle that
+ * starts at the door. `annex.ts` lays the desks out at these spots; each desk and its chair stop the player.
+ */
+export const CLASS0_SPOTS: { x: number; z: number }[] = [-11.0, -9.2, -7.4].flatMap((x) => [0.1, 1.25, 2.4, 3.55, 4.7].map((z) => ({ x, z })));
+export function classUpSpots(r: Rect): { x: number; z: number }[] {
+  return [0.8, 1.6, 4.6, 5.4].flatMap((dx) => [-9.4, -8.1, -6.8, -5.5].map((z) => ({ x: r.x0 + dx, z })));
+}
 const FURNITURE: Obstacle[] = [
   // Technical room: bench and rack, server cabinet, extinguisher, shelving, cabinet row, cupboard, desk, chair, bin,
   // the second row of racks.
@@ -452,9 +459,9 @@ const FURNITURE: Obstacle[] = [
   { rect: rect(FACE.left, FACE.left + 0.5, 0.1, 2.1), y0: 0, y1: 2 },
   { rect: rect(FACE.right - 0.68, FACE.right, -0.4, 1.65), y0: 0, y1: 2 },
   { rect: rect(FACE.right - 0.53, FACE.right, 1.95, 3.25), y0: 0, y1: 1 },
-  { rect: rect(-1.65, -0.15, FACE.front - 0.75, FACE.front), y0: 0, y1: 1 },
-  { rect: rect(-1.25, -0.65, FACE.front - 1.4, FACE.front - 0.8), y0: 0, y1: 1 },
-  { rect: rect(0.1, 0.4, FACE.front - 0.45, FACE.front - 0.15), y0: 0, y1: 1 },
+  { rect: rect(-5.25, -3.75, FACE.front - 0.75, FACE.front), y0: 0, y1: 1 },
+  { rect: rect(-4.85, -4.25, FACE.front - 1.4, FACE.front - 0.8), y0: 0, y1: 1 },
+  { rect: rect(-3.5, -3.2, FACE.front - 0.45, FACE.front - 0.15), y0: 0, y1: 1 },
   { rect: rect(-3.0, 3.0, 3.25, 4.15), y0: 0, y1: 2.2 },
   // Lab room: the teacher's bench and rack, three rows of student desks either side of the aisle, the lockers.
   ...roomFurniture(LAB_Z, 0),
@@ -483,7 +490,11 @@ const FURNITURE: Obstacle[] = [
     ];
   }),
   // The classroom downstairs: its block of desks facing the board on the west wall, the teacher's desk.
-  { rect: rect(CLASS0_DESKS.x0, CLASS0_DESKS.x1, CLASS0_DESKS.z0, CLASS0_DESKS.z1), y0: 0, y1: 1 },
+  // Classroom 001: each desk (its width along z) and its chair on the desk's east side.
+  ...CLASS0_SPOTS.flatMap(({ x, z }) => [
+    { rect: rect(x - 0.28, x + 0.28, z - 0.36, z + 0.36), y0: 0, y1: 0.9 },
+    { rect: rect(x + 0.32, x + 0.78, z - 0.24, z + 0.24), y0: 0, y1: 0.9 },
+  ]),
   { rect: rect(-13.3, -12.5, 1.3, 2.7), y0: 0, y1: 1 },
   // Toilets: the cubicles along the back wall, the washbasins on the east wall.
   { rect: rect(-13.95, -11.0, -9.12, -7.55), y0: 0, y1: 2.1 },
@@ -496,7 +507,12 @@ const FURNITURE: Obstacle[] = [
   { rect: rect(-10.3, -9.4, -7.45, -6.45), y0: 0, y1: 1 },
   { rect: rect(-8.1, -7.2, -7.45, -6.45), y0: 0, y1: 1 },
   // Upstairs classrooms: desks facing the board on the back wall.
-  ...[ROOMS.classroom1, ROOMS.classroom2].map((r) => ({ rect: rect(r.x0 + 1.1, r.x1 - 1.1, CLASS_UP_DESKS.z0, CLASS_UP_DESKS.z1), y0: FLOOR_Y, y1: FLOOR_Y + 1 })),
+  ...[ROOMS.classroom1, ROOMS.classroom2].flatMap((r) =>
+    classUpSpots(r).flatMap(({ x, z }) => [
+      { rect: rect(x - 0.36, x + 0.36, z - 0.28, z + 0.28), y0: FLOOR_Y, y1: FLOOR_Y + 0.9 },
+      { rect: rect(x - 0.24, x + 0.24, z + 0.32, z + 0.78), y0: FLOOR_Y, y1: FLOOR_Y + 0.9 },
+    ]),
+  ),
   { rect: rect(-6.35, -5.05, -11.6, -10.15), y0: FLOOR_Y, y1: FLOOR_Y + 1 },
   { rect: rect(5.05, 6.35, -11.6, -10.15), y0: FLOOR_Y, y1: FLOOR_Y + 1 },
 ];
