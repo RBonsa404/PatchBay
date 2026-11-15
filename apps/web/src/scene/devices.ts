@@ -321,7 +321,7 @@ function modelSocket(parent: THREE.Object3D, m: Materials, device: string, spec:
 }
 
 /** Build a device from its Blender model: its meshes, then a socket at each `port:` marker. False if there is none. */
-function buildFromGear(name: GearName, id: string, model: DeviceModel, m: Materials, view: DeviceView, tag: string): boolean {
+function buildFromGear(name: GearName, id: string, model: DeviceModel, m: Materials, view: DeviceView, tag: string, tagColour = '#0f172a'): boolean {
   const source = gearModel(name);
   if (!source) return false;
   const copy = source.clone(true);
@@ -332,7 +332,7 @@ function buildFromGear(name: GearName, id: string, model: DeviceModel, m: Materi
   const markers = new Map<string, THREE.Object3D>();
   copy.traverse((o) => {
     const label = (o.userData.name as string | undefined) ?? o.name;
-    if (label.startsWith('port:') || label.startsWith('led:') || label === 'tag') markers.set(label, o);
+    if (label.startsWith('port:') || label.startsWith('led:') || label.startsWith('note:') || label === 'tag') markers.set(label, o);
     else if ((o as THREE.Mesh).isMesh) {
       o.castShadow = true;
       o.receiveShadow = true;
@@ -349,7 +349,35 @@ function buildFromGear(name: GearName, id: string, model: DeviceModel, m: Materi
   // The hostname on a printed tag, where the model marks it (else between the console and the ports).
   const spot = markers.get('tag');
   const at = spot ? local(spot) : new THREE.Vector3(-view.width / 2 + 0.13, view.height * 0.62, view.depth / 2);
-  label(view.root, tag, at.x, at.y, view.depth / 2, 0.07, 0.012, '#0f172a');
+  label(view.root, tag, at.x, at.y, view.depth / 2, 0.07, 0.012, tagColour);
+  return true;
+}
+
+/**
+ * A patch panel from its Blender model: the building's links arrive on its first ports, and where each one goes is
+ * written in the label window above its group of six, as a technician writes it with a marker.
+ */
+function panelFromGear(id: string, ports: { name: string; label: string }[], m: Materials, view: DeviceView): boolean {
+  if (!buildFromGear('patch-panel-24', id, { ports: ports.map((p) => ({ name: p.name, kind: 'ethernet' as const })) } as unknown as DeviceModel, m, view, id, '#fbbf24')) return false;
+  const copy = view.root.children.find((o) => o.type === 'Group' || o.type === 'Object3D' || (o as THREE.Mesh).isMesh);
+  const notes = new Map<string, THREE.Vector3>();
+  copy?.traverse((o) => {
+    const label = (o.userData.name as string | undefined) ?? o.name;
+    if (label.startsWith('note:')) notes.set(label.slice(5), view.root.worldToLocal(o.getWorldPosition(new THREE.Vector3())));
+  });
+  const groups = new Map<number, string[]>();
+  for (const p of ports) {
+    const n = Number(p.name.slice(1));
+    if (!p.label || !Number.isFinite(n)) continue;
+    const group = Math.floor((n - 1) / 6);
+    groups.set(group, [...(groups.get(group) ?? []), `${n} : ${p.label}`]);
+  }
+  for (const [group, lines] of groups) {
+    const first = notes.get(`P${group * 6 + 1}`);
+    const last = notes.get(`P${group * 6 + 6}`);
+    if (!first || !last) continue;
+    label(view.root, lines.join('   ·   '), (first.x + last.x) / 2, first.y, view.depth / 2 + 0.0004, 0.09, 0.0058, '#0f172a');
+  }
   return true;
 }
 
@@ -536,6 +564,20 @@ export function buildPatchPanel(id: string, ports: { name: string; label: string
   const [w, h, d] = [0.445, 0.044, 0.05];
   const view: DeviceView = { id, shape: 'switch', root: new THREE.Group(), ports: new Map(), body: [], height: h, width: w, depth: d, inRack: true, roomZ, roomY };
   view.root.name = id;
+  if (panelFromGear(id, ports, m, view)) {
+    view.root.position.set(0, PANEL_Y + roomY, RACK.frontZ - view.depth / 2 + roomZ);
+    addRackEars(view.root, view.width, view.height, view.depth);
+    pickCopies(view, m);
+    for (const b of view.body) b.userData.device = id;
+    for (const port of view.ports.values()) {
+      port.hit.visible = false;
+      port.hit.userData.dynamic = true;
+      port.socket.userData.dynamic = true;
+    }
+    bake(view.root);
+    freeze(view.root);
+    return view;
+  }
   const chassis = mesh(new THREE.BoxGeometry(w, h, d), m.panel);
   chassis.position.y = h / 2;
   view.root.add(chassis);
