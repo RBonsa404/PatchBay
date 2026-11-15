@@ -61,7 +61,7 @@ export class Hud {
   private readonly qualityButton: HTMLElement;
   private readonly micButton: HTMLButtonElement | null;
 
-  constructor(private readonly level: Level, private readonly actions: HudActions, quality: Quality, index = 0, private readonly exam = false) {
+  constructor(private readonly level: Level, private readonly actions: HudActions, quality: Quality, index = 0, private readonly exam = false, tour = false) {
     this.objectivesList = h('ol', { class: 'objective-list' });
     this.scoreLabel = h('span', { class: 'score' }, '0');
     this.scoreBar = h('span', { class: 'fill' });
@@ -85,18 +85,18 @@ export class Hud {
 
     const root = h(
       'div',
-      { class: 'hud' },
+      { class: tour ? 'hud tour' : 'hud' },
       h(
         'header',
         { class: 'hud-top' },
-        h('div', { class: 'mission-chip panel-solid' }, h('span', { class: 'label' }, `${t('briefing.mission')} ${String(index + 1).padStart(2, '0')}`), h('strong', {}, tx(level.title))),
+        h('div', { class: 'mission-chip panel-solid' }, h('span', { class: 'label' }, tour ? t('tour.title') : `${t('briefing.mission')} ${String(index + 1).padStart(2, '0')}`), h('strong', {}, tour ? t('tour.chip') : tx(level.title))),
         h(
           'div',
           { class: 'toolbar panel-solid' },
           toolButton(t('brief.tool'), BookOpen, () => actions.brief()),
           toolButton(t('hud.view'), Scan, () => actions.overview()),
           h('i', { class: 'tool-sep' }),
-          exam ? null : toolButton(t('hud.hint'), Lightbulb, () => actions.hint()),
+          exam || tour ? null : toolButton(t('hud.hint'), Lightbulb, () => actions.hint()),
           exam ? null : toolButton(t('assistant.tool'), MessageCircleQuestion, () => actions.ask()),
           toolButton(t('ports.tool'), Keyboard, () => actions.ports()),
           toolButton(t('help.tool'), CircleHelp, () => actions.help()),
@@ -105,7 +105,7 @@ export class Hud {
           soundButton,
           this.micButton,
           toolButton(t('hud.menu'), Menu, () => actions.menu()),
-          h('button', { class: 'btn primary small', onclick: () => actions.check() }, icon(CircleCheckBig, 16), h('span', {}, exam ? t('exam.hand') : t('hud.check'))),
+          tour ? null : h('button', { class: 'btn primary small', onclick: () => actions.check() }, icon(CircleCheckBig, 16), h('span', {}, exam ? t('exam.hand') : t('hud.check'))),
         ),
       ),
       h(

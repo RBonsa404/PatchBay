@@ -6,6 +6,7 @@ import level04 from '../levels/l04-reseau-du-batiment.json';
 import { levelSchema } from './schema.js';
 
 export { levelSchema } from './schema.js';
+export { tour, TOUR_LEVEL, type TourStop } from './tour.js';
 
 /** Validate untrusted level data (a file, a teacher's upload). Throws a readable error listing every problem. */
 export function parseLevel(data: unknown): Level {

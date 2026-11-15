@@ -4,6 +4,8 @@ import { sound } from '../audio.js';
 import { t, tx } from '../i18n.js';
 import { Player, type MoveInput } from './player.js';
 import { Coach, type CoachView } from './coach.js';
+import { TourGuide } from './tour.js';
+import type { TourStop } from '@patchbay/content';
 import { setGameTarget, type GameTarget } from './gamepad.js';
 import { CableLayer, portFrame } from '../scene/cables.js';
 import { buildDevice, buildPatchPanel, flickerLed, highlightSocket, rackOccupied, setLed, type DeviceView, type PortView } from '../scene/devices.js';
@@ -11,9 +13,10 @@ import { buildWhiteboard } from '../scene/details.js';
 import { buildAnnex } from '../scene/annex.js';
 import { applyLightmap } from '../scene/lightmaps.js';
 import { BUILDING, rackFillers, setMainDoorOpen } from '../scene/room.js';
-import { DOORS, zoneOf, type ZoneName as Zone } from '../scene/building.js';
+import { blockedAt, DOORS, groundAt, zoneOf, type ZoneName as Zone } from '../scene/building.js';
 import type { Quality, Stage } from '../scene/stage.js';
 import { AskAicha } from '../ui/askAicha.js';
+import { h } from '../ui/dom.js';
 import { CABLE_ORDER, Hud } from '../ui/hud.js';
 import { closePanel, Consoles, openPanelKey, resetHostShells, showHostPanel, showBriefPanel, showConfirm, showHelp, showNotice, showPortList } from '../ui/panels.js';
 import { extraCables, tidiness, type Tidiness } from './cabling.js';
@@ -80,7 +83,12 @@ const LONG_PRESS_MS = 550;
 export interface MissionEvents {
   complete(result: Grade): void;
   menu(): void;
+  /** The guided tour's last button: on to the first mission. */
+  tourDone?(): void;
 }
+
+/** The zone the player stands in to see a level's room. */
+const ROOM_ZONE: Record<string, Zone> = { '': 'room', annexe: 'lab', etage: 'office' };
 
 /** One level being played: the network, its 3D devices and cables, the HUD and the player's actions. */
 export class Mission {
@@ -138,8 +146,13 @@ export class Mission {
   private readonly aicha: AskAicha;
   /** Sitting at the laptop: getting up when the console closes. */
   private seated = false;
+  /** A guided tour: no clock and no grade, Aïcha's bubble takes the player from one piece of equipment to the next. */
+  private readonly tour: boolean;
+  private guide: TourGuide | null = null;
+  private fade: HTMLElement | null = null;
 
-  constructor(private readonly stage: Stage, readonly level: Level, private readonly events: MissionEvents, index = 0, private readonly exam = false) {
+  constructor(private readonly stage: Stage, readonly level: Level, private readonly events: MissionEvents, index = 0, private readonly exam = false, tour: TourStop[] | null = null) {
+    this.tour = tour !== null;
     this.clockAt = performance.now();
     this.limit = Math.round((level.timeLimit ?? DEFAULT_LIMIT) * (exam ? EXAM_TIME : 1));
     this.remaining = this.limit;
@@ -238,15 +251,92 @@ export class Mission {
       cycleQuality: () => this.cycleQuality(),
       listen: () => this.listenVoice(),
       selectCable: (type) => this.select(type),
-    }, stage.currentQuality, index, exam);
-    setTimeout(() => this.hud.banner(`${t('briefing.mission')} ${String(index + 1).padStart(2, '0')}`, exam ? t('exam.start') : this.coach?.active ? t('timer.tutorial') : t('timer.start')), this.entrance * 1000);
+    }, stage.currentQuality, index, exam, this.tour);
+    setTimeout(() => (this.tour ? this.hud.banner(t('tour.title'), t('tour.banner')) : this.hud.banner(`${t('briefing.mission')} ${String(index + 1).padStart(2, '0')}`, exam ? t('exam.start') : this.coach?.active ? t('timer.tutorial') : t('timer.start'))), this.entrance * 1000);
     stage.onQualityLowered = (q) => this.hud.showQuality(q);
     this.cleanup.push(() => {
       stage.onQualityLowered = null;
     });
     this.listen();
     this.afterChange();
-    this.coach = exam ? null : Coach.for(level.id, stage, () => this.coachView());
+    this.coach = exam || tour ? null : Coach.for(level.id, stage, () => this.coachView());
+    if (tour) {
+      this.guide = new TourGuide(tour, {
+        show: (stop) => void this.showStop(stop),
+        done: () => (this.events.tourDone ? this.events.tourDone() : this.events.menu()),
+        quit: () => this.events.menu(),
+      });
+    }
+  }
+
+  // ---- the guided tour ------------------------------------------------------------------------------------------
+
+  /** Take the player's eyes to what a stop of the tour is about, in whichever room it is. */
+  private async showStop(stop: TourStop): Promise<void> {
+    const f = stop.focus;
+    if ('device' in f) {
+      const view = this.devices.get(f.device) ?? this.panels.get(f.device);
+      if (!view) return;
+      const room = this.level.devices.find((d) => d.id === f.device)?.room ?? this.level.panels?.find((p) => p.id === f.device)?.room ?? '';
+      await this.goToRoom(room, view.root.getWorldPosition(new THREE.Vector3()).x);
+      this.focusOn(view, true);
+    } else {
+      await this.goToRoom('');
+      if ('board' in f) this.toggleBoard();
+      else this.overview();
+    }
+  }
+
+  /** Stop any flight or zoom: the eyes are the player's again, where they stand. */
+  private settle(): void {
+    this.flight++;
+    this.stage.stopFlight();
+    this.flying = false;
+    this.following = true;
+    this.anchor = null;
+    this.seated = false;
+  }
+
+  /**
+   * Bring the player into a room of the level, in front of its bench (as near `x` as the furniture allows). Another
+   * room is reached in a short fade to black: flying through the walls would show the inside of the building.
+   */
+  private async goToRoom(room: string, x = 0): Promise<void> {
+    this.settle();
+    const zone = zoneOf(this.player.x, this.player.floorY + 0.1, this.player.z);
+    if (zone === ROOM_ZONE[room]) return;
+    const origin = (ORIGINS[room] ?? ORIGINS['']) as Origin;
+    const spot = this.freeSpot(x, origin.z + 1.75, origin.y) ?? this.freeSpot(0, origin.z + 1.75, origin.y);
+    if (!spot) return;
+    const fade = (this.fade ??= document.body.appendChild(h('div', { class: 'tour-fade', 'aria-hidden': 'true' })));
+    const quick = reducedMotion();
+    if (!quick) {
+      fade.classList.add('on');
+      await new Promise((r) => setTimeout(r, 240));
+    }
+    this.player.place(spot[0], spot[1], spot[2]);
+    this.player.faceHome();
+    this.settle();
+    this.stage.camera.position.copy(this.player.eye);
+    sound.play('step');
+    if (!quick) {
+      await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 80)));
+      fade.classList.remove('on');
+    }
+  }
+
+  /** The nearest place to (x, z) where a body can stand on floor `y`, searching in widening rings. */
+  private freeSpot(x: number, z: number, y: number): [number, number, number] | null {
+    for (let r = 0; r <= 1.6; r += 0.2) {
+      const turns = r === 0 ? 1 : 12;
+      for (let i = 0; i < turns; i++) {
+        const a = (i / turns) * Math.PI * 2;
+        const [px, pz] = [x + Math.cos(a) * r, z + Math.sin(a) * r];
+        const g = groundAt(px, pz, y);
+        if (g !== null && Math.abs(g - y) < 0.05 && !blockedAt(px, pz, g)) return [px, pz, g];
+      }
+    }
+    return null;
   }
 
   private coachView(): CoachView {
@@ -294,6 +384,8 @@ export class Mission {
     for (const fn of this.cleanup) fn();
     this.stopListening?.();
     this.coach?.dispose();
+    this.guide?.dispose();
+    this.fade?.remove();
     this.cables.showPreview('straight', null, null);
     this.hud.destroy();
     closePanel();
@@ -693,10 +785,16 @@ export class Mission {
   private onFocus(): void {
     const { port, device } = this.pick();
     const view = this.devices.get(port?.device ?? device ?? '') ?? this.panels.get(port?.device ?? device ?? '');
-    if (!view) return;
-    const target = view.root.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, view.height * 0.6, 0));
-    const distance = Math.max(0.42, view.width * 1.25);
-    const position = target.clone().add(new THREE.Vector3(0, distance * 0.35, distance));
+    if (view) this.focusOn(view);
+  }
+
+  /** A close look at a device: the eyes fly up to its front. */
+  private focusOn(view: DeviceView, wide = false): void {
+    const centre = view.root.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, view.height * 0.6, 0));
+    // The tour shows the device in its setting, in the top half of the screen: Aïcha's bubble is below it.
+    const distance = wide ? Math.max(0.95, view.width * 2.1) : Math.max(0.42, view.width * 1.25);
+    const target = wide ? centre.clone().add(new THREE.Vector3(0, -distance * 0.2, 0)) : centre;
+    const position = centre.clone().add(new THREE.Vector3(0, distance * 0.35, distance));
     this.fly(position, target, 0.9, () => {
       this.anchor = position;
       this.player.lookAlong(target.clone().sub(position));
@@ -747,7 +845,7 @@ export class Mission {
 
   /** Leaving loses the work in progress: ask first. */
   private leave(): void {
-    if (this.finished) return this.events.menu();
+    if (this.finished || this.tour) return this.events.menu();
     showConfirm(t('leave.title'), t('leave.text'), t('leave.confirm'), () => this.events.menu());
   }
 
@@ -877,6 +975,7 @@ export class Mission {
     if (this.paused) return;
     if (this.finished) return;
     this.twinkle(dt);
+    if (this.tour) return;
     if (this.entrance > 0) {
       this.entrance -= real;
     } else if (!this.coach?.active) {
@@ -1127,6 +1226,7 @@ export class Mission {
   }
 
   private check(): void {
+    if (this.tour) return;
     if (this.finished) return;
     const evaluation = evaluate(this.net, this.level.objectives);
     this.trafficResults = new Map(evaluation.results.filter((r) => TRAFFIC.has(this.level.objectives.find((o) => o.id === r.id)!.type)).map((r) => [r.id, r]));

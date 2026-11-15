@@ -1,7 +1,8 @@
 import { sound } from '../audio.js';
-import { ArrowLeft, ArrowRight, ChevronRight, GraduationCap, LayoutList, Lock, Play, RotateCcw, Settings, Star, Timer, Trophy } from 'lucide';
+import { ArrowLeft, ArrowRight, ChevronRight, Compass, GraduationCap, LayoutList, Lock, Play, RotateCcw, Settings, Star, Timer, Trophy } from 'lucide';
 import type { Level } from '@patchbay/sim-core';
 import { clock, type Grade } from '../game/scoring.js';
+import { tourSeen } from '../game/tour.js';
 import { t, tx } from '../i18n.js';
 import { clubBadge, dedsecCredit, icon, logo, MENTOR, mentorPortrait } from './brand.js';
 import { h, leave, starCount, ui } from './dom.js';
@@ -54,7 +55,8 @@ const button = (label: string, onclick: () => void, kind = '', glyph?: Parameter
   h('button', { class: `btn ${kind}`, onclick }, glyph && !after ? icon(glyph) : null, h('span', {}, label), glyph && after ? icon(glyph) : null);
 
 /** Title: the room in the background, the game's name and menu on the left, the club at the bottom. */
-export function showTitle(onPlay: () => void, onMissions: () => void, onSettings?: () => void): void {
+export function showTitle(onPlay: () => void, onMissions: () => void, onSettings?: () => void, onTour?: () => void): void {
+  const newcomer = !tourSeen() && progress.best('l01-cablage-console') === null;
   const screen: HTMLElement = h(
     'div',
     { class: 'screen screen-side' },
@@ -68,6 +70,9 @@ export function showTitle(onPlay: () => void, onMissions: () => void, onSettings
         'nav',
         { class: 'menu', 'aria-label': 'Menu principal' },
         h('button', { class: 'menu-item primary', onclick: () => void leave(screen).then(onPlay) }, icon(Play, 20), h('span', {}, t('title.play')), icon(ChevronRight, 20)),
+        onTour
+          ? h('button', { class: `menu-item${newcomer ? ' suggested' : ''}`, onclick: () => void leave(screen).then(onTour) }, icon(Compass, 20), h('span', {}, t('title.tour'), newcomer ? h('small', {}, t('title.tourNew')) : null), icon(ChevronRight, 20))
+          : null,
         h('button', { class: 'menu-item', onclick: () => void leave(screen).then(onMissions) }, icon(LayoutList, 20), h('span', {}, t('title.missions')), icon(ChevronRight, 20)),
         onSettings ? h('button', { class: 'menu-item', onclick: () => void leave(screen).then(onSettings) }, icon(Settings, 20), h('span', {}, t('settings.title')), icon(ChevronRight, 20)) : null,
       ),

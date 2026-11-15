@@ -6,8 +6,8 @@ import type { Text } from '../../sim-core/src/index.js';
  */
 
 export interface TourStop {
-  /** What the camera looks at: a device or panel by its id, the whiteboard, or the whole room. */
-  focus: { device: string } | { board: true } | { room: true };
+  /** What the camera looks at: a device or panel by its id, the whiteboard, the whole room, or the cable reserve. */
+  focus: { device: string } | { board: true } | { room: true } | { cables: true };
   title: Text;
   text: Text;
 }
@@ -58,7 +58,7 @@ export const tour: TourStop[] = [
     },
   },
   {
-    focus: { room: true },
+    focus: { cables: true },
     title: { fr: 'Le bon câble pour chaque liaison' },
     text: {
       fr: "En bas de l'écran, ta réserve de câbles. Le câble droit, bleu, relie deux appareils différents : un PC à un switch, un switch à un routeur. Le câble croisé, orange, relie deux appareils semblables : deux switchs, ou un PC directement à un routeur. Le câble console sert à configurer, et le câble série relie deux routeurs éloignés. Quand tu prends un câble, les ports où il peut aller s'allument en vert.",
@@ -75,7 +75,7 @@ export const tour: TourStop[] = [
     focus: { device: 'S2' },
     title: { fr: 'Les autres salles du bâtiment' },
     text: {
-      fr: "Le réseau ne s'arrête pas à cette pièce. La salle de TP, au bout du couloir, et l'administration, à l'étage, ont chacune leur baie et leur switch. Ils remontent jusqu'ici par les câbles du bâtiment. Les VLAN séparent ensuite les étudiants, les enseignants et l'administration sur le même matériel.",
+      fr: "Le réseau ne s'arrête pas à cette pièce. La salle de TP, au bout du couloir, et l'administration, à l'étage, ont chacune leur baie et leur switch. Ils remontent jusqu'à la salle technique par les câbles posés dans les murs, puis par les panneaux de brassage. Les VLAN séparent ensuite les étudiants, les enseignants et l'administration sur le même matériel.",
     },
   },
   {

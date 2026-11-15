@@ -5,7 +5,7 @@ import '@fontsource/inter/600.css';
 import '@fontsource/jetbrains-mono/400.css';
 import './style.css';
 import * as THREE from 'three';
-import { campaign } from '@patchbay/content';
+import { campaign, tour, TOUR_LEVEL } from '@patchbay/content';
 import { catalog, type Level } from '@patchbay/sim-core';
 import { sound } from './audio.js';
 import { startGamepad } from './game/gamepad.js';
@@ -94,7 +94,7 @@ function endShowcase(): void {
 
 function title(): void {
   showcase();
-  showTitle(() => briefing(firstUnfinished()), missions, () => showSettings(stage, title));
+  showTitle(() => briefing(firstUnfinished()), missions, () => showSettings(stage, title), visit);
 }
 
 function missions(): void {
@@ -113,7 +113,13 @@ function briefing(index: number): void {
   showBriefing(level, index, () => play(index), missions, () => play(index, true));
 }
 
-function play(index: number, exam = false): void {
+/** The guided tour of the equipment, in the building of the mission where every kind of it is found. */
+function visit(): void {
+  const index = campaign.findIndex((l) => l.id === TOUR_LEVEL);
+  play(index < 0 ? campaign.length - 1 : index, false, true);
+}
+
+function play(index: number, exam = false, guided = false): void {
   // A screen first, painted before the work starts: the mission is built, then its shaders compiled in the background.
   const loading = bootScreen.cloneNode(true) as HTMLElement;
   document.body.append(loading);
@@ -130,8 +136,9 @@ function play(index: number, exam = false): void {
           const next = index + 1 < campaign.length ? () => briefing(index + 1) : undefined;
           showResults(level, result, { ...(next ? { next } : {}), retry: () => play(index, exam), menu: missions });
         },
-        menu: missions,
-      }, index, exam);
+        menu: guided ? title : missions,
+        tourDone: () => briefing(0),
+      }, index, exam, guided ? tour : null);
       mission = started;
       void stage.prepare().then(() => {
         started.startClock();

@@ -30,7 +30,7 @@ async function open({ width = 1600, height = 900, soft = false, uncapped = false
 
 /** Start mission `n` (1-based) from the missions screen and wait until it is on screen. */
 async function startMission(page, n, exam = false) {
-  await page.click('.menu-item:nth-child(2)');
+  await page.click('.menu-item:has-text("Parcours")');
   await wait(500);
   await page.click(`.mission-row[data-mission="${n}"]`);
   await wait(500);

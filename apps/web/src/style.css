@@ -89,6 +89,9 @@ h1, h2, h3 { font-family: var(--font-heading); margin: 0; line-height: 1.2; font
   font: 600 15px var(--font-heading); letter-spacing: 0.08em; text-transform: uppercase; transition: background 0.15s, border-color 0.15s, padding 0.15s;
 }
 .menu-item span { flex: 1; }
+.menu-item span small { display: block; margin-top: 3px; font: 400 12.5px/1.35 var(--font-body); letter-spacing: 0; text-transform: none; color: var(--text-3); }
+.menu-item.suggested { border-color: rgba(56, 189, 248, 0.55); }
+.menu-item.suggested .icon:first-child { color: var(--cyan); }
 .menu-item .icon:last-child { opacity: 0.5; }
 .menu-item:hover { background: rgba(255, 255, 255, 0.06); border-color: var(--line-strong); padding-left: 22px; }
 .menu-item.primary { background: var(--amber); border-color: var(--amber); color: #111827; }
@@ -240,6 +243,14 @@ h1, h2, h3 { font-family: var(--font-heading); margin: 0; line-height: 1.2; font
 .coach .dots i.now { background: var(--amber); }
 /* With a side panel open, the mentor moves into the space left of it. */
 @media (min-width: 901px) { body:has(.panel) .coach { left: calc((100vw - min(560px, 100vw - 370px) - 28px) / 2); } }
+/* The guided tour: no clock, no checklist; the bubble has room for longer explanations. */
+.hud.tour .hud-timer, .hud.tour .objectives { display: none; }
+.tour-guide .coach-body strong { font-size: 15px; }
+.tour-guide p { min-height: 66px; line-height: 1.5; cursor: default; }
+.tour-guide .dots i { cursor: pointer; width: 8px; height: 8px; }
+.tour-guide footer .btn { display: inline-flex; align-items: center; gap: 4px; }
+.tour-fade { position: fixed; inset: 0; background: #050a18; opacity: 0; pointer-events: none; transition: opacity 0.22s ease; z-index: 14; }
+.tour-fade.on { opacity: 1; }
 .pulse-ui { outline: 2px solid var(--amber); outline-offset: 2px; animation: pulse-ui 1.2s ease-in-out infinite; }
 @keyframes pulse-ui { 50% { outline-color: rgba(251, 191, 36, 0.2); } }
 
@@ -550,3 +561,9 @@ body.time-low::after { content: ''; position: fixed; inset: 0; pointer-events: n
 .segmented button { padding: 6px 12px; border: 0; background: transparent; color: var(--text-2); font: 600 13px var(--font-heading); cursor: pointer; }
 .segmented button.on { background: var(--amber); color: #0b1220; }
 .pause-card .small { font-size: 12.5px; margin: -6px 0 0; }
+
+/* The tour's bubble: centred (there are no objectives on the left), wide enough for Aïcha's explanations. */
+.coach.tour-guide { left: 50%; right: auto; transform: translateX(-50%); width: min(720px, calc(100vw - 28px)); min-width: 0; animation: tour-rise 0.35s var(--ease-out); }
+@keyframes tour-rise { from { opacity: 0; transform: translate(-50%, 12px); } to { opacity: 1; transform: translate(-50%, 0); } }
+.coach.tour-guide .coach-body { min-width: 0; }
+@media (min-width: 901px) { .coach.tour-guide, body:has(.panel) .coach.tour-guide { left: 50%; right: auto; transform: translateX(-50%); bottom: 100px; } }
