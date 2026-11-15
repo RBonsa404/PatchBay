@@ -4,6 +4,7 @@ import type { PortView } from './devices.js';
 import { BENCH_TOP, MANAGER, RACK, roomOrigin } from './room.js';
 import { fillet, Rope } from './rope.js';
 import type { Stage } from './stage.js';
+import { atlasLabel } from './textures.js';
 
 /** Cable colours: the usual workshop habits (blue straight, amber crossover, light-blue console, dark serial). */
 export const CABLE_STYLE: Record<CableType, { colour: string; radius: number }> = {
@@ -177,6 +178,37 @@ function plug(type: CableType): THREE.Group {
   return g;
 }
 
+const LABEL_STOCK = new THREE.MeshStandardMaterial({ color: '#f4f6f8', roughness: 0.7 });
+const labelInks = new Map<THREE.Texture, THREE.MeshStandardMaterial>();
+
+/** Interface names as they are written on a label: Gi0/2, Fa0/24, S0/0/0, Con. */
+function shortPort(port: string): string {
+  return port.replace('GigabitEthernet', 'Gi').replace('FastEthernet', 'Fa').replace('Serial', 'S').replace('Console', 'Con').replace('Auxiliary', 'Aux');
+}
+
+/**
+ * The flag label every enterprise cable carries near each plug: where its other end goes. Its sides face the room, so
+ * it reads when one zooms on the port.
+ */
+function cableLabel(text: string, row: number): THREE.Group {
+  const g = new THREE.Group();
+  const stock = new THREE.Mesh(new THREE.BoxGeometry(0.0138, 0.0082, 0.0008), LABEL_STOCK);
+  const { texture, uv: [u0, v0, u1, v1] } = atlasLabel(text, 220, 120, '#0f172a', '600 40px Inter, sans-serif');
+  let ink = labelInks.get(texture);
+  if (!ink) {
+    ink = new THREE.MeshStandardMaterial({ map: texture, transparent: true, roughness: 0.7, depthWrite: false });
+    labelInks.set(texture, ink);
+  }
+  const face = new THREE.PlaneGeometry(0.0132, 0.0072);
+  (face.attributes.uv as THREE.BufferAttribute).set([u0, v1, u1, v1, u0, v0, u1, v0]);
+  const front = new THREE.Mesh(face, ink);
+  front.position.z = 0.0005;
+  g.add(stock, front);
+  // Hanging under the cable, just past the plug's boot; one cable in two a row lower, so neighbours do not overlap.
+  g.position.set(0, -0.0085 - row * 0.0095, 0.046 + row * 0.006);
+  return g;
+}
+
 function placePlug(group: THREE.Group, point: THREE.Vector3, normal: THREE.Vector3): void {
   group.position.copy(point);
   group.quaternion.setFromUnitVectors(FORWARD, normal);
@@ -265,7 +297,7 @@ export class CableLayer {
       let view: THREE.Group;
       if (originKey(oa) === originKey(ob)) {
         curve = this.routeInRoom(a.point, a.normal, b.point, b.normal, lane, radius);
-        view = this.build(cable.type, a, b, [curve]);
+        view = this.build(cable.type, a, b, [curve], cable, lane % 2);
       } else {
         // Between rooms, what shows is a patch cord to the rack's panel at each end: the rest is in the walls.
         const end = (p: { point: THREE.Vector3; normal: THREE.Vector3 }, o: { y: number; z: number }): { point: THREE.Vector3; normal: THREE.Vector3 } => ({ point: panelSocket(lane).add(new THREE.Vector3(0, o.y, o.z)), normal: FORWARD_NORMAL.clone() });
@@ -273,7 +305,7 @@ export class CableLayer {
         const cordA = this.routeInRoom(a.point, a.normal, pa.point, pa.normal, lane, radius);
         const cordB = this.routeInRoom(pb.point, pb.normal, b.point, b.normal, lane, radius);
         curve = new THREE.CatmullRomCurve3([...cordA.points, ...cordB.points], false, 'centripetal', 0.5);
-        view = this.build(cable.type, a, b, [cordA, cordB]);
+        view = this.build(cable.type, a, b, [cordA, cordB], cable, lane % 2);
         const plugs = [plug(cable.type), plug(cable.type)];
         placePlug(plugs[0] as THREE.Group, pa.point, pa.normal);
         placePlug(plugs[1] as THREE.Group, pb.point, pb.normal);
@@ -285,7 +317,7 @@ export class CableLayer {
     }
   }
 
-  private build(type: CableType, a: { point: THREE.Vector3; normal: THREE.Vector3 }, b: { point: THREE.Vector3; normal: THREE.Vector3 }, curves: THREE.CatmullRomCurve3[]): THREE.Group {
+  private build(type: CableType, a: { point: THREE.Vector3; normal: THREE.Vector3 }, b: { point: THREE.Vector3; normal: THREE.Vector3 }, curves: THREE.CatmullRomCurve3[], cable: Cable, row = 0): THREE.Group {
     const style = CABLE_STYLE[type];
     const group = new THREE.Group();
     // A little of its own light: a cable keeps its colour in the shade of the rack.
@@ -294,6 +326,9 @@ export class CableLayer {
     const pb = plug(type);
     placePlug(pa, a.point, a.normal);
     placePlug(pb, b.point, b.normal);
+    // Each end says where the other one goes.
+    pa.add(cableLabel(`${cable.b.device} ${shortPort(cable.b.port)}`, row));
+    pb.add(cableLabel(`${cable.a.device} ${shortPort(cable.a.port)}`, row));
     group.add(pa, pb);
     pb.visible = false;
     // Unroll: grow the drawn part of each tube, then show the far plug.
