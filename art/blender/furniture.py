@@ -5,7 +5,8 @@
 Kinds: `wc` (a toilet cubicle: laminate partitions, a door, the bowl and its cistern, a paper holder), `washbasin` (a
 two-basin counter with taps, the mirror above, a hand dryer), `vending` (a drinks and snacks machine, lit front),
 `whiteboard` (a classroom whiteboard on the wall, its tray and markers), `reception` (a counter), `meeting` (a table
-for eight). Front at -Y (+Z in the game), base on the floor.
+for eight), `lockers` (three steel locker columns), `binder_cabinet` (a low cabinet of binders), `projector` (on its
+ceiling mount) and `screen_case` (a projection screen's housing and bottom bar). Front at -Y (+Z in the game), base on the floor.
 """
 import math
 import os
@@ -149,6 +150,94 @@ elif kind == 'meeting':
         parts.append(c.box(f'leg{s}', (0.06, D - 0.2, 0.7), (s * (W / 2 - 0.25), 0, 0.37), steel, bevel=4 * mm))
         parts.append(c.box(f'foot{s}', (0.08, D - 0.1, 0.03), (s * (W / 2 - 0.25), 0, 0.015), steel, bevel=4 * mm))
     parts.append(c.box('box', (0.3, 0.12, 0.012), (0, 0, 0.756), steel, bevel=2 * mm))
+elif kind == 'lockers':
+    # Three steel locker columns side by side, two doors each: louvres pressed into the doors, a number plate, a
+    # padlock hasp, a plinth set back from the front.
+    body = c.material('locker', '#7b8794', 0.42, 0.6)
+    doorm = c.material('locker-door', '#8a96a3', 0.38, 0.6)
+    dark = c.material('slot', '#1f2933', 0.7)
+    steel = c.material('steel', '#c3c8ce', 0.25, 0.9)
+    plate_m = c.material('plate', '#e2e8f0', 0.5)
+    W, D, H, N = 0.58, 0.5, 2.0, 3
+    for n in range(N):
+        x = (n - (N - 1) / 2) * 0.6
+        parts.append(c.box(f'carcass{n}', (W, D - 0.02, H - 0.08), (x, 0.01, 0.08 + (H - 0.08) / 2), body, bevel=4 * mm))
+        parts.append(c.box(f'plinth{n}', (W - 0.04, D - 0.08, 0.08), (x, 0.03, 0.04), dark))
+        for tier, (z0, z1) in enumerate(((0.12, 1.02), (1.06, 1.96))):
+            h = z1 - z0
+            zc = (z0 + z1) / 2
+            parts.append(c.box(f'door{n}{tier}', (W - 0.03, 0.018, h), (x, -D / 2 - 0.004, zc), doorm, bevel=3 * mm))
+            # Six louvres near the top of each door, then the hasp and the number.
+            for k in range(6):
+                parts.append(c.box(f'louvre{n}{tier}{k}', (0.22, 0.006, 0.012), (x, -D / 2 - 0.014, z1 - 0.07 - k * 0.026), dark, bevel=2 * mm))
+            parts.append(c.box(f'hasp{n}{tier}', (0.03, 0.02, 0.07), (x + W / 2 - 0.07, -D / 2 - 0.022, zc), steel, bevel=3 * mm))
+            parts.append(cylinder(f'ring{n}{tier}', 0.012, 0.006, (x + W / 2 - 0.07, -D / 2 - 0.034, zc + 0.02), steel, 12, rot=(math.pi / 2, 0, 0)))
+            parts.append(c.box(f'plate{n}{tier}', (0.08, 0.004, 0.035), (x, -D / 2 - 0.015, z1 - 0.26), plate_m, bevel=1 * mm))
+            parts.append(c.text(f'num{n}{tier}', str(n * 2 + tier + 1), 0.022, (x, -D / 2 - 0.0175, z1 - 0.268), dark))
+    parts.append(c.box('top', (N * 0.6 - 0.02, D, 0.012), (0, 0, H + 0.006), body, bevel=2 * mm))
+elif kind == 'binder_cabinet':
+    # A low office cabinet, 2.6 m long: grey carcass, four sliding doors with recessed pulls, an oak top, and the
+    # year's binders standing on it, their spines labelled.
+    body = c.material('cabinet', '#9aa5b1', 0.45, 0.3)
+    doorm = c.material('cabinet-door', '#aab4bf', 0.4, 0.3)
+    oak = c.material('oak', '#b08a5a', 0.45)
+    dark = c.material('pull', '#2f3640', 0.4, 0.7)
+    label = c.material('label', '#f8fafc', 0.6)
+    binders = [c.material(f'binder{k}', colour, 0.6) for k, colour in enumerate(('#1d4ed8', '#fbbf24', '#0b1e3f', '#94a3b8'))]
+    W, D, H = 2.6, 0.5, 0.85
+    parts.append(c.box('carcass', (W, D - 0.02, H - 0.09), (0, 0.01, 0.06 + (H - 0.09) / 2), body, bevel=4 * mm))
+    parts.append(c.box('plinth', (W - 0.04, D - 0.08, 0.06), (0, 0.03, 0.03), dark))
+    parts.append(c.box('top', (W + 0.04, D + 0.03, 0.03), (0, -0.005, H - 0.015), oak, bevel=4 * mm, segments=3))
+    for i in range(4):
+        x = -W / 2 + W / 8 + i * W / 4
+        offset = -0.012 if i % 2 == 0 else -0.026
+        parts.append(c.box(f'door{i}', (W / 4 + 0.02, 0.014, H - 0.16), (x, -D / 2 + offset, 0.06 + (H - 0.16) / 2 + 0.02), doorm, bevel=2 * mm))
+        side = 1 if i % 2 == 0 else -1
+        parts.append(c.box(f'pull{i}', (0.02, 0.008, 0.16), (x + side * (W / 8 - 0.06), -D / 2 + offset - 0.009, 0.5), dark, bevel=2 * mm))
+    for i in range(23):
+        x = -W / 2 + 0.3 + i * 0.086 + (0.04 if i >= 12 else 0)
+        parts.append(c.box(f'binder{i}', (0.05, 0.28, 0.32), (x, 0.0, H + 0.16), binders[i % 4], bevel=3 * mm))
+        parts.append(c.box(f'spine{i}', (0.032, 0.004, 0.09), (x, -0.141, H + 0.2), label))
+        parts.append(cylinder(f'hole{i}', 0.012, 0.004, (x, -0.142, H + 0.07), dark, 12, rot=(math.pi / 2, 0, 0)))
+elif kind == 'projector':
+    # A classroom projector on its ceiling mount: white body with rounded edges, the lens and its focus ring at the
+    # front (-Y), vents along the side, the pole up to the ceiling plate at 3 m.
+    white = c.material('projector', '#e8ebef', 0.4)
+    grey = c.material('projector-grey', '#5b6470', 0.45, 0.4)
+    black = c.material('black', '#0b0d10', 0.3)
+    glass = c.material('lens', '#1e293b', 0.05, 0.2, emission='#e0f2fe', strength=1.5)
+    steel = c.material('steel', '#b8bec6', 0.3, 0.9)
+    led = c.material('led', '#22c55e', 0.3, emission='#22c55e', strength=6)
+    zc = 2.72
+    parts.append(c.box('body', (0.34, 0.28, 0.11), (0, 0, zc), white, bevel=14 * mm, segments=4))
+    parts.append(c.box('band', (0.342, 0.282, 0.012), (0, 0, zc - 0.035), grey, bevel=4 * mm))
+    parts.append(cylinder('barrel', 0.05, 0.03, (-0.07, -0.145, zc), black, 32, rot=(math.pi / 2, 0, 0)))
+    parts.append(cylinder('ring', 0.044, 0.012, (-0.07, -0.166, zc), grey, 32, rot=(math.pi / 2, 0, 0)))
+    parts.append(cylinder('glass', 0.036, 0.004, (-0.07, -0.173, zc), glass, 32, rot=(math.pi / 2, 0, 0)))
+    for k in range(7):
+        parts.append(c.box(f'vent{k}', (0.004, 0.012, 0.06), (0.172, -0.08 + k * 0.025, zc), black))
+        parts.append(c.box(f'grille{k}', (0.008, 0.004, 0.05), (0.03 + k * 0.016, -0.141, zc), black))
+    parts.append(cylinder('power', 0.006, 0.003, (0.14, -0.141, zc + 0.03), led, 12, rot=(math.pi / 2, 0, 0)))
+    parts.append(c.box('cradle', (0.2, 0.16, 0.012), (0, 0.02, zc + 0.061), steel, bevel=2 * mm))
+    parts.append(cylinder('pole', 0.018, 3.0 - zc - 0.067, (0, 0.02, (3.0 + zc + 0.067) / 2), steel, 16))
+    parts.append(cylinder('collar', 0.024, 0.03, (0, 0.02, zc + 0.12), grey, 16))
+    parts.append(cylinder('plate', 0.07, 0.008, (0, 0.02, 2.996), steel, 32))
+    parts.append(cylinder('cable', 0.005, 3.0 - zc - 0.07, (0.03, 0.06, (3.0 + zc + 0.07) / 2), black, 8))
+elif kind == 'screen_case':
+    # A wall projection screen's housing: a white aluminium case across the top with its end caps and wall
+    # brackets, the black weighted bar at the bottom and its pull cord. The screen itself is drawn by the game.
+    alu = c.material('case', '#eef1f4', 0.35, 0.4)
+    cap = c.material('cap', '#3f4752', 0.45)
+    black = c.material('bar', '#14171c', 0.4, 0.3)
+    W = 2.55
+    parts.append(cylinder('case', 0.045, W, (0, -0.05, 2.74), alu, 24, rot=(0, math.pi / 2, 0), scale=(0.85, 1, 1)))
+    for s in (-1, 1):
+        parts.append(cylinder(f'cap{s}', 0.048, 0.03, (s * (W / 2 + 0.015), -0.05, 2.74), cap, 24, rot=(0, math.pi / 2, 0)))
+        parts.append(c.box(f'bracket{s}', (0.04, 0.05, 0.08), (s * (W / 2 - 0.2), -0.015, 2.74), cap, bevel=2 * mm))
+    parts.append(c.box('slot', (W - 0.08, 0.012, 0.006), (0, -0.05, 2.692), black))
+    parts.append(c.box('bottom', (W - 0.1, 0.024, 0.03), (0, -0.03, 1.2), black, bevel=4 * mm))
+    parts.append(cylinder('cord', 0.003, 0.14, (0, -0.03, 1.115), black, 8))
+    parts.append(sphere('knob', 0.016, (0, -0.03, 1.04), black))
 else:
     raise SystemExit(f'unknown kind {kind}')
 

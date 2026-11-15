@@ -21,7 +21,6 @@ const lit = (color: string, roughness = 0.6, metalness = 0.1): THREE.MeshStandar
 const STEEL = lit('#475569', 0.45, 0.75);
 const BLACK = lit('#1b2028', 0.55, 0.25);
 const WOOD = new THREE.MeshStandardMaterial({ ...photo('plywood', 0.7, 0.5), roughness: 0.8 });
-const GREY = lit('#94a3b8', 0.65, 0.2);
 const KEYS = new THREE.MeshStandardMaterial({ map: keyboardTexture(), roughness: 0.55 });
 const LED = new THREE.MeshStandardMaterial({ color: '#38bdf8', emissive: '#38bdf8', emissiveIntensity: 1.6 });
 
@@ -221,17 +220,11 @@ function labFurniture(): THREE.Group {
   const map = diagramTexture();
   const projected = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.48), new THREE.MeshStandardMaterial({ map, emissive: '#ffffff', emissiveMap: map, emissiveIntensity: 0.28, roughness: 0.85 }));
   projected.position.set(-4.2, 1.95, -1.572);
-  g.add(soft(2.55, 0.08, 0.1, BLACK, -4.2, 2.74, -1.55, 0.02), soft(2.45, 0.018, 0.02, BLACK, -4.2, 1.2, -1.565, 0.006), projected);
-  const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, 0.03, 20), BLACK);
-  lens.rotation.x = Math.PI / 2;
-  lens.position.set(-4.2, 2.72, 2.35);
-  g.add(soft(0.34, 0.12, 0.28, lit('#e8ebef', 0.5), -4.2, 2.72, 2.5, 0.025), lens, box(0.04, 0.2, 0.04, STEEL, -4.2, 2.89, 2.5));
+  // The screen's case and bar, the projector on its pole and the lockers are models (`art/blender/furniture.py`),
+  // placed by `buildAnnex`.
+  g.add(projected);
 
   // Lockers against the left wall, rules and the patching plan above the desks.
-  for (const z of [-1.2, -0.6, 0.0]) {
-    g.add(box(0.5, 2.0, 0.58, GREY, left + 0.27, 1.0, z));
-    g.add(box(0.005, 1.9, 0.005, BLACK, left + 0.522, 1.0, z, false), box(0.02, 0.14, 0.02, lit('#e2e8f0', 0.2, 1), left + 0.535, 1.05, z + 0.04, false));
-  }
   const lockerShadow = contactShadow(0.8, 2.0, 0.5);
   lockerShadow.position.set(left + 0.3, 0.004, -0.6);
   g.add(lockerShadow);
@@ -253,9 +246,6 @@ function officeFurniture(): THREE.Group {
   for (const cx of [-3.1, 3.1]) {
     for (const dx of [-1.0, 0, 1.0]) g.add(deskAt(cx + dx, 3.1, -1), deskAt(cx + dx, 3.9, 1));
   }
-  g.add(box(0.5, 0.85, 2.6, GREY, left + 0.27, 0.425, 1.3), box(0.52, 0.03, 2.65, WOOD, left + 0.28, 0.865, 1.3));
-  const colours = ['#1d4ed8', '#fbbf24', '#0b1e3f', '#94a3b8'];
-  for (let i = 0; i < 24; i++) g.add(box(0.22, 0.28, 0.05, lit(colours[i % 4] as string, 0.7), left + 0.27, 1.02, 0.3 + i * 0.086));
   const cabinetShadow = contactShadow(0.85, 2.9, 0.45);
   cabinetShadow.position.set(left + 0.3, 0.004, 1.3);
   const name = lettering('ADMINISTRATION', 1.9, 0.22, '#0b1e3f');
@@ -533,6 +523,10 @@ export function buildAnnex(floors: boolean): THREE.Group {
   lab.position.z = LAB_Z;
   const labPart = part('part-lab', zoneShell('lab', { lights: true }), lab);
   placeMany(labPart, 'SchoolChair_01', LAB_DESK_ROWS.flatMap((row) => LAB_DESK_X.map((x) => ({ x, y: 0, z: row + 0.75 + LAB_Z, turn: Math.PI }))));
+  const labLeft = ROOMS.lab.x0 + WALL_T / 2;
+  placeProp(labPart, 'screen_case', { x: -4.2, y: 0, z: -1.6 + LAB_Z, turn: 0 });
+  placeProp(labPart, 'projector', { x: -4.2, y: 0, z: 2.5 + LAB_Z, turn: Math.PI });
+  placeProp(labPart, 'lockers', { x: labLeft + 0.27, y: 0, z: -0.6 + LAB_Z, turn: Math.PI / 2 });
   g.add(labPart, part('part-lower', zoneShell('corridor', { lights: true }), corridorDecor(false, floors)));
   if (floors) {
     const office = buildRoomParts();
@@ -541,6 +535,7 @@ export function buildAnnex(floors: boolean): THREE.Group {
     const officePart = part('part-office', zoneShell('office', { lights: true }), office);
     placeMany(officePart, 'SchoolChair_01', [-3.1, 3.1].flatMap((cx) => [-1.0, 0, 1.0].flatMap((dx) => [{ x: cx + dx, y: FLOOR_Y, z: 2.45, turn: 0 }, { x: cx + dx, y: FLOOR_Y, z: 4.55, turn: Math.PI }])));
     const left = ROOMS.room.x0 + WALL_T / 2;
+    placeProp(officePart, 'binder_cabinet', { x: left + 0.27, y: FLOOR_Y, z: 1.3, turn: Math.PI / 2 });
     placeProp(officePart, 'binder_notebook', { x: left + 0.27, y: FLOOR_Y + 0.88, z: 2.45, turn: Math.PI / 2 });
     g.add(part('part-stairs', zoneShell('stairs', { lights: true }), stairDecor()), officePart, part('part-upper', zoneShell('corridor1', { lights: true }), corridorDecor(true, true)));
   }

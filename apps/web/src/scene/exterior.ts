@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { FLOOR_Y, inside, ROOM_HEIGHT, SITE_EXIT_X, SITE_Z, siteOf, WALL, WALLS, wallPieces, WINDOWS, ZONES, type Rect, type SiteName } from './building.js';
 import { photoRelief } from './materials.js';
+import { placeMany, placeProp, type Placement } from './props.js';
 import { textTexture } from './textures.js';
 
 /**
@@ -112,6 +113,7 @@ export function buildExterior(site: SiteName): THREE.Group {
     }
   }
   // The flat roofs: over every room that has nothing above it.
+  let tankRoof: { x: number; z: number; y: number; area: number; w: number; d: number } | null = null;
   const gravel = lit('#8d8a83', 0.95);
   for (const zone of ZONES) {
     if (!onSite((zone.rect.x0 + zone.rect.x1) / 2, (zone.rect.z0 + zone.rect.z1) / 2)) continue;
@@ -130,11 +132,46 @@ export function buildExterior(site: SiteName): THREE.Group {
         roof.position.set((x0 + x1) / 2, y, (z0 + z1) / 2);
         roof.receiveShadow = true;
         g.add(roof);
+        const area = (x1 - x0) * (z1 - z0);
+        if (area > 12 && (!tankRoof || y > tankRoof.y + 0.1 || (Math.abs(y - tankRoof.y) < 0.1 && area > tankRoof.area))) tankRoof = { x: (x0 + x1) / 2, z: (z0 + z1) / 2, y, area, w: x1 - x0, d: z1 - z0 };
       }
     }
   }
   g.add(entrance(site));
+  // Life on the outside walls and the roof: split air conditioners beside the windows, the water tank on its tower.
+  placeMany(g, 'ac_unit', airConditioners(onSite));
+  if (tankRoof) {
+    const roof: { x: number; z: number; y: number; w: number; d: number } = tankRoof;
+    placeProp(g, 'water_tank', { x: roof.x + Math.max(0, roof.w / 2 - 1.6), y: roof.y, z: roof.z - Math.max(0, roof.d / 2 - 1.6), turn: 0.2 });
+  }
   return g;
+}
+
+/**
+ * The outdoor unit of a split air conditioner beside every other outside window, hung at the height of its sill on
+ * the side where the wall goes on; none where it would cover another window or hang off the building.
+ */
+function airConditioners(onSite: (x: number, z: number) => boolean): Placement[] {
+  const units: Placement[] = [];
+  const along = (w: (typeof WINDOWS)[number]): number => (w.along === 'x' ? w.x : w.z);
+  WINDOWS.forEach((w, i) => {
+    if (i % 2 === 1 || !onSite(w.x, w.z)) return;
+    // The outward normal of the wall the window is in.
+    const [ox, oz] = w.along === 'x' ? [0, -w.inside] : [-w.inside, 0];
+    for (const side of [1, -1]) {
+      const c = along(w) + side * (w.width / 2 + 0.75);
+      const [x, z] = w.along === 'x' ? [c, w.z] : [w.x, c];
+      const y = w.y + w.sill;
+      // Wall behind (a room inside), open air in front, and no other window under the unit.
+      const covers = WINDOWS.some((o) => o !== w && o.along === w.along && Math.abs((o.along === 'x' ? o.z : o.x) - (w.along === 'x' ? w.z : w.x)) < 0.01 && Math.abs(o.y - w.y) < 0.1 && Math.abs(along(o) - c) < o.width / 2 + 0.5);
+      const behind = zoneAt(x - ox * 0.4, y, z - oz * 0.4) !== null && zoneAt(x - ox * 0.4 + (w.along === 'x' ? 0.45 * side : 0), y, z - oz * 0.4 + (w.along === 'z' ? 0.45 * side : 0)) !== null;
+      const front = zoneAt(x + ox * 0.6, y, z + oz * 0.6) === null;
+      if (covers || !behind || !front) continue;
+      units.push({ x: x + ox * (WALL / 2), y: y - 0.1, z: z + oz * (WALL / 2), turn: Math.atan2(ox, oz) });
+      return;
+    }
+  });
+  return units;
 }
 
 /** The street door from outside: double glazed doors, a concrete canopy, the name of the place in letters. */
@@ -185,5 +222,44 @@ export function buildStreet(site: SiteName, footprint: Rect): THREE.Group {
   line.rotation.x = -Math.PI / 2;
   line.position.set(road.position.x, -0.006, road.position.z);
   g.add(road, line);
+  g.add(boundary(e, footprint));
+  return g;
+}
+
+/**
+ * The plot's front boundary, as round most buildings of the city: a low rendered wall with a painted railing along
+ * the street, returning to the façade at both ends, and the open sliding gate in front of the door.
+ */
+function boundary(e: (typeof ENTRANCES)[SiteName], footprint: Rect): THREE.Group {
+  const g = new THREE.Group();
+  const [ox, oz] = e.out;
+  const turn = Math.atan2(ox, oz);
+  // Along the street: a = (oz, -ox), the model's +X once turned.
+  const [ax, az] = [oz, -ox];
+  const d = 3.4;
+  const px = e.x + ox * d;
+  const pz = e.z + oz * d;
+  const corners: [number, number][] = [[footprint.x0, footprint.z0], [footprint.x1, footprint.z0], [footprint.x0, footprint.z1], [footprint.x1, footprint.z1]];
+  const s = corners.map(([x, z]) => (x - px) * ax + (z - pz) * az);
+  let lo = Math.min(...s) - 1.5;
+  let hi = Math.max(...s) + 1.5;
+  // The open gate slides behind the wall on the side with the more room; the wall runs at least past its leaf.
+  const LEAF = 6.8;
+  const right = hi >= -lo;
+  if (right) hi = Math.max(hi, LEAF);
+  else lo = Math.min(lo, -LEAF);
+  const at = (u: number, v: number, t = turn): Placement => ({ x: px + ax * u + ox * v, y: 0, z: pz + az * u + oz * v, turn: t });
+  placeProp(g, 'gate', at(0, 0, right ? turn : turn + Math.PI));
+  const bays: Placement[] = [];
+  const BAY = 2.5;
+  const START = 2.4 - 0.15;
+  // The model's pillar is at its +X end: to the right of the gate the bays run outwards, to the left they turn round.
+  let east = START;
+  let west = -START;
+  for (; east < hi; east += BAY) bays.push(at(east + BAY / 2, 0));
+  for (; west > lo; west -= BAY) bays.push(at(west - BAY / 2, 0, turn + Math.PI));
+  // The returns, from the ends of the front wall back to the building's line.
+  for (const u of [east, west]) for (let v = -BAY / 2; v > -(d + 1.5); v -= BAY) bays.push(at(u, v, turn + (Math.PI / 2) * Math.sign(u)));
+  placeMany(g, 'fence', bays);
   return g;
 }
