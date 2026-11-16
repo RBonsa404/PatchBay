@@ -24,7 +24,9 @@ export type Motion =
   | 'Interact'
   | 'PickUp_Table'
   | 'Sitting_Idle_Loop'
-  | 'Sitting_Talking_Loop';
+  | 'Sitting_Talking_Loop'
+  | 'Stairs_Up_Loop'
+  | 'Stairs_Down_Loop';
 
 /** The shared clips, and the height of the hips of the person they were made on. */
 function animations(): Promise<{ list: THREE.AnimationClip[]; hips: number }> {

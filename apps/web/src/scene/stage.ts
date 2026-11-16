@@ -226,8 +226,8 @@ export class Stage {
     // Ambient occlusion: the soft darkening where objects meet, which anchors them in the room.
     this.ao = new GTAOPass(this.scene, this.camera, 1, 1);
     this.ao.blendIntensity = 0.85;
-    this.ao.updateGtaoMaterial({ radius: 0.3, distanceExponent: 1.4, thickness: 1, scale: 1.1, samples: 14, distanceFallOff: 1, screenSpaceRadius: false });
-    this.ao.updatePdMaterial({ lumaPhi: 1.5, samples: 16, rings: 2, radius: 16 });
+    this.ao.updateGtaoMaterial({ radius: 0.3, distanceExponent: 1.4, thickness: 1, scale: 1.1, samples: 8, distanceFallOff: 1, screenSpaceRadius: false });
+    this.ao.updatePdMaterial({ lumaPhi: 1.5, samples: 8, rings: 2, radius: 12 });
     // By far the dearest effect of the frame, and a soft one: half the resolution does not show, and costs a quarter.
     const sizeAo = this.ao.setSize.bind(this.ao);
     this.ao.setSize = (w, h) => sizeAo(Math.ceil(w / 2), Math.ceil(h / 2));
@@ -291,7 +291,9 @@ export class Stage {
   setQuality(q: Quality): void {
     this.quality = q;
     const full = q === 'high';
-    this.renderer.setPixelRatio(q === 'low' ? 1 : Math.min(window.devicePixelRatio, full ? 1.5 : 1.25));
+    // Pixels are the dearest thing on a laptop's graphics chip: never more than one per screen pixel below high, and
+    // at most 1.25 in high (1.5 drew 2.25 times the pixels of a plain screen for a barely visible gain).
+    this.renderer.setPixelRatio(q === 'low' ? 1 : Math.min(window.devicePixelRatio, full ? 1.25 : 1));
     this.renderer.shadowMap.enabled = q !== 'low';
     this.key.castShadow = q !== 'low';
     this.frontKey.castShadow = q !== 'low';
@@ -303,9 +305,10 @@ export class Stage {
       light.shadow.map?.dispose();
       light.shadow.map = null;
     }
-    // Medium keeps the cheap filters (glow, vignette, grade); only the ambient occlusion is for high.
+    // Medium keeps the cheapest filters (vignette, grade); the glow and the ambient occlusion are for high.
     const post = q !== 'low';
-    this.bloom.enabled = post;
+    // The glow's several blurred copies of the screen are for high only.
+    this.bloom.enabled = full;
     this.ao.enabled = full;
     this.vignette.enabled = post;
     this.grade.enabled = post;

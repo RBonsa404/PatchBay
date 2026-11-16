@@ -114,6 +114,76 @@ for name in KEEP:
     made.append(new)
     print('clip', name, f1 - f0 + 1, 'frames')
 
+
+
+def derive(src_name, name, knee, hip, lean):
+    """A gait for the stairs, from the walk: on stairs the knee lifts higher and bends more, the trunk leans into the
+    climb. Each leg's bend is read in the walk itself (its sign tells the hinge's direction), then amplified."""
+    from mathutils import Quaternion
+    src = next(a for a in made if a.name == src_name + '_mh')
+    act = src.copy()
+    act.name = name + '_mh'
+    act.use_fake_user = True
+    curves = {}
+    for fc in (fc for b in [act] for fc in (b.fcurves if hasattr(b, 'fcurves') else [])):
+        curves.setdefault(fc.data_path, {})[fc.array_index] = fc
+    if not curves:  # layered actions (Blender 4.4+): the curves live in the action's channel bag
+        for layer in act.layers:
+            for strip in layer.strips:
+                for bag in strip.channelbags:
+                    for fc in bag.fcurves:
+                        curves.setdefault(fc.data_path, {})[fc.array_index] = fc
+    def rot(bone):
+        return curves.get(f'pose.bones["{bone}"].rotation_quaternion')
+    import math
+
+    def swing(qs):
+        """The axis a bone swings about in the walk, and its angle about it at each frame (from the first frame)."""
+        rel = [qs[0].inverted() @ q for q in qs]
+        widest = max(rel, key=lambda r: r.angle if r.angle <= math.pi else 2 * math.pi - r.angle)
+        axis = widest.axis.normalized()
+        angles = [2 * math.atan2(r.x * axis.x + r.y * axis.y + r.z * axis.z, r.w) for r in rel]
+        return axis, angles
+
+    for side in ('l', 'r'):
+        calf, thigh = rot(f'calf_{side}'), rot(f'thigh_{side}')
+        if not calf or not thigh:
+            continue
+        n = len(calf[0].keyframe_points)
+        cq = [Quaternion([calf[i].keyframe_points[k].co[1] for i in range(4)]) for k in range(n)]
+        tq = [Quaternion([thigh[i].keyframe_points[k].co[1] for i in range(4)]) for k in range(n)]
+        caxis, ca = swing(cq)
+        taxis, ta = swing(tq)
+        # The knee folds one way only: its bend is how far it is from its straightest frame, in that direction.
+        lo, hi = min(ca), max(ca)
+        fold = 1 if abs(hi) >= abs(lo) else -1
+        straight = lo if fold > 0 else hi
+        bends = [abs(x - straight) for x in ca]
+        # Forward for the thigh is the way it swings while the knee is folded (the leg comes through in the air).
+        mb, mt = sum(bends) / n, sum(ta) / n
+        fwd = 1 if sum((b - mb) * (t - mt) for b, t in zip(bends, ta)) >= 0 else -1
+        for k in range(n):
+            new_c = cq[k] @ Quaternion(caxis, fold * (knee * bends[k] + 0.1))
+            new_t = tq[k] @ Quaternion(taxis, fwd * (hip * bends[k] + 0.06))
+            for i in range(4):
+                calf[i].keyframe_points[k].co[1] = new_c[i]
+                thigh[i].keyframe_points[k].co[1] = new_t[i]
+    spine = rot('spine_01')
+    if spine:
+        for k in range(len(spine[0].keyframe_points)):
+            q = Quaternion([spine[i].keyframe_points[k].co[1] for i in range(4)]) @ Quaternion((1, 0, 0), lean)
+            for i in range(4):
+                spine[i].keyframe_points[k].co[1] = q[i]
+    for group in curves.values():
+        for fc in group.values():
+            fc.update()
+    made.append(act)
+    print('clip', name, 'derived from', src_name)
+
+
+derive('Walk_Loop', 'Stairs_Up_Loop', knee=0.3, hip=0.42, lean=0.1)
+derive('Walk_Loop', 'Stairs_Down_Loop', knee=0.25, hip=0.15, lean=-0.04)
+
 R.animation_data.action = None
 for act in made:
     track = R.animation_data.nla_tracks.new()

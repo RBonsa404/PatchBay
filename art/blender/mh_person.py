@@ -546,6 +546,46 @@ def export_person(path):
             if g.name not in bones:
                 o.vertex_groups.remove(g)
         o.select_set(False)
+    # The skin under the tops goes a little inside them: an arm that bends can no longer push it through a sleeve.
+    from mathutils.bvhtree import BVHTree
+    tops = [o for o in meshes if any(o.name.endswith(i[0]) for i in spec.get('clothes', []) if len(i) > 2 and i[2]) or 'shirt' in o.name or 'suit' in o.name]
+    body = next((o for o in meshes if o.name == human.name), None)
+    if body and tops:
+        trees = []
+        for t in tops:
+            mw = t.matrix_world
+            trees.append(BVHTree.FromPolygons([mw @ v.co for v in t.data.vertices], [list(p.vertices) for p in t.data.polygons]))
+        bw = body.matrix_world
+        inv = bw.inverted().to_3x3()
+        body.data.update()
+        moved = 0
+        for v in body.data.vertices:
+            p = bw @ v.co
+            if any((hit := tr.find_nearest(p))[0] is not None and hit[3] < 0.035 for tr in trees):
+                n = (bw.to_3x3() @ v.normal).normalized()
+                v.co = bw.inverted() @ (p - n * 0.007)
+                moved += 1
+        body.data.update()
+        print('tucked skin under tops', moved)
+    # Lighter for the game: a person seen at a few metres needs far fewer triangles than a close-up render. Hair cards,
+    # eyes, brows and lashes keep theirs (thin cut-out shapes do not survive simplifying).
+    for o in meshes:
+        n = o.name.lower()
+        if any(k in n for k in ('eye', 'brow', 'lash', 'low-poly')) or o.name in [h.name for h in hair_objs]:
+            continue
+        ratio = 0.3 if any(k in n for k in ('shoe', 'sneaker', 'flat', 'maryjane', 'oxford')) else 0.45
+        before = len(o.data.polygons)
+        if before < 1500:
+            continue
+        bpy.context.view_layer.objects.active = o
+        mod = o.modifiers.new('lighter', 'DECIMATE')
+        mod.ratio = ratio
+        mod.use_collapse_triangulate = True
+        # Before the skeleton's modifier: simplified in the rest pose.
+        while o.modifiers[0] != mod:
+            bpy.ops.object.modifier_move_up(modifier=mod.name)
+        bpy.ops.object.modifier_apply(modifier=mod.name)
+        print('lighter', o.name, before, '->', len(o.data.polygons))
     for img in bpy.data.images:
         if img.size[0] > 1024 and img.has_data:
             img.scale(1024, max(1, img.size[1] * 1024 // img.size[0]))

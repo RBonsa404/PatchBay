@@ -945,6 +945,7 @@ export class Mission {
   private avatar: Person | null = null;
   private readonly people: { person: Person; who: Colleague; leg: number; talking: number; line: number }[] = [];
   private lastFoot = new THREE.Vector3();
+  private climb = 0;
   private talkBubble: HTMLElement | null = null;
 
   /** The player's student and the colleagues of the places this mission goes to. */
@@ -1080,13 +1081,18 @@ export class Mission {
     a.update(dt);
     const p = this.player;
     const foot = new THREE.Vector3(p.x, p.floorY, p.z);
-    const speed = dt > 0 ? foot.distanceTo(this.lastFoot) / dt : 0;
+    const speed = dt > 0 ? Math.hypot(foot.x - this.lastFoot.x, foot.z - this.lastFoot.z) / dt : 0;
+    // On the stairs the feet climb: the gait follows (a short memory smooths the steps of the walking surface).
+    const rise = dt > 0 ? (foot.y - this.lastFoot.y) / dt : 0;
+    this.climb = this.climb * 0.8 + rise * 0.2;
     this.lastFoot.copy(foot);
     a.root.position.copy(foot);
     a.root.rotation.y = p.yaw;
     const view = this.backView();
     a.root.visible = view;
     if (this.seated) a.play('Sitting_Idle_Loop');
+    else if (speed > 0.25 && this.climb > 0.15) a.play('Stairs_Up_Loop', 0.2);
+    else if (speed > 0.25 && this.climb < -0.15) a.play('Stairs_Down_Loop', 0.2);
     else if (speed > 2.4) a.play('Jog_Fwd_Loop', 0.2);
     else if (speed > 0.25) a.play('Walk_Loop', 0.2);
     else a.play('Idle_Loop', 0.3);
