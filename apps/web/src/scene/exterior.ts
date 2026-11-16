@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { FLOOR_Y, inside, ROOM_HEIGHT, SITE_EXIT_X, SITE_Z, siteOf, WALL, WALLS, wallPieces, WINDOWS, ZONES, type Rect, type SiteName } from './building.js';
 import { photo, photoRelief } from './materials.js';
 import { placeMany, placeProp, type Placement } from './props.js';
@@ -138,11 +139,145 @@ export function buildExterior(site: SiteName): THREE.Group {
     }
   }
   g.add(entrance(site));
+  g.add(glazing(onSite));
   // Life on the outside walls and the roof: split air conditioners beside the windows, the water tank on its tower.
   placeMany(g, 'ac_unit', airConditioners(onSite));
   if (tankRoof) {
     const roof: { x: number; z: number; y: number; w: number; d: number } = tankRoof;
     placeProp(g, 'water_tank', { x: roof.x + Math.max(0, roof.w / 2 - 1.6), y: roof.y, z: roof.z - Math.max(0, roof.d / 2 - 1.6), turn: 0.2 });
+  }
+  return g;
+}
+
+/** How many looks the glazing atlas holds side by side (blinds lowered more or less, curtains, a lit ceiling). */
+const GLAZING_LOOKS = 4;
+let glazingAtlas: THREE.CanvasTexture | null = null;
+
+/**
+ * What a window shows from the street by day: the room is much darker than the street, so the glass reads as a deep
+ * blue-grey with the sky reflected in a soft streak, the ceiling lights glowing at the top, and venetian blinds or a
+ * curtain behind it. Painted once in a canvas, `GLAZING_LOOKS` looks side by side.
+ */
+function glazingTexture(): THREE.CanvasTexture {
+  if (glazingAtlas) return glazingAtlas;
+  const [W, H] = [512, 448];
+  const canvas = document.createElement('canvas');
+  canvas.width = W * GLAZING_LOOKS;
+  canvas.height = H;
+  const c = canvas.getContext('2d') as CanvasRenderingContext2D;
+  // A fixed sequence, the same on every machine: no window ever changes from one visit to the next.
+  let seed = 7;
+  const rand = (): number => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+  for (let k = 0; k < GLAZING_LOOKS; k++) {
+    const x0 = k * W;
+    // The room: dark, a little lighter near the ceiling, its far wall and a desk seen as darker shapes.
+    const room = c.createLinearGradient(0, 0, 0, H);
+    room.addColorStop(0, '#3b4a57');
+    room.addColorStop(0.35, '#26323d');
+    room.addColorStop(1, '#151d25');
+    c.fillStyle = room;
+    c.fillRect(x0, 0, W, H);
+    c.fillStyle = 'rgba(10,14,18,0.55)';
+    c.fillRect(x0 + W * (0.1 + rand() * 0.3), H * 0.62, W * 0.45, H * 0.38);
+    // The ceiling's LED panels, glowing.
+    c.fillStyle = 'rgba(214,226,236,0.55)';
+    for (let i = 0; i < 2; i++) c.fillRect(x0 + W * (0.12 + i * 0.46 + rand() * 0.08), H * 0.04, W * 0.26, H * 0.025);
+    // Blinds lowered to a different height in each look, or a curtain drawn to one side.
+    if (k === GLAZING_LOOKS - 1) {
+      const side = rand() < 0.5 ? 0 : 1;
+      const curtain = c.createLinearGradient(x0, 0, x0 + W * 0.3, 0);
+      curtain.addColorStop(0, '#b9a98f');
+      curtain.addColorStop(1, '#8a7c66');
+      c.fillStyle = curtain;
+      for (let f = 0; f < 6; f++) {
+        c.globalAlpha = f % 2 ? 0.92 : 0.78;
+        c.fillRect(x0 + (side ? W * 0.7 : 0) + f * W * 0.05, 0, W * 0.05, H);
+      }
+      c.globalAlpha = 1;
+    } else {
+      const down = H * ([0.22, 0.48, 0.7][k % 3] as number);
+      for (let y = 0; y < down; y += 11) {
+        c.fillStyle = '#c8ccc9';
+        c.fillRect(x0, y, W, 8);
+        c.fillStyle = '#8e9493';
+        c.fillRect(x0, y + 8, W, 1.5);
+      }
+      c.fillStyle = '#9aa09f';
+      c.fillRect(x0, down - 2, W, 6);
+    }
+    // The sky in the glass: a soft diagonal streak, brighter at the top.
+    const sky = c.createLinearGradient(x0, 0, x0 + W, H);
+    sky.addColorStop(0, 'rgba(190,215,235,0.32)');
+    sky.addColorStop(0.35, 'rgba(190,215,235,0.1)');
+    sky.addColorStop(0.5, 'rgba(225,238,248,0.28)');
+    sky.addColorStop(0.62, 'rgba(190,215,235,0.06)');
+    sky.addColorStop(1, 'rgba(190,215,235,0)');
+    c.fillStyle = sky;
+    c.fillRect(x0, 0, W, H);
+  }
+  glazingAtlas = new THREE.CanvasTexture(canvas);
+  glazingAtlas.colorSpace = THREE.SRGBColorSpace;
+  glazingAtlas.anisotropy = 4;
+  return glazingAtlas;
+}
+
+/**
+ * Every outside window seen from the street: the reveals of the opening, the glass set back in it and its aluminium
+ * frame with the same mullion and transom as inside. All of it faces outwards (never drawn from inside), merged into
+ * three meshes for the whole building: three draw calls whatever the number of windows.
+ */
+function glazing(onSite: (x: number, z: number) => boolean): THREE.Group {
+  const g = new THREE.Group();
+  g.name = 'glazing';
+  const parts = { glass: [] as THREE.BufferGeometry[], frame: [] as THREE.BufferGeometry[], reveal: [] as THREE.BufferGeometry[] };
+  const DEPTH = 0.035;
+  const matrix = new THREE.Matrix4();
+  const plane = (list: THREE.BufferGeometry[], w: number, h: number, x: number, y: number, z: number, rx = 0, ry = 0): void => {
+    const p = new THREE.PlaneGeometry(w, h);
+    p.rotateX(rx);
+    p.rotateY(ry);
+    p.translate(x, y, z);
+    list.push(p);
+  };
+  WINDOWS.forEach((w, i) => {
+    const [ox, oz] = w.along === 'x' ? [0, -w.inside] : [-w.inside, 0];
+    const [cx, cz] = [w.x + ox * (WALL / 2), w.z + oz * (WALL / 2)];
+    if (!onSite(w.x, w.z) || zoneAt(cx + ox * 0.3, w.y + w.sill + 0.5, cz + oz * 0.3) !== null) return;
+    const [W, H] = [w.width, w.height];
+    const before = { glass: parts.glass.length, frame: parts.frame.length, reveal: parts.reveal.length };
+    // Reveals, a millimetre inside the room's own, so the two never fight when both are drawn.
+    plane(parts.reveal, DEPTH, H, -W / 2 + 0.001, H / 2, -DEPTH / 2, 0, Math.PI / 2);
+    plane(parts.reveal, DEPTH, H, W / 2 - 0.001, H / 2, -DEPTH / 2, 0, -Math.PI / 2);
+    plane(parts.reveal, W, DEPTH, 0, H - 0.001, -DEPTH / 2, Math.PI / 2);
+    plane(parts.reveal, W, DEPTH, 0, 0.001, -DEPTH / 2, -Math.PI / 2);
+    // The glass, showing one of the looks of the atlas.
+    plane(parts.glass, W, H, 0, H / 2, -DEPTH);
+    const look = (i * 5 + Math.round(w.x * 3 + w.z)) % GLAZING_LOOKS;
+    const uv = (parts.glass[parts.glass.length - 1] as THREE.BufferGeometry).attributes.uv as THREE.BufferAttribute;
+    for (let v = 0; v < uv.count; v++) uv.setX(v, (look + uv.getX(v)) / GLAZING_LOOKS);
+    // The frame just proud of the glass: its four sides, the mullion and the transom.
+    const f = -DEPTH + 0.004;
+    plane(parts.frame, 0.055, H, -W / 2 + 0.0275, H / 2, f);
+    plane(parts.frame, 0.055, H, W / 2 - 0.0275, H / 2, f);
+    plane(parts.frame, W, 0.055, 0, 0.0275, f);
+    plane(parts.frame, W, 0.055, 0, H - 0.0275, f);
+    plane(parts.frame, 0.045, H - 0.11, 0, H / 2, f + 0.001);
+    plane(parts.frame, W - 0.11, 0.045, 0, H * 0.72, f + 0.001);
+    matrix.makeRotationY(Math.atan2(ox, oz)).setPosition(cx, w.y + w.sill, cz);
+    for (const key of ['glass', 'frame', 'reveal'] as const) for (const p of parts[key].slice(before[key])) p.applyMatrix4(matrix);
+  });
+  const materials = {
+    glass: new THREE.MeshStandardMaterial({ map: glazingTexture(), roughness: 0.1, metalness: 0.2 }),
+    frame: lit('#3a3f45', 0.4, 0.6),
+    reveal: lit('#d6c19c', 0.92),
+  };
+  for (const key of ['glass', 'frame', 'reveal'] as const) {
+    if (!parts[key].length) continue;
+    const mesh = new THREE.Mesh(mergeGeometries(parts[key], false), materials[key]);
+    mesh.receiveShadow = true;
+    mesh.name = `glazing-${key}`;
+    for (const p of parts[key]) p.dispose();
+    g.add(mesh);
   }
   return g;
 }
