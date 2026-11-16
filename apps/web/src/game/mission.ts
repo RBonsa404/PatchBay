@@ -161,6 +161,8 @@ export class Mission {
   private hovered: PortView | null = null;
   private trafficResults = new Map<string, ObjectiveResult>();
   private hintIndex = 0;
+  /** Hints asked, for the « sans indice » badge. */
+  private hintsUsed = 0;
   private finished = false;
   private coach: Coach | null = null;
   private recording = false;
@@ -2158,11 +2160,12 @@ export class Mission {
     const zone = zoneOf(this.player.x, this.player.floorY + 0.1, this.player.z);
     const origin = (zone === 'lab' ? ORIGINS.annexe : zone === 'office' ? ORIGINS.etage : ORIGINS['']) as Origin;
     const finale = this.stage.flyTo(new THREE.Vector3(0, 1.9 + origin.y, 2.8 + origin.z), HOME.target.clone().add(new THREE.Vector3(0, origin.y, origin.z)), 1.6);
-    const result = { ...grade(evaluation, this.remaining, this.limit, timedOut, this.exam), tidiness: this.tidiness() };
+    const result = { ...grade(evaluation, this.remaining, this.limit, timedOut, this.exam), tidiness: this.tidiness(), hints: this.hintsUsed, cabled: this.level.solution.cables.some((c) => c.type !== 'console') };
     void Promise.race([finale, new Promise((resolve) => setTimeout(resolve, 1800))]).then(() => this.events.complete(result));
   }
 
   private hint(): void {
+    this.hintsUsed++;
     const next = this.level.hints[this.hintIndex];
     if (next) {
       this.hintIndex++;

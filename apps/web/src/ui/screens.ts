@@ -1,7 +1,8 @@
 import { sound } from '../audio.js';
-import { ArrowLeft, ArrowRight, ChevronRight, Compass, GraduationCap, LayoutList, Lock, Play, RotateCcw, School, Settings, Star, Timer, Trophy } from 'lucide';
+import { ArrowLeft, ArrowRight, Cable, ChevronRight, Compass, Crown, Flag, GraduationCap, LayoutList, LightbulbOff, Lock, Play, RotateCcw, School, Settings, Star, Timer, TimerReset, Trophy, Zap } from 'lucide';
 import type { Level } from '@patchbay/sim-core';
 import { clock, type Grade } from '../game/scoring.js';
+import type { BadgeId } from '../game/badges.js';
 import { tourSeen } from '../game/tour.js';
 import { t, tx } from '../i18n.js';
 import { clubBadge, dedsecCredit, icon, logo, MENTOR, mentorPortrait } from './brand.js';
@@ -262,7 +263,27 @@ function confetti(host: HTMLElement): void {
   requestAnimationFrame(frame);
 }
 
-export function showResults(level: Level, result: Grade, actions: { next?: () => void; retry: () => void; menu: () => void }): void {
+const BADGE_ICONS = { first: Flag, record: TimerReset, fast: Zap, nohint: LightbulbOff, tidy: Cable, rankS: Crown } as const;
+
+/** The badges earned by this mission, a « Nouveau » on those never earned before; they land after the stars. */
+function badgeRow(earned: readonly BadgeId[], fresh: readonly BadgeId[]): HTMLElement | null {
+  if (earned.length === 0) return null;
+  return h(
+    'ul',
+    { class: 'badge-row', 'aria-label': t('badges.title') },
+    ...earned.map((b, i) =>
+      h(
+        'li',
+        { class: `badge badge-${b}${fresh.includes(b) ? ' fresh' : ''}`, style: `animation-delay: ${0.9 + i * 0.12}s`, title: t(`badge.${b}.hint`) },
+        h('span', { class: 'badge-medal' }, icon(BADGE_ICONS[b], 18)),
+        h('span', { class: 'badge-name' }, t(`badge.${b}`)),
+        fresh.includes(b) ? h('span', { class: 'badge-new' }, t('badges.new')) : null,
+      ),
+    ),
+  );
+}
+
+export function showResults(level: Level, result: Grade, actions: { next?: () => void; retry: () => void; menu: () => void }, badges: { earned: readonly BadgeId[]; fresh: readonly BadgeId[] } = { earned: [], fresh: [] }): void {
   const { evaluation } = result;
   const score = h('div', { class: 'score' }, '0');
   const title = result.exam ? t('results.exam') : result.timedOut ? t('results.timeout') : evaluation.complete ? t('results.title') : t('results.timeout');
@@ -277,6 +298,7 @@ export function showResults(level: Level, result: Grade, actions: { next?: () =>
       h('h2', {}, tx(level.title)),
       h('div', { class: 'score-row' }, h('div', { class: `rank rank-${result.rank}` }, result.rank), h('div', { class: 'score-block' }, score, h('span', { class: 'out-of' }, '/ 100'))),
       starRow(result.total, 34),
+      badgeRow(badges.earned, badges.fresh),
       h(
         'dl',
         { class: 'breakdown' },
@@ -309,6 +331,8 @@ export function showResults(level: Level, result: Grade, actions: { next?: () =>
   if (stars >= 2) confetti(screen);
   // A note for each star as it lands.
   [0.25, 0.5, 0.75].slice(0, stars).forEach((delay) => setTimeout(() => sound.play('objective'), delay * 1000));
+  // And one more for each new badge.
+  if (badges.fresh.length) setTimeout(() => sound.play('objective'), (0.9 + badges.earned.indexOf(badges.fresh[0] as BadgeId) * 0.12) * 1000);
   // Count the score up, and let the stars land one after the other.
   const start = performance.now();
   const tick = (now: number): void => {

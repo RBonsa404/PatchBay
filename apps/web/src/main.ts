@@ -23,6 +23,7 @@ import { panorama } from './scene/outside.js';
 import { showClassroom } from './ui/classroom.js';
 import { showSettings } from './ui/pause.js';
 import { randomTip } from './ui/tips.js';
+import { earnedBadges, badgeStore } from './game/badges.js';
 import { progress, showBriefing, showMissions, showResults, showTitle } from './ui/screens.js';
 
 // A soft tick on every button of the interface.
@@ -160,7 +161,9 @@ function play(index: number, exam = false, guided = false): void {
             void classroom.report(level.id, exam, result).then((sent) => notify(sent ? 'Résultat envoyé à ta classe.' : 'Résultat gardé : il partira vers ta classe dès que le réseau reviendra.'));
           }
           const next = index + 1 < campaign.length ? () => briefing(index + 1) : undefined;
-          showResults(level, result, { ...(next ? { next } : {}), retry: () => play(index, exam), menu: missions });
+          const earned = guided ? [] : earnedBadges(result, { hints: result.hints ?? 0, cabled: result.cabled ?? false, bestTime: badgeStore.bestTime(level.id) });
+          const fresh = guided ? [] : badgeStore.record(level.id, result, earned);
+          showResults(level, result, { ...(next ? { next } : {}), retry: () => play(index, exam), menu: missions }, { earned, fresh });
         },
         menu: guided ? title : missions,
         tourDone: () => briefing(0),

@@ -21,6 +21,10 @@ export interface Grade {
   limit: number;
   /** The tidiness of the cabling, marked apart (the game's, not the engine's). */
   tidiness?: Tidiness;
+  /** Hints asked during the mission (for the badges). */
+  hints?: number;
+  /** Whether the mission asked for cables to be laid (for the badges). */
+  cabled?: boolean;
 }
 
 const OBJECTIVES = 80;
