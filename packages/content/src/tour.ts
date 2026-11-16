@@ -6,8 +6,11 @@ import type { Text } from '../../sim-core/src/index.js';
  */
 
 export interface TourStop {
-  /** What the camera looks at: a device or panel by its id, the whiteboard, the whole room, or the cable reserve. */
-  focus: { device: string } | { board: true } | { room: true } | { cables: true } | { place: { x: number; z: number; upstairs?: boolean; yaw: number; pitch?: number } };
+  /**
+   * What the camera looks at: a device or panel by its id, the whiteboard, the whole room, the cable reserve, or a spot
+   * of a building (a far site's spot in that site's own coordinates, as if its technical room stood where the campus's does).
+   */
+  focus: { device: string } | { board: true } | { room: true } | { cables: true } | { place: { x: number; z: number; upstairs?: boolean; yaw: number; pitch?: number; site?: 'agence' | 'datacenter' } };
   title: Text;
   text: Text;
 }
@@ -110,14 +113,42 @@ export const tour: TourStop[] = [
     focus: { place: { x: -11.6, z: -2.84, yaw: -Math.PI / 2, pitch: 0.02 } },
     title: { fr: 'Les autres sites' },
     text: {
-      fr: "Au bout du couloir, la porte de la rue. Dans les missions à plusieurs sites, l'IST a une agence à Bobo-Dioulasso et un opérateur loue la ligne entre les deux villes. Pour t'y rendre, sors par cette porte ou appuie sur G : tu suis le trajet sur la carte du Burkina Faso, puis tu entres dans l'autre bâtiment.",
+      fr: "Au bout du couloir, la porte de la rue. Dans les missions à plusieurs sites, l'IST a une agence à Bobo-Dioulasso et un opérateur loue la ligne entre les deux villes. Pour t'y rendre, sors par cette porte ou appuie sur G : tu suis le trajet sur la carte du Burkina Faso, puis tu entres dans l'autre bâtiment. Allons-y ensemble.",
+    },
+  },
+  {
+    focus: { place: { site: 'agence', x: -6.6, z: -4.6, yaw: 2.16, pitch: -0.05 } },
+    title: { fr: "L'agence de Bobo-Dioulasso" },
+    text: {
+      fr: "Nous voici à Bobo-Dioulasso, à plus de trois cents kilomètres du campus. Fatim t'accueille à l'entrée. Chaque site est un vrai bâtiment, avec son accueil, la direction, une salle de réunion, des toilettes et sa salle informatique. Les employés d'ici travaillent sur le même réseau que le campus, grâce à la ligne louée.",
+    },
+  },
+  {
+    focus: { place: { site: 'agence', x: 0, z: 5.0, yaw: Math.PI, pitch: -0.1 } },
+    title: { fr: "La salle informatique de l'agence" },
+    text: {
+      fr: "La baie de l'agence attend encore son routeur : tu l'installeras toi-même dans la mission sur le site distant. Regarde le chemin de câbles jaune au-dessus : c'est par là qu'arrivera la ligne de l'opérateur, jusqu'au boîtier qu'il fixe au mur. Le routeur s'y branche par un câble série, et l'opérateur relie les deux villes.",
+    },
+  },
+  {
+    focus: { place: { site: 'datacenter', x: 0.4, z: -4.9, yaw: -2.01, pitch: 0.02 } },
+    title: { fr: "L'opérateur : la salle d'exploitation" },
+    text: {
+      fr: "Ici, c'est le fournisseur d'accès qui loue la ligne entre les deux villes et donne accès à Internet. Sur le mur d'écrans, ses techniciens surveillent chaque ligne louée : en service ou coupée, avec l'alarme et sa cause. Pendant tes missions, ces écrans montrent l'état réel de tes propres liaisons.",
+    },
+  },
+  {
+    focus: { place: { site: 'datacenter', x: -5.2, z: 0.2, yaw: 1.2, pitch: -0.05 } },
+    title: { fr: 'La salle des serveurs' },
+    text: {
+      fr: "Le centre de données de l'opérateur : des rangées de baies sur un faux plancher, sous lequel l'air froid de la climatisation circule. C'est ici que se trouvent le routeur du fournisseur d'accès et le serveur qui joue le rôle d'Internet dans les missions sur l'accès à Internet et le dépannage.",
     },
   },
   {
     focus: { room: true },
     title: { fr: 'Travailler sans gêne' },
     text: {
-      fr: "Tu vois ton personnage de dos quand tu marches. Dès que tu prends un câble, que tu branches ou que tu ouvres une console, la vue passe à la première personne : c'est le mode focus, pour voir chaque port sans que ton corps le cache. La touche F change la vue à tout moment.",
+      fr: "De retour au campus. Tu vois ton personnage de dos quand tu marches. Dès que tu prends un câble, que tu branches ou que tu ouvres une console, la vue passe à la première personne : c'est le mode focus, pour voir chaque port sans que ton corps le cache. La touche F change la vue à tout moment.",
     },
   },
   {

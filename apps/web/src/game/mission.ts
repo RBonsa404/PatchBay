@@ -359,7 +359,10 @@ export class Mission {
       await this.goToRoom(room, view.root.getWorldPosition(new THREE.Vector3()).x);
       this.focusOn(view, true);
     } else if ('place' in f) {
-      await this.goToPlace(f.place.x, f.place.z, f.place.upstairs ? FLOOR_Y : 0, f.place.yaw, f.place.pitch ?? 0);
+      // A far site's spot: its building is put up first (behind the fade), the same way the trip there does.
+      const site = f.place.site;
+      if (site) this.buildSiteOnce(site);
+      await this.goToPlace(f.place.x, f.place.z + (site ? SITE_Z[site] : 0), f.place.upstairs ? FLOOR_Y : 0, f.place.yaw, f.place.pitch ?? 0);
     } else {
       await this.goToRoom('');
       if ('board' in f) this.toggleBoard();
@@ -1019,7 +1022,8 @@ export class Mission {
     this.avatar = new Person(settings.character);
     this.stage.level.add(this.avatar.root);
     if (!this.building) return;
-    const sites = new Set(this.sites());
+    // The guided tour goes to all three sites: everyone is there.
+    const sites = new Set<SiteName>(this.tour ? ['campus', 'agence', 'datacenter'] : this.sites());
     for (const who of COLLEAGUES) {
       const site = siteOf(who.at.z);
       if (!sites.has(site)) continue;
