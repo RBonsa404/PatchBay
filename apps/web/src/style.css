@@ -708,3 +708,11 @@ body.photo-on .hud, body.photo-on .minimap, body.photo-on .toasts, body.photo-on
   .photo-tools { justify-content: flex-start; }
   .photo-keys { display: none; }
 }
+
+/* Aïcha's tip on the loading screen: her portrait, the tip, and two quiet buttons (her voice only when asked). */
+#boot .loading-tip { display: flex; gap: 14px; align-items: flex-start; text-align: left; }
+#boot .loading-tip .mentor-portrait { flex: none; width: 44px; height: 44px; }
+#boot .loading-tip .tip-text { display: block; }
+#boot .tip-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+#boot .tip-btn { padding: 5px 12px; border: 1px solid #34425a; border-radius: 999px; background: transparent; color: #cbd5e1; font: 500 12.5px var(--font-body, system-ui); cursor: pointer; }
+#boot .tip-btn:hover { border-color: #38bdf8; color: #fff; }

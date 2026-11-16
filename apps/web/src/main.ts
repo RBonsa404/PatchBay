@@ -23,6 +23,8 @@ import { panorama } from './scene/outside.js';
 import { showClassroom } from './ui/classroom.js';
 import { showSettings } from './ui/pause.js';
 import { randomTip } from './ui/tips.js';
+import { mentorPortrait } from './ui/brand.js';
+import { say, stopVoice } from './voiceover.js';
 import { earnedBadges, badgeStore } from './game/badges.js';
 import { progress, showBriefing, showMissions, showResults, showTitle } from './ui/screens.js';
 
@@ -137,6 +139,33 @@ function visit(): void {
   play(index < 0 ? campaign.length - 1 : index, false, true);
 }
 
+/**
+ * Aïcha's tip while a mission loads: about that mission two times out of three. Her recorded voice reads it only if the
+ * player asks (Écouter); another tip on request.
+ */
+function loadingTip(level: string): HTMLElement {
+  let tip = randomTip(level);
+  const text = h('span', { class: 'tip-text' }, tip);
+  const listen = h('button', { class: 'tip-btn', type: 'button', onclick: () => void say(tip) }, 'Écouter');
+  const other = h('button', {
+    class: 'tip-btn',
+    type: 'button',
+    onclick: () => {
+      stopVoice();
+      let next = randomTip(level);
+      for (let i = 0; i < 5 && next === tip; i++) next = randomTip(level);
+      tip = next;
+      text.textContent = tip;
+    },
+  }, 'Astuce suivante');
+  return h(
+    'div',
+    { class: 'loading-tip' },
+    mentorPortrait(),
+    h('div', {}, h('b', {}, 'L’astuce d’Aïcha'), text, h('div', { class: 'tip-actions' }, listen, other)),
+  );
+}
+
 function play(index: number, exam = false, guided = false): void {
   // A screen first, painted before the work starts: the mission is built, then its shaders compiled in the background.
   const loading = bootScreen.cloneNode(true) as HTMLElement;
@@ -144,7 +173,7 @@ function play(index: number, exam = false, guided = false): void {
   loading.querySelector('strong')?.replaceWith(
     h('div', { class: 'loading-title' }, h('span', {}, guided ? 'Visite guidée' : `Mission ${String(index + 1).padStart(2, '0')}`), h('strong', {}, tx(next.title))),
   );
-  loading.append(h('p', { class: 'loading-tip' }, h('b', {}, 'Astuce'), randomTip()));
+  loading.append(loadingTip(next.id));
   document.body.append(loading);
   sound.setMood('mission');
   requestAnimationFrame(() => {

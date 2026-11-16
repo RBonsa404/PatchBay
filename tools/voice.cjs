@@ -30,7 +30,7 @@ const esbuild = require(path.join(root, 'node_modules/esbuild'));
 const tmp = path.join(os.tmpdir(), 'ist-voice-texts.cjs');
 esbuild.buildSync({
   stdin: {
-    contents: "export { tour } from './packages/content/src/tour.ts'; export { COLLEAGUES, REACTIONS, WOMEN } from './apps/web/src/game/cast.ts';",
+    contents: "export { tour } from './packages/content/src/tour.ts'; export { COLLEAGUES, REACTIONS, WOMEN } from './apps/web/src/game/cast.ts'; export { TIPS, LEVEL_TIPS } from './apps/web/src/ui/tips.ts';",
     resolveDir: root,
     loader: 'ts',
   },
@@ -41,11 +41,13 @@ esbuild.buildSync({
   logLevel: 'error',
   define: { 'import.meta.env': '{}' },
 });
-const { tour, COLLEAGUES, REACTIONS, WOMEN } = require(tmp);
+const { tour, COLLEAGUES, REACTIONS, WOMEN, TIPS, LEVEL_TIPS } = require(tmp);
 
 const VOICE = { aicha: 'fr_FR-siwis-medium', man: 'fr_FR-tom-medium', woman: 'fr_FR-upmc-medium' };
 const lines = [];
 for (const stop of tour) lines.push({ voice: 'aicha', text: stop.text.fr });
+// Aïcha's tips on the loading screens, read when the player asks for it.
+for (const tip of [...TIPS, ...Object.values(LEVEL_TIPS).flat()]) lines.push({ voice: 'aicha', text: tip });
 for (const who of COLLEAGUES) for (const line of who.lines) lines.push({ voice: WOMEN.has(who.model) ? 'woman' : 'man', text: line });
 // The reactions, said by anyone: once in each voice, keyed by voice and text.
 for (const line of REACTIONS) for (const voice of ['man', 'woman']) lines.push({ voice, text: line, as: `${voice}|${line}` });
