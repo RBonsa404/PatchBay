@@ -156,6 +156,212 @@ elif kind == 'gate':
         parts.append(c.box(f'bar{k}', (0.02, 0.02, 1.72), (gx - W / 2 + 0.13 + k * 0.133, -0.3, 1.01), paint))
     for s in (-1, 1):
         parts.append(cylinder(f'wheel{s}', 0.05, 0.03, (gx + s * (W / 2 - 0.3), -0.3, 0.05), steel, 20, rot=(math.pi / 2, 0, 0)))
+elif kind in ('shop_open', 'shop_closed'):
+    # One 4 m bay of a single-storey shop of the city, across the street: rendered blockwork (painted per shop in the
+    # game: the 'render' material is white and tinted), a 3 m opening with its roller shutter, a painted sign board
+    # over it, and a corrugated sheet awning on two steel posts to shade the pavement.
+    render = c.material('render', '#ffffff', 0.93)
+    plinth = c.material('plinth', '#5e4c3d', 0.9)
+    coping = c.material('coping', '#e6e0d4', 0.75)
+    inside = c.material('inside', '#2a2622', 0.95)
+    shutter = c.material('shutter', '#8d949b', 0.45, 0.7)
+    tole = c.material('tole', '#9aa0a4', 0.5, 0.65)
+    rust = c.material('rust', '#7d5234', 0.85, 0.3)
+    steel = c.material('post', '#3f464d', 0.5, 0.6)
+    board = c.material('board', '#f2efe8', 0.6)
+    concrete = c.material('step', '#a9a296', 0.9)
+    W, D, H, P = 4.0, 4.0, 3.3, 0.45
+    f = -D / 2
+    OW, OH = 3.0, 2.5
+    # Front wall round the opening, sides, back, roof slab.
+    for s in (-1, 1):
+        parts.append(c.box(f'pier{s}', ((W - OW) / 2, 0.2, H + P), (s * (W + OW) / 4, f + 0.1, (H + P) / 2), render))
+        parts.append(c.box(f'side{s}', (0.2, D, H + P), (s * (W / 2 - 0.1), 0, (H + P) / 2), render))
+    parts.append(c.box('lintel', (OW, 0.2, H + P - OH), (0, f + 0.1, OH + (H + P - OH) / 2), render))
+    parts.append(c.box('back', (W, 0.2, H + P), (0, D / 2 - 0.1, (H + P) / 2), render))
+    parts.append(c.box('slab', (W, D, 0.15), (0, 0, H), render))
+    parts.append(c.box('coping', (W + 0.02, 0.26, 0.05), (0, f + 0.11, H + P + 0.025), coping))
+    parts.append(c.box('plinth', (W + 0.01, 0.21, 0.32), (0, f + 0.1, 0.16), plinth))
+    parts.append(c.box('step', (OW + 0.2, 0.45, 0.14), (0, f - 0.2, 0.07), concrete, bevel=10 * mm))
+    # The sign board over the opening (its painting is laid on in the game, 3.6 × 0.62 m, front at f - 0.04).
+    parts.append(c.box('board', (3.7, 0.04, 0.7), (0, f - 0.02, H + 0.05), board, bevel=6 * mm))
+    # Roller shutter: its housing over the opening, and either the slats down or the shop open with its goods.
+    parts.append(c.box('housing', (OW + 0.1, 0.24, 0.26), (0, f - 0.12, OH + 0.13), shutter, bevel=15 * mm, segments=3))
+    for s in (-1, 1):
+        parts.append(c.box(f'guide{s}', (0.05, 0.06, OH), (s * (OW / 2 + 0.02), f - 0.03, OH / 2), shutter))
+    if kind == 'shop_closed':
+        for k in range(31):
+            parts.append(c.box(f'slat{k}', (OW, 0.03, 0.075), (0, f - 0.03, 0.04 + k * 0.08), shutter, bevel=8 * mm))
+        parts.append(c.box('bottom', (OW, 0.05, 0.05), (0, f - 0.04, 0.03), steel))
+        parts.append(c.box('lock', (0.06, 0.03, 0.08), (0, f - 0.07, 0.12), c.material('brass', '#b08d3a', 0.35, 1.0)))
+    else:
+        parts.append(c.box('floor', (W - 0.4, D - 0.4, 0.02), (0, 0, 0.01), concrete))
+        parts.append(c.box('dark', (W - 0.42, 0.02, H - 0.1), (0, D / 2 - 0.21, H / 2), inside))
+        for s in (-1, 1):
+            parts.append(c.box(f'darkside{s}', (0.02, D - 0.4, H - 0.1), (s * (W / 2 - 0.21), 0, H / 2), inside))
+        parts.append(c.box('ceiling', (W - 0.4, D - 0.4, 0.02), (0, 0, H - 0.08), inside))
+        # Shelves along the back wall, crowded with packets and tins; a counter at the front.
+        wood = c.material('shelf', '#6b4a2e', 0.8)
+        goods = [c.material(f'goods{i}', col, 0.6) for i, col in enumerate(('#c0392b', '#e9b949', '#1f6fb2', '#2e8b57', '#f3f0e6', '#d35400'))]
+        k = 0
+        for z in (0.5, 1.05, 1.6, 2.15):
+            parts.append(c.box(f'shelf{z}', (W - 0.6, 0.45, 0.03), (0, D / 2 - 0.45, z), wood))
+            x = -W / 2 + 0.4
+            while x < W / 2 - 0.45:
+                w = 0.14 + ((k * 37) % 9) * 0.02
+                h = 0.18 + ((k * 53) % 7) * 0.035
+                parts.append(c.box(f'item{k}', (w, 0.3, h), (x + w / 2, D / 2 - 0.45, z + 0.015 + h / 2), goods[k % len(goods)]))
+                x += w + 0.025
+                k += 1
+        parts.append(c.box('counter', (2.0, 0.55, 1.0), (0.4, f + 1.3, 0.5), wood, bevel=10 * mm))
+        parts.append(c.box('glass', (1.9, 0.5, 0.02), (0.4, f + 1.3, 1.01), c.material('vitrine', '#c9d6dd', 0.1, 0.2)))
+        parts.append(c.box('crate', (0.5, 0.35, 0.3), (-1.0, f + 0.7, 0.15), goods[0], bevel=8 * mm))
+        parts.append(c.box('crate2', (0.5, 0.35, 0.3), (-1.0, f + 0.7, 0.45), goods[1], bevel=8 * mm))
+    # The awning: corrugated sheet sloping from the wall down to its two posts, a rusty edge.
+    import bmesh
+    mesh = bpy.data.meshes.new('awning')
+    bm = bmesh.new()
+    AW, AD, waves, top, low = W + 0.1, 1.9, 26, 2.95, 2.62
+    cols = waves * 4
+    grid = []
+    for j in range(2):
+        y = f - 0.02 - j * AD
+        zb = top if j == 0 else low
+        row = []
+        for i in range(cols + 1):
+            x = -AW / 2 + AW * i / cols
+            row.append(bm.verts.new((x, y, zb + 0.018 * math.sin(i / cols * waves * 2 * math.pi))))
+        grid.append(row)
+    for i in range(cols):
+        bm.faces.new((grid[0][i], grid[0][i + 1], grid[1][i + 1], grid[1][i]))
+    bm.to_mesh(mesh)
+    bm.free()
+    awning = bpy.data.objects.new('awning', mesh)
+    bpy.context.collection.objects.link(awning)
+    awning.data.materials.append(tole)
+    mod = awning.modifiers.new('thick', 'SOLIDIFY')
+    mod.thickness = 0.006
+    c.apply_modifiers(awning)
+    parts.append(awning)
+    parts.append(c.box('edge', (AW, 0.03, 0.05), (0, f - 0.02 - AD, low - 0.01), rust))
+    parts.append(c.box('beam', (AW - 0.1, 0.05, 0.08), (0, f - AD + 0.1, low - 0.06), steel))
+    for s in (-1, 1):
+        parts.append(cylinder(f'post{s}', 0.03, low - 0.06, (s * (AW / 2 - 0.15), f - AD + 0.1, (low - 0.06) / 2), steel, 12))
+elif kind == 'pole':
+    # A concrete electricity pole of the town, 9 m, its steel crossarm and three insulators, and a street lamp.
+    concrete = c.material('concrete', '#a7a39b', 0.9)
+    steel = c.material('steel', '#4b5157', 0.5, 0.7)
+    porcelain = c.material('porcelain', '#e8e6df', 0.3)
+    lamp = c.material('lamp', '#fff7e0', 0.3, emission='#fff1c8', strength=2)
+    bpy.ops.mesh.primitive_cone_add(vertices=16, radius1=0.15, radius2=0.09, depth=9.0, location=(0, 0, 4.5))
+    shaft = bpy.context.active_object
+    shaft.name = 'shaft'
+    shaft.data.materials.append(concrete)
+    parts.append(shaft)
+    # The crossarm runs across the street (along Y, like the lamp's arm); the wires along the street sit on the
+    # insulators at y = -0.75, 0, 0.75, 8.73 m up (the game hangs them there).
+    parts.append(c.box('arm', (0.08, 1.7, 0.08), (0, 0, 8.55), steel))
+    for y in (-0.75, 0, 0.75):
+        parts.append(cylinder(f'ins{y}', 0.035, 0.14, (0, y, 8.66), porcelain, 12))
+    parts.append(bar('lamparm', (0, -0.1, 7.2), (0, -1.6, 7.6), 0.03, steel))
+    parts.append(c.box('head', (0.22, 0.5, 0.1), (0, -1.75, 7.55), steel, bevel=20 * mm, segments=3))
+    parts.append(c.box('glow', (0.18, 0.42, 0.01), (0, -1.75, 7.495), lamp))
+elif kind == 'tree':
+    # A neem, the shade tree of every street of Ouagadougou: a short leaning trunk, four limbs, a broad rounded
+    # crown of leaf clumps (lumpy spheres, two greens).
+    bark = c.material('bark', '#4a3b2e', 0.95)
+    leaf = c.material('leaf', '#4c6a2b', 0.85)
+    leaf2 = c.material('leaf2', '#3a5622', 0.85)
+    parts.append(bar('trunk', (0, 0, 0), (0.15, 0.05, 2.6), 0.2, bark, 12))
+    crown = (0.15, 0.05, 2.6)
+    tips = [(1.6, 0.4, 4.6), (-1.4, 0.6, 4.8), (0.3, -1.5, 4.7), (0.1, 1.4, 5.2), (0.2, 0.0, 5.6)]
+    for i, t in enumerate(tips):
+        parts.append(bar(f'limb{i}', crown, t, 0.11 - i * 0.012, bark, 10))
+    for i, (a, b) in enumerate(((tips[0], (2.6, -0.4, 4.9)), (tips[1], (-2.5, 0.2, 5.0)), (tips[2], (-0.6, -2.4, 4.9)), (tips[3], (0.9, 2.4, 5.3)))):
+        parts.append(bar(f'twig{i}', a, b, 0.05, bark, 8))
+    seed = 11
+
+    def rnd():
+        global seed
+        seed = (seed * 16807) % 2147483647
+        return seed / 2147483647
+    # The neem's pinnate leaves, painted into a small picture with its alpha: leaflets either side of a midrib, three
+    # leaves per picture. Laid on crossed cards (alpha cut out in the game), the crown reads as foliage, not as balls.
+    S = 256
+    img = bpy.data.images.new('neem_leaves', S, S, alpha=True)
+    px = [0.0] * (S * S * 4)
+    greens = ((0.16, 0.27, 0.06), (0.22, 0.34, 0.08), (0.12, 0.21, 0.05))
+    for li, (cx0, cy0, ang) in enumerate(((60, 30, 1.25), (150, 40, 1.75), (200, 120, 2.4), (70, 140, 0.9), (130, 150, 1.5))):
+        dx, dy = math.cos(ang), math.sin(ang)
+        g = greens[li % 3]
+        for k in range(9):
+            t = 12 + k * 11
+            mx, my = cx0 + dx * t, cy0 + dy * t
+            for side in (-1, 1):
+                la = ang + side * 0.95
+                lx, ly = math.cos(la), math.sin(la)
+                ex, ey = mx + lx * 13, my + ly * 13
+                for yy in range(int(ey - 16), int(ey + 17)):
+                    for xx in range(int(ex - 16), int(ex + 17)):
+                        if not (0 <= xx < S and 0 <= yy < S):
+                            continue
+                        u = (xx - ex) * lx + (yy - ey) * ly
+                        v = -(xx - ex) * ly + (yy - ey) * lx
+                        if (u / 14) ** 2 + (v / 4.5) ** 2 <= 1:
+                            i4 = (yy * S + xx) * 4
+                            shade = 0.85 + 0.3 * (v / 4.5 + 1) / 2
+                            px[i4:i4 + 4] = [g[0] * shade, g[1] * shade, g[2] * shade, 1.0]
+    img.pixels = px
+    img.file_format = 'PNG'
+    img.pack()
+    leaves = bpy.data.materials.new('leaves')
+    leaves.use_nodes = True
+    nodes = leaves.node_tree.nodes
+    bsdf = nodes.get('Principled BSDF')
+    node = nodes.new('ShaderNodeTexImage')
+    node.image = img
+    leaves.node_tree.links.new(node.outputs['Color'], bsdf.inputs['Base Color'])
+    leaves.node_tree.links.new(node.outputs['Alpha'], bsdf.inputs['Alpha'])
+    bsdf.inputs['Roughness'].default_value = 0.75
+    # A dark core inside the crown so that the cards never let the sky through as a sieve.
+    for i, (x, y, z, r) in enumerate(((0.15, 0.05, 4.9, 1.9), (1.4, 0.3, 4.8, 1.2), (-1.2, 0.4, 4.9, 1.2), (0.2, -1.3, 4.8, 1.2), (0.2, 1.3, 5.1, 1.2))):
+        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2, radius=r, location=(x, y, z))
+        o = bpy.context.active_object
+        o.name = f'core{i}'
+        o.scale = (1.0, 1.0, 0.6)
+        o.data.materials.append(leaf2)
+        bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+        parts.append(o)
+    # Cards: three crossed quads per tuft, tufts over the shell of a broad, flattened crown.
+    import bmesh
+    mesh = bpy.data.meshes.new('foliage')
+    bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new('UVMap')
+    for i in range(170):
+        a = rnd() * 2 * math.pi
+        e = (rnd() - 0.3) * math.pi * 0.5
+        shell = 0.7 + rnd() * 0.35
+        cx = 0.15 + math.cos(a) * math.cos(e) * 3.0 * shell
+        cy = 0.05 + math.sin(a) * math.cos(e) * 3.0 * shell
+        cz = 4.95 + math.sin(e) * 1.3 * shell
+        size = 0.9 + rnd() * 0.5
+        for q in range(3):
+            yaw = rnd() * math.pi
+            tilt = (rnd() - 0.5) * 1.2
+            ux, uy = math.cos(yaw) * size / 2, math.sin(yaw) * size / 2
+            vz = math.cos(tilt) * size / 2
+            vx, vy = -math.sin(yaw) * math.sin(tilt) * size / 2, math.cos(yaw) * math.sin(tilt) * size / 2
+            corners = [(-1, -1), (1, -1), (1, 1), (-1, 1)]
+            verts = [bm.verts.new((cx + s * ux + t * vx, cy + s * uy + t * vy, cz + t * vz)) for s, t in corners]
+            f = bm.faces.new(verts)
+            for loop, (s, t) in zip(f.loops, corners):
+                loop[uvl].uv = ((s + 1) / 2, (t + 1) / 2)
+    bm.to_mesh(mesh)
+    bm.free()
+    cards = bpy.data.objects.new('foliage', mesh)
+    bpy.context.collection.objects.link(cards)
+    cards.data.materials.append(leaves)
+    parts.append(cards)
 else:
     raise SystemExit(f'unknown kind {kind}')
 
@@ -168,4 +374,5 @@ body = c.join(parts, kind)
 c.export_glb(out)
 print('exported', out, 'faces', len(body.data.polygons))
 if len(argv) > 2:
-    c.preview(argv[2], target=(0, 0, 0.8 if kind != 'water_tank' else 1.6), distance=3.2 if kind == 'ac_unit' else 7.5, angle=(-30, 15))
+    view = {'ac_unit': (0.8, 3.2), 'water_tank': (1.6, 7.5), 'pole': (4.5, 16), 'tree': (3.5, 16), 'shop_open': (1.8, 9), 'shop_closed': (1.8, 9)}.get(kind, (0.8, 7.5))
+    c.preview(argv[2], target=(0, 0, view[0]), distance=view[1], angle=(-30, 15))

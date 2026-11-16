@@ -22,7 +22,7 @@ import { closePanel, Consoles, openPanelKey, resetHostShells, showHostPanel, sho
 import { extraCables, tidiness, type Tidiness } from './cabling.js';
 import { testCable, type CableTest } from './tester.js';
 import { showTester } from '../ui/tester.js';
-import { daytime, daytimeOf, setDaytime } from '../scene/daytime.js';
+import { daytime, daytimeName, daytimeOf, setDaytime } from '../scene/daytime.js';
 import { clock, grade, type Grade } from './scoring.js';
 import { canListen, listenOnce } from '../voice.js';
 import { settings } from '../settings.js';
@@ -32,7 +32,7 @@ import { Minimap } from '../ui/minimap.js';
 import { Person } from '../scene/people.js';
 import { COLLEAGUES, REACTIONS, WOMEN, type Colleague } from './cast.js';
 import { playTrip, showSiteChooser } from '../ui/travel.js';
-import { buildExterior, buildStreet, ENTRANCES } from '../scene/exterior.js';
+import { buildExterior, buildStreet, ENTRANCES, HAZE } from '../scene/exterior.js';
 import { journeyMap, journeyPath, journeyTrail, JOURNEY_ORIGIN } from '../scene/journey.js';
 import { distanceKm, SITES } from '../ui/travel.js';
 import { pauseOpen, showPause } from '../ui/pause.js';
@@ -1242,6 +1242,14 @@ export class Mission {
     const o = this.outsideOf(site);
     o.street.visible = on;
     this.showTown(site);
+    // Where the street is modelled up to the horizon (the campus), its own sky replaces the photographed town, and the
+    // dusty haze of the harmattan softens its far ends.
+    const sky = o.street.getObjectByName('street-sky');
+    if (sky) {
+      const town = this.stage.scene.getObjectByName(`panorama-${site}`);
+      if (town) town.visible = !on;
+      this.stage.scene.fog = on ? new THREE.Fog(HAZE[daytimeName()], 22, 160) : null;
+    }
     o.exterior.traverse((m) => ((m as THREE.Mesh).isMesh ? (m.castShadow = on) : null));
     this.stage.setOutdoors(on, door.clone().addScaledVector(out, -6), out.clone().multiplyScalar(0.7).addScaledVector(side, 0.45).setY(1.1));
     return { door, out, side };

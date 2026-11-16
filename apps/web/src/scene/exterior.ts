@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { FLOOR_Y, inside, ROOM_HEIGHT, SITE_EXIT_X, SITE_Z, siteOf, WALL, WALLS, wallPieces, WINDOWS, ZONES, type Rect, type SiteName } from './building.js';
+import { daytime, daytimeName, type Daytime } from './daytime.js';
 import { photo, photoRelief } from './materials.js';
 import { placeMany, placeProp, type Placement } from './props.js';
 import { textTexture } from './textures.js';
@@ -415,6 +416,8 @@ export function buildStreet(site: SiteName, footprint: Rect): THREE.Group {
   line.position.set(road.position.x, -0.006, road.position.z);
   g.add(road, line);
   g.add(boundary(e, footprint));
+  // Across the campus street, the town is modelled (the photographed one was a foreign shopping street).
+  if (site === 'campus') g.add(facingStreet(site));
   return g;
 }
 
@@ -453,5 +456,229 @@ function boundary(e: (typeof ENTRANCES)[SiteName], footprint: Rect): THREE.Group
   // The returns, from the ends of the front wall back to the building's line.
   for (const u of [east, west]) for (let v = -BAY / 2; v > -(d + 1.5); v -= BAY) bays.push(at(u, v, turn + (Math.PI / 2) * Math.sign(u)));
   placeMany(g, 'fence', bays);
+  return g;
+}
+
+
+interface Shop {
+  sign: [string, string];
+  paint: string;
+  ground: string;
+  ink: string;
+  open: boolean;
+}
+const shop = (title: string, line: string, paint: string, ground: string, ink: string, open = true): Shop => ({ sign: [title, line], paint, ground, ink, open });
+
+/** Across the campus street, in order along it: shops, open or with their shutter down, and gaps where a neem grows. */
+const FAR_SHOPS: (Shop | null)[] = [
+  shop('VULCANISATEUR', 'Pneus · chambres à air · motos et vélos', '#cdb38c', '#111827', '#facc15'),
+  shop('DÉPÔT DE BOISSONS', 'Eau · sucreries · glace', '#d8c3a5', '#0e7490', '#ffffff', false),
+  null,
+  shop('ATELIER SOUDURE', 'Portails · grilles · fenêtres', '#bfc4c7', '#374151', '#fbbf24'),
+  shop('BOULANGERIE DU QUARTIER', 'Pain chaud matin et soir', '#e6cfa3', '#f5e7c6', '#7c2d12'),
+  shop('PRESSING ÉCLAT', 'Lavage · repassage · teinture', '#c8d3dc', '#ffffff', '#0369a1', false),
+  shop('ALIMENTATION GÉNÉRALE', 'Chez Adama · riz, huile, sucre', '#d9c19a', '#1d4ed8', '#ffffff'),
+  shop('QUINCAILLERIE DU PROGRÈS', 'Ciment · fer · peinture · plomberie', '#c9a27c', '#f5d90a', '#7f1d1d'),
+  shop('COUTURE MODERNE', 'Awa · Faso Dan Fani · retouches', '#d8b7a3', '#ffffff', '#9d174d', false),
+  null,
+  shop('CYBER LE BAOBAB', 'Internet · photocopie · saisie · impression', '#b8c7a6', '#0b1e3f', '#38bdf8'),
+  shop('TÉLÉPHONES · ACCESSOIRES', 'Réparation · crédit · transfert d’argent', '#e3d3b4', '#f97316', '#ffffff'),
+  shop('PIÈCES MOTOS', 'Entretien · vidange · pneus', '#c7cfd6', '#dc2626', '#ffffff', false),
+  null,
+  shop('MAQUIS LA JOIE', 'Poulet braisé · riz gras · boissons fraîches', '#e6c98f', '#15803d', '#fef08a'),
+  shop('SALON BELLE VIE', 'Coiffure · tresses · esthétique', '#d9c19a', '#7c3aed', '#ffffff', false),
+  shop('LIBRAIRIE PAPETERIE', 'Fournitures scolaires · livres', '#c9a27c', '#ffffff', '#1d4ed8'),
+  shop('MENUISERIE BOIS', 'Lits · armoires · portes', '#cfb592', '#78350f', '#fde68a', false),
+  null,
+  shop('ÉLECTRICITÉ BÂTIMENT', 'Câbles · disjoncteurs · lampes', '#d6d0c2', '#1e3a8a', '#fbbf24'),
+  shop('DÉPÔT DE GAZ', 'Bouteilles 6 et 12 kg', '#c2cbb4', '#b91c1c', '#ffffff', false),
+  shop('CAFÉ SENEGALAIS', 'Café Touba · pain · omelette', '#e2c79b', '#fef3c7', '#92400e'),
+];
+/** On the campus side of the street, beyond its fence: the neighbours, facing the street too. */
+const NEAR_SHOPS: (Shop | null)[] = [
+  shop('TAILLEUR LE CHIC', 'Costumes · tenues de cérémonie', '#d7c4a8', '#0f172a', '#e2e8f0', false),
+  shop('KIOSQUE INFORMATIQUE', 'Clés USB · câbles · cartouches', '#c5d0d8', '#1d4ed8', '#ffffff'),
+  null,
+  shop('PHOTO STUDIO', 'Photos d’identité minute', '#e1cfb0', '#be185d', '#ffffff'),
+  shop('BOUTIQUE ALIMENTATION', 'Lait · conserves · savon', '#cdb38c', '#16a34a', '#ffffff', false),
+];
+
+/** How many signs the atlas holds side by side, and the size of each. */
+const SIGN_COLUMNS = 4;
+const [SIGN_W, SIGN_H] = [512, 88];
+
+/** The shops' sign boards, all painted into one picture, worn by the sun. */
+function signAtlas(shops: Shop[]): THREE.CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = SIGN_W * SIGN_COLUMNS;
+  c.height = SIGN_H * Math.ceil(shops.length / SIGN_COLUMNS);
+  const g = c.getContext('2d') as CanvasRenderingContext2D;
+  let seed = 5;
+  const rnd = (): number => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  shops.forEach((s, i) => {
+    const [x, y] = [(i % SIGN_COLUMNS) * SIGN_W, Math.floor(i / SIGN_COLUMNS) * SIGN_H];
+    g.fillStyle = s.ground;
+    g.fillRect(x, y, SIGN_W, SIGN_H);
+    g.strokeStyle = s.ink;
+    g.lineWidth = 3;
+    g.strokeRect(x + 5, y + 5, SIGN_W - 10, SIGN_H - 10);
+    g.fillStyle = s.ink;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.font = '800 34px Poppins, Inter, sans-serif';
+    g.fillText(s.sign[0], x + SIGN_W / 2, y + 33, SIGN_W - 30);
+    g.font = '600 17px Inter, sans-serif';
+    g.fillText(s.sign[1], x + SIGN_W / 2, y + 66, SIGN_W - 40);
+    // Sun-bleached paint and a few streaks of dust from the top edge.
+    for (let k = 0; k < 140; k++) {
+      g.fillStyle = `rgba(255, 250, 235, ${rnd() * 0.12})`;
+      g.fillRect(x + rnd() * SIGN_W, y + rnd() * SIGN_H, 1 + rnd() * 9, 1 + rnd() * 2);
+    }
+    for (let k = 0; k < 8; k++) {
+      g.fillStyle = `rgba(90, 60, 30, ${0.05 + rnd() * 0.08})`;
+      g.fillRect(x + rnd() * SIGN_W, y, 1 + rnd() * 2, SIGN_H * (0.2 + rnd() * 0.6));
+    }
+  });
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+
+/** The haze at the horizon, by time of day (the fog of the street takes it too). */
+export const HAZE: Record<Daytime, string> = { morning: '#e9e1d2', noon: '#ebe5d9', evening: '#ecd2b4' };
+
+/** A wire hanging between two points: `sag` metres below the straight line in the middle. */
+function wire(a: THREE.Vector3, b: THREE.Vector3, sag: number): THREE.BufferGeometry {
+  const points: THREE.Vector3[] = [];
+  for (let i = 0; i <= 16; i++) {
+    const t = i / 16;
+    points.push(a.clone().lerp(b, t).setY(a.y + (b.y - a.y) * t - sag * 4 * t * (1 - t)));
+  }
+  return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 16, 0.009, 4, false);
+}
+
+/**
+ * The sky over the street without the photographed town: deep blue overhead, the dusty pale haze of the harmattan at
+ * the horizon (November), and the laterite plain under it, so that the street's ends melt into the haze.
+ */
+function hazySky(radius: number): THREE.Mesh {
+  const look = daytime();
+  const geometry = new THREE.SphereGeometry(radius, 48, 24);
+  const pos = geometry.attributes.position as THREE.BufferAttribute;
+  const [top, haze, earth] = [new THREE.Color(look.hour.startsWith('17') ? '#8fa6c4' : '#6f9ccc'), new THREE.Color(HAZE[daytimeName()]), new THREE.Color('#b69a7c')];
+  const colours: number[] = [];
+  for (let i = 0; i < pos.count; i++) {
+    const h = pos.getY(i) / radius;
+    const col = h >= 0 ? haze.clone().lerp(top, Math.min(1, h * 2.2) ** 0.7) : haze.clone().lerp(earth, Math.min(1, -h * 12));
+    colours.push(col.r, col.g, col.b);
+  }
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colours, 3));
+  const sky = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false, toneMapped: false }));
+  sky.renderOrder = -11;
+  sky.frustumCulled = false;
+  sky.name = 'street-sky';
+  return sky;
+}
+
+
+/**
+ * The campus street, modelled rather than photographed: rows of single-storey shops of the city (rendered blockwork
+ * in faded paints, roller shutters, painted sign boards, sheet-metal awnings on posts) on both sides, neem trees in
+ * the gaps, the concrete poles of the electricity line with their wires and street lamps, under a hazy sky.
+ */
+function facingStreet(site: SiteName): THREE.Group {
+  const g = new THREE.Group();
+  g.name = `facing-${site}`;
+  const e = ENTRANCES[site];
+  const [ox, oz] = e.out;
+  const [ax, az] = [oz, -ox];
+  const across = Math.atan2(-ox, -oz);
+  const BAY = 4;
+  const FAR = 15;
+  const NEAR = 3.0;
+  const at = (u: number, v: number, t = across): Placement => ({ x: e.x + ax * u + ox * v, y: 0, z: e.z + az * u + oz * v, turn: t });
+  const open: Placement[] = [];
+  const closed: Placement[] = [];
+  const trees: Placement[] = [];
+  const painted: Shop[] = [];
+  const boards: THREE.BufferGeometry[] = [];
+  // One row of shops: their fronts on the line `front` out from the door, facing the street.
+  const row = (list: (Shop | null)[], from: number, front: number, facing: number, back: number): void => {
+    list.forEach((s, i) => {
+      const u = from + i * BAY;
+      if (!s) {
+        trees.push({ ...at(u, front + back * 1.2), turn: i * 1.7 + u, scale: 0.92 + (Math.abs(u) % 3) * 0.07 });
+        return;
+      }
+      (s.open ? open : closed).push({ ...at(u, front + back * 2, facing), tint: s.paint });
+      const n = painted.push(s) - 1;
+      const [col, line] = [n % SIGN_COLUMNS, Math.floor(n / SIGN_COLUMNS)];
+      const plane = new THREE.PlaneGeometry(3.6, 0.62);
+      const uv = plane.attributes.uv as THREE.BufferAttribute;
+      for (let k = 0; k < uv.count; k++) uv.setXY(k, (col + uv.getX(k)) / SIGN_COLUMNS, line + 1 - uv.getY(k));
+      plane.userData.line = line;
+      plane.rotateY(facing);
+      const p = at(u, front - back * 0.045);
+      plane.translate(p.x, 3.35, p.z);
+      boards.push(plane);
+    });
+  };
+  row(FAR_SHOPS, -((FAR_SHOPS.length - 1) / 2) * BAY, FAR, across, 1);
+  // The neighbours either side of the campus plot, beyond its fence.
+  const out = Math.atan2(ox, oz);
+  row(NEAR_SHOPS, 16, NEAR, out, -1);
+  row([...NEAR_SHOPS].reverse(), -16 - (NEAR_SHOPS.length - 1) * BAY, NEAR, out, -1);
+  // Atlas lines counted from the top of the picture: flip them now that the number of lines is known.
+  const lines = Math.ceil(painted.length / SIGN_COLUMNS);
+  for (const b of boards) {
+    const uv = b.attributes.uv as THREE.BufferAttribute;
+    for (let k = 0; k < uv.count; k++) uv.setY(k, 1 - uv.getY(k) / lines);
+  }
+  // Behind the row, the rest of the quarter: the backs of other houses and shops at odd depths and heights (some of
+  // two storeys), and the crowns of the trees in their yards, fading into the haze.
+  let seed = 19;
+  const rnd = (): number => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const PAINTS = ['#d9c19a', '#c9a27c', '#e3d3b4', '#d8b7a3', '#cdb38c', '#c2cbb4', '#e6cfa3', '#bfc4c7'];
+  for (let u = -74; u < 74; u += 4.5 + rnd() * 3) {
+    closed.push({ ...at(u, FAR + 9 + rnd() * 7, across + Math.PI), scale: 0.95 + rnd() * 0.65, tint: PAINTS[Math.floor(rnd() * PAINTS.length)] as string });
+    if (rnd() > 0.62) trees.push({ ...at(u + 2, FAR + 7 + rnd() * 10), turn: rnd() * 6, scale: 0.85 + rnd() * 0.4 });
+  }
+  placeMany(g, 'shop_open', open);
+  placeMany(g, 'shop_closed', closed);
+  const half = ((FAR_SHOPS.length - 1) / 2) * BAY;
+  trees.push({ ...at(-half - 4.5, FAR + 0.8), turn: 0.4 }, { ...at(half + 4.5, FAR + 0.8), turn: 2.2, scale: 1.08 });
+  placeMany(g, 'tree', trees);
+  const signs = new THREE.Mesh(mergeGeometries(boards), new THREE.MeshStandardMaterial({ map: signAtlas(painted), roughness: 0.75 }));
+  signs.receiveShadow = true;
+  g.add(signs);
+  // The pavements in front of the shops, beaten earth and worn concrete.
+  for (const [v, length] of [[FAR - 1.0, 2 * half + 12], [NEAR + 1.0, 200]] as const) {
+    const pave = new THREE.Mesh(new THREE.PlaneGeometry(2.4, length), new THREE.MeshStandardMaterial({ ...photo('asphalt_02', 1, length / 4), color: '#c9b9a0', roughness: 1 }));
+    pave.rotation.set(-Math.PI / 2, 0, across - Math.PI / 2);
+    const mid = at(0, v);
+    pave.position.set(mid.x, -0.004, mid.z);
+    pave.receiveShadow = true;
+    g.add(pave);
+  }
+  // Laterite as far as the haze.
+  const plain = new THREE.Mesh(new THREE.CircleGeometry(260, 48), new THREE.MeshStandardMaterial({ ...photo('red_laterite_soil_stones', 120, 120), roughness: 1 }));
+  plain.rotation.x = -Math.PI / 2;
+  plain.position.set(e.x, -0.03, e.z);
+  plain.receiveShadow = true;
+  plain.renderOrder = -6;
+  g.add(plain);
+  // The electricity line on the far kerb: poles every 20 m, three wires from insulator to insulator.
+  const poles = [-50, -30, -10, 10, 30, 50].map((u) => at(u, FAR - 2.3));
+  placeMany(g, 'pole', poles);
+  const insulator = (p: Placement, k: number): THREE.Vector3 => new THREE.Vector3(0, 8.73, k * 0.75).applyAxisAngle(new THREE.Vector3(0, 1, 0), p.turn ?? 0).add(new THREE.Vector3(p.x, 0, p.z));
+  const wires: THREE.BufferGeometry[] = [];
+  for (let i = 0; i < poles.length - 1; i++) for (const k of [-1, 0, 1]) wires.push(wire(insulator(poles[i] as Placement, k), insulator(poles[i + 1] as Placement, k), 0.55));
+  const line = new THREE.Mesh(mergeGeometries(wires), lit('#15171a', 0.6, 0.3));
+  line.castShadow = true;
+  g.add(line);
+  const sky = hazySky(240);
+  sky.position.set(e.x, 0, e.z);
+  g.add(sky);
   return g;
 }

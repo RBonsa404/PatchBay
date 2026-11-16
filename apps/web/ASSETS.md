@@ -59,6 +59,6 @@ Bandes de panoramas photographiés, posées sur un grand cylindre autour de chaq
 
 ## Modèles faits pour le jeu
 
-Dans Blender, par scripts (`art/blender/`) : switch Catalyst 2960, routeurs 2911 et 1841, panneau de brassage 24 ports, poste de TP (bureau, écran, clavier, souris, tour), boîtier de l'opérateur (NTU), cabines de toilettes, lavabos, distributeur, tableau blanc, comptoir d'accueil, table de réunion.
+Dans Blender, par scripts (`art/blender/`) : switch Catalyst 2960, routeurs 2911 et 1841, panneau de brassage 24 ports, poste de TP (bureau, écran, clavier, souris, tour), boîtier de l'opérateur (NTU), cabines de toilettes, lavabos, distributeur, tableau blanc, comptoir d'accueil, table de réunion ; dehors (`outdoor.py`) : climatiseur, réservoir d'eau, clôture, portail, boutiques de la rue (ouverte et fermée, enseignes peintes dans le jeu), poteau électrique avec lampadaire, neem (feuilles peintes par le script).
 
 Les modèles, les textures photo et les musiques sont allégés pour le jeu (moins de triangles, images de 256 à 512 px, MP3 à 96 kbit/s). Le socle de l'extincteur porte « EXTINCTEUR ».

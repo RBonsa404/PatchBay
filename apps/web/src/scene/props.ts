@@ -37,10 +37,27 @@ export function withoutTransmission<T extends THREE.Object3D>(root: T): T {
   return root;
 }
 
+/** Foliage painted on cards ('leaves'): the picture's alpha cuts the leaves out, seen from both sides. */
+function cutOutLeaves<T extends THREE.Object3D>(root: T): T {
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+      if (material.name !== 'leaves') continue;
+      material.transparent = false;
+      material.alphaTest = 0.5;
+      material.depthWrite = true;
+      material.side = THREE.DoubleSide;
+      material.needsUpdate = true;
+    }
+  });
+  return root;
+}
+
 export function loadProp(name: string): Promise<THREE.Group> {
   let model = models.get(name);
   if (!model) {
-    model = loader.loadAsync(`${import.meta.env.BASE_URL}models/${name}.glb`).then((gltf) => withoutTransmission(gltf.scene));
+    model = loader.loadAsync(`${import.meta.env.BASE_URL}models/${name}.glb`).then((gltf) => cutOutLeaves(withoutTransmission(gltf.scene)));
     models.set(name, model);
   }
   return model;
@@ -58,6 +75,8 @@ export interface Placement {
   /** Lay it down or lean it: extra turns around x and z. */
   tiltX?: number;
   tiltZ?: number;
+  /** Paint for the model's 'render' material (left white in Blender), so that each copy can have its own colour. */
+  tint?: string;
 }
 
 /** Add a copy of a model under `parent`, once it has loaded. */
@@ -122,6 +141,10 @@ export function placeMany(parent: THREE.Object3D, name: string, list: Placement[
           place.compose(where.set(at.x, at.y, at.z), q.setFromEuler(turn), scale.setScalar(at.scale ?? 1));
           many.setMatrixAt(i, place.clone().multiply(mesh.matrixWorld));
         });
+        if ((mesh.material as THREE.Material).name === 'render' && list.some((at) => at.tint)) {
+          const colour = new THREE.Color();
+          list.forEach((at, i) => many.setColorAt(i, colour.set(at.tint ?? '#ffffff')));
+        }
         many.castShadow = true;
         many.receiveShadow = true;
         many.computeBoundingSphere();
