@@ -2314,7 +2314,10 @@ export class Mission {
     const zone = zoneOf(this.player.x, this.player.floorY + 0.1, this.player.z);
     const origin = (zone === 'lab' ? ORIGINS.annexe : zone === 'office' ? ORIGINS.etage : ORIGINS['']) as Origin;
     const finale = this.stage.flyTo(new THREE.Vector3(0, 1.9 + origin.y, 2.8 + origin.z), HOME.target.clone().add(new THREE.Vector3(0, origin.y, origin.z)), 1.6);
-    const result = { ...grade(evaluation, this.remaining, this.limit, timedOut, this.exam), tidiness: this.tidiness(), hints: this.hintsUsed, cabled: this.level.solution.cables.some((c) => c.type !== 'console') };
+    const cabled = this.level.solution.cables.some((c) => c.type !== 'console');
+    // No cord taken from the stock in a mission that asked for cables: there is no work to mark (not « impeccable »).
+    const tidy = cabled && this.cables.cords().length === 0 ? {} : { tidiness: this.tidiness() };
+    const result = { ...grade(evaluation, this.remaining, this.limit, timedOut, this.exam), ...tidy, hints: this.hintsUsed, cabled };
     void Promise.race([finale, new Promise((resolve) => setTimeout(resolve, 1800))]).then(() => this.events.complete(result));
   }
 

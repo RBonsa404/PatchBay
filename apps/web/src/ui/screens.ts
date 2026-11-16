@@ -1,5 +1,5 @@
 import { sound } from '../audio.js';
-import { ArrowLeft, ArrowRight, Cable, ChevronRight, Compass, Crown, Flag, GraduationCap, LayoutList, LightbulbOff, Lock, Play, RotateCcw, School, Settings, Star, Timer, TimerReset, Trophy, Zap } from 'lucide';
+import { ArrowLeft, ArrowRight, Cable, Check, ChevronRight, Compass, Crown, Flag, GraduationCap, LayoutList, Lightbulb, LightbulbOff, Lock, Play, RotateCcw, School, Settings, Star, Timer, TimerReset, Trophy, X, Zap } from 'lucide';
 import type { Level } from '@patchbay/sim-core';
 import { clock, type Grade } from '../game/scoring.js';
 import type { BadgeId } from '../game/badges.js';
@@ -312,10 +312,19 @@ export function showResults(level: Level, result: Grade, actions: { next?: () =>
       h(
         'ul',
         { class: 'check-list results-list' },
-        ...level.objectives.map((o) => {
-          const passed = evaluation.results.find((r) => r.id === o.id)?.passed ?? false;
-          return h('li', { class: passed ? 'done' : 'missed' }, h('span', {}, tx(o.label)), h('span', { class: 'pts' }, passed ? `+${o.points}` : '0'));
-        }),
+        // What is left to fix comes first, with its hint (never in an exam), then what was done.
+        ...[...level.objectives]
+          .map((o) => ({ o, passed: evaluation.results.find((r) => r.id === o.id)?.passed ?? false }))
+          .sort((p, q) => Number(p.passed) - Number(q.passed))
+          .map(({ o, passed }) =>
+            h(
+              'li',
+              { class: passed ? 'done' : 'missed' },
+              h('span', { class: 'mark', 'aria-label': passed ? t('results.passed') : t('results.missed') }, icon(passed ? Check : X, 13)),
+              h('span', { class: 'what' }, tx(o.label), !passed && !result.exam && o.hint ? h('small', { class: 'hint' }, icon(Lightbulb, 12), tx(o.hint)) : null),
+              h('span', { class: 'pts' }, passed ? `+${o.points}` : '0'),
+            ),
+          ),
       ),
       actions.next || !evaluation.complete ? null : h('p', { class: 'muted' }, t('results.campaignDone')),
       h(

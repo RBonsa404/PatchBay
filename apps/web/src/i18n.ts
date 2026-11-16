@@ -37,6 +37,8 @@ const fr = {
   'exam.tasks': 'Sujet',
   'results.timeout': 'Temps écoulé',
   'results.exam': 'Examen terminé',
+  'results.passed': 'réussi',
+  'results.missed': 'manqué',
   'results.objectives': 'Objectifs',
   'results.speed': 'Rapidité',
   'results.time': 'Temps',
