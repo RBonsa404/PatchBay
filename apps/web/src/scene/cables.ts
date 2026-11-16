@@ -336,6 +336,15 @@ export class CableLayer {
     return [...this.lengths.values()].flat();
   }
 
+  /** The cords of the cable drawn at a port (one, or one per room for a link through the walls), in metres. */
+  cordsAt(device: string, port: string): number[] {
+    for (const [key, { cable }] of this.paths) {
+      const here = (e: CableEnd): boolean => e.device === device && e.port === port;
+      if (here(cable.a) || here(cable.b)) return this.lengths.get(key) ?? [];
+    }
+    return [];
+  }
+
   /** Add the cables that appeared, remove those that are gone. New cables unroll from the first port. */
   sync(cables: Cable[], ports: (device: string, port: string) => PortView | undefined): void {
     const wanted = new Map(cables.map((c) => [keyOf(c), c]));

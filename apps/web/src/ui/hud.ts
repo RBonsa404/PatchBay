@@ -21,6 +21,8 @@ export interface HudActions {
   cycleQuality(): Quality;
   listen(): void;
   selectCable(type: CableType | null): void;
+  /** Take the cable tester out or put it away. */
+  tester(): void;
   /** Go to another site (missions across several sites only). */
   travel?(): void;
 }
@@ -35,6 +37,13 @@ function cableGlyph(type: CableType): SVGElement {
       ? '<rect x="6" y="8" width="20" height="12" rx="2" fill="#94a3b8"/><rect x="9" y="11" width="14" height="6" rx="1" fill="#1e293b"/>'
       : '<rect x="9" y="6" width="14" height="14" rx="2" fill="#e2e8f0"/><path d="M12 6h8v-3h-8z" fill="#cbd5e1"/><g fill="#d97706"><rect x="11.5" y="8" width="1.4" height="4"/><rect x="14" y="8" width="1.4" height="4"/><rect x="16.6" y="8" width="1.4" height="4"/><rect x="19.1" y="8" width="1.4" height="4"/></g>';
   const source = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 40" width="26" height="32" aria-hidden="true">${plug}<rect x="12" y="20" width="8" height="6" rx="1.5" fill="${colour}"/><path d="M16 26c0 6-6 7-6 14" stroke="${colour}" stroke-width="4" fill="none" stroke-linecap="round"/></svg>`;
+  const doc = new DOMParser().parseFromString(source, 'image/svg+xml');
+  return document.importNode(doc.documentElement, true) as unknown as SVGElement;
+}
+
+/** The handheld tester: a grey case, its screen showing a wire map, and the RJ45 socket on top. */
+function testerGlyph(): SVGElement {
+  const source = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 40" width="26" height="32" aria-hidden="true"><rect x="7" y="2" width="8" height="5" rx="1" fill="#94a3b8"/><rect x="5" y="6" width="22" height="32" rx="4" fill="#fbbf24"/><rect x="8" y="9" width="16" height="13" rx="1.5" fill="#050a18"/><path d="M11 12h10M11 15h10M11 18h10" stroke="#38bdf8" stroke-width="1.4"/><circle cx="12" cy="29" r="2.4" fill="#1e293b"/><circle cx="20" cy="29" r="2.4" fill="#1e293b"/><rect x="12" y="34" width="8" height="1.6" rx=".8" fill="#1e293b"/></svg>';
   const doc = new DOMParser().parseFromString(source, 'image/svg+xml');
   return document.importNode(doc.documentElement, true) as unknown as SVGElement;
 }
@@ -238,7 +247,7 @@ export class Hud {
     for (const id of ids) this.hintsShown.add(id);
   }
 
-  setInventory(left: Partial<Record<CableType, number>>, selected: CableType | null): void {
+  setInventory(left: Partial<Record<CableType, number>>, selected: CableType | null, testing = false): void {
     const types = CABLE_ORDER.filter((type) => this.level.inventory.cables[type] !== undefined);
     const slots = types.map((type, i) => {
       const count = left[type] ?? 0;
@@ -258,7 +267,15 @@ export class Hud {
         h('span', { class: 'count' }, `× ${count}`),
       );
     });
-    this.inventory.replaceChildren(...slots, h('span', { class: 'tool-hint' }, t(matchMedia('(pointer: coarse)').matches ? 'hud.toolHintTouch' : 'hud.toolHint')));
+    const tester = h(
+      'button',
+      { class: `cable-slot tester-slot${testing ? ' selected' : ''}`, 'aria-pressed': testing ? 'true' : 'false', title: t('tester.tool'), onclick: () => this.actions.tester() },
+      h('kbd', {}, 'L'),
+      testerGlyph(),
+      h('span', { class: 'name' }, t('tester.slot')),
+      h('span', { class: 'count' }, 'RJ45'),
+    );
+    this.inventory.replaceChildren(...slots, h('i', { class: 'slot-sep' }), tester, h('span', { class: 'tool-hint' }, t(matchMedia('(pointer: coarse)').matches ? 'hud.toolHintTouch' : 'hud.toolHint')));
   }
 
   showTooltip(text: string | null, x = 0, y = 0, bad = false): void {

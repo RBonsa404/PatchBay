@@ -198,6 +198,30 @@ h1, h2, h3 { font-family: var(--font-heading); margin: 0; line-height: 1.2; font
 .cable-slot .name { font-weight: 600; font-size: 13.5px; }
 .cable-slot .count { font: 500 12px var(--font-mono); color: var(--text-3); }
 .cable-slot kbd { position: absolute; top: 4px; right: 6px; font: 500 10px var(--font-mono); color: var(--text-3); }
+.inventory .slot-sep { width: 1px; margin: 6px 2px; background: var(--line); }
+.cable-slot.tester-slot { min-width: 118px; }
+
+/* The cable tester: a handheld's screen, night blue with cyan traces, the verdict as the one amber-or-colour mark. */
+.panel.tester-panel { bottom: auto; width: min(380px, calc(100vw - 28px)); }
+.tester-screen { padding: 12px 14px 14px; border-radius: 10px; background: #050a18; border: 6px solid #1f2937; box-shadow: inset 0 0 0 1px #0b1e3f, 0 0 0 1px #fbbf24; font-family: var(--font-mono); }
+.tester-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.tester-brand { font: 600 11px var(--font-mono); letter-spacing: 0.18em; color: var(--cyan); }
+.tester-badge { font: 700 12px var(--font-mono); letter-spacing: 0.1em; padding: 2px 9px; border-radius: 4px; color: #050a18; background: var(--text-3); }
+.tester-badge.pass { background: var(--success); }
+.tester-badge.warn { background: var(--amber); }
+.tester-badge.fail { background: var(--danger); color: #fff; animation: tester-blink 0.9s steps(2) 3; }
+@keyframes tester-blink { 50% { opacity: 0.35; } }
+.tester-kind { display: block; font: 600 13.5px var(--font-mono); color: #e2e8f0; margin-bottom: 6px; }
+.wiremap { display: block; width: 100%; height: auto; }
+.wiremap .wm-head { font: 600 8px var(--font-mono); fill: var(--text-3); letter-spacing: 0.12em; }
+.wiremap .wm-pin { fill: #0b1e3f; stroke: #38bdf8; stroke-width: 1.2; }
+.wiremap .wm-num { font: 600 8px var(--font-mono); fill: #e2e8f0; }
+.wiremap path, .wiremap line { animation: wm-draw 0.5s var(--ease-out) forwards; }
+@keyframes wm-draw { from { opacity: 0; } to { opacity: 1; } }
+.tester-length { display: flex; justify-content: space-between; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #1e3a5f; font-size: 13px; color: var(--text-2); }
+.tester-length b { color: var(--cyan); }
+.tester-advice { margin: 12px 2px 0; font-size: 13.5px; color: var(--text-2); }
+@media (prefers-reduced-motion: reduce) { .tester-badge.fail, .wiremap path, .wiremap line { animation: none; } }
 .inventory .tool-hint { align-self: center; font-size: 12px; color: var(--text-3); max-width: 230px; padding: 0 10px; border-left: 1px solid var(--line); }
 
 .tooltip { position: fixed; padding: 5px 9px; border-radius: 5px; font: 500 12px var(--font-mono); pointer-events: none; transform: translate(14px, 14px); white-space: nowrap; z-index: 20; background: #0b0f17; border: 1px solid var(--line-strong); color: var(--text); }

@@ -298,7 +298,8 @@ const CONTROLS: [string, string][] = [
   ['H', 'demander à Aïcha'],
   ['P', 'liste des ports, pour tout faire au clavier'],
   ['M / N', 'couper la musique / morceau suivant'],
-  ['Échap', 'fermer, reposer le câble, revenir'],
+  ['L', 'testeur de câble : lire le câble d’un port'],
+  ['Échap', 'fermer, reposer le câble ou le testeur, revenir'],
 ];
 
 export function showHelp(): void {

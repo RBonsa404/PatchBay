@@ -20,6 +20,8 @@ import { h } from '../ui/dom.js';
 import { CABLE_ORDER, Hud } from '../ui/hud.js';
 import { closePanel, Consoles, openPanelKey, resetHostShells, showHostPanel, showBriefPanel, showConfirm, showHelp, showNotice, showPortList } from '../ui/panels.js';
 import { extraCables, tidiness, type Tidiness } from './cabling.js';
+import { testCable, type CableTest } from './tester.js';
+import { showTester } from '../ui/tester.js';
 import { clock, grade, type Grade } from './scoring.js';
 import { canListen, listenOnce } from '../voice.js';
 import { settings } from '../settings.js';
@@ -127,6 +129,8 @@ const HOP_GAP = 0.16;
 const MAX_HOPS = 90;
 /** How long a finger must stay down to unplug (the touch version of the right click). */
 const LONG_PRESS_MS = 550;
+/** How far the building's cables climb from a patch panel to the tray under the ceiling, in metres. */
+const BUILDING_DROP = 1.4;
 
 export interface MissionEvents {
   complete(result: Grade): void;
@@ -150,6 +154,8 @@ export class Mission {
   private readonly pointer = new THREE.Vector2();
   private readonly cleanup: (() => void)[] = [];
   private selected: CableType | null = null;
+  /** The cable tester in hand: a click on a port reads its cable instead of plugging. */
+  private testing = false;
   private firstEnd: PortView | null = null;
   private hovered: PortView | null = null;
   private trafficResults = new Map<string, ObjectiveResult>();
@@ -313,6 +319,7 @@ export class Mission {
       cycleQuality: () => this.cycleQuality(),
       listen: () => this.listenVoice(),
       selectCable: (type) => this.select(type),
+      tester: () => this.toggleTester(),
     }, stage.currentQuality, index, exam, this.tour);
     setTimeout(() => (this.tour ? this.hud.banner(t('tour.title'), t('tour.banner')) : this.hud.banner(`${t('briefing.mission')} ${String(index + 1).padStart(2, '0')}`, exam ? t('exam.start') : this.coach?.active ? t('timer.tutorial') : t('timer.start'))), this.entrance * 1000);
     stage.onQualityLowered = (q) => this.hud.showQuality(q);
@@ -616,12 +623,13 @@ export class Mission {
         // Close what is open first; with nothing open, Escape pauses the game.
         if (pauseOpen()) return;
         if (openPanelKey()) closePanel();
-        else if (this.selected || this.firstEnd || this.anchor) {
+        else if (this.selected || this.testing || this.firstEnd || this.anchor) {
           this.select(null);
           if (this.anchor) this.overview(0.7);
         } else this.openPause();
       }
       if (e.code === 'KeyT' && !typing) this.toggleBoard();
+      if (e.code === 'KeyL' && !typing) this.toggleTester();
       if (e.code === 'KeyV' && !typing) this.listenVoice();
       if (e.code === 'KeyH' && !typing && !this.exam) this.aicha.open();
       if (e.code === 'KeyP' && !typing) this.showPorts();
@@ -709,7 +717,7 @@ export class Mission {
     } else {
       this.hud.showTooltip(null);
     }
-    this.stage.renderer.domElement.style.cursor = port || device || board ? 'pointer' : this.selected ? 'crosshair' : 'grab';
+    this.stage.renderer.domElement.style.cursor = port || device || board ? 'pointer' : this.selected || this.testing ? 'crosshair' : 'grab';
 
     if (this.selected && this.firstEnd) {
       const target = port ? portFrame(port).point : this.pointerPoint(this.firstEnd);
@@ -762,6 +770,7 @@ export class Mission {
     if (exit) return this.openTravel();
     const id = port?.device ?? device;
     if (id && !this.inReach(id)) return;
+    if (port && this.testing) return this.testPort(port);
     if (port && this.selected) return this.plugEnd(port);
     if (id && this.panels.has(id)) return showNotice(id, t('panel.patch'));
     if (id) this.openDevice(id);
@@ -1107,7 +1116,7 @@ export class Mission {
    * behind as soon as the work is put down.
    */
   private get focused(): boolean {
-    return this.selected !== null || this.firstEnd !== null || this.anchor !== null || document.querySelector('.terminal, .host-settings') !== null;
+    return this.selected !== null || this.testing || this.firstEnd !== null || this.anchor !== null || document.querySelector('.terminal, .host-settings') !== null;
   }
 
   private wasFocused = false;
@@ -1879,6 +1888,67 @@ export class Mission {
     this.cull();
   }
 
+  /** Take the cable tester out, or put it away. */
+  private toggleTester(): void {
+    if (this.testing) return this.select(null);
+    this.select(null);
+    this.testing = true;
+    this.hud.setInventory(this.inventoryLeft(), null, true);
+    this.hud.toast(t('tester.inHand'));
+    sound.play('click');
+  }
+
+  /** Metres of the building's cable between two patch panel ports: along the walls, up to the tray and back down. */
+  private buildingRun(a: PortView, b: PortView): number {
+    const p = a.hit.getWorldPosition(new THREE.Vector3());
+    const q = b.hit.getWorldPosition(new THREE.Vector3());
+    return Math.abs(p.x - q.x) + Math.abs(p.z - q.z) + Math.abs(p.y - q.y) + 2 * BUILDING_DROP;
+  }
+
+  /** Plug the tester into `port`, its remote unit at the far end of the cable, and show what it reads. */
+  private testPort(port: PortView): void {
+    const where = `${port.device} · ${port.port}`;
+    const strictMdix = this.net.options.strictMdix;
+    const sum = (list: number[]): number => list.reduce((n, l) => n + l, 0);
+    this.avatar?.gesture(port.hit.getWorldPosition(new THREE.Vector3()).y - this.player.floorY < 0.5 ? 'Fixing_Kneeling' : 'Interact');
+    sound.play('plug');
+    let test: CableTest;
+    let to = '';
+    const cord = this.cords.find((c) => c.end === port || c.panel === port);
+    if (this.panels.has(port.device) && !cord) {
+      // A bare panel port: the building's cable to the other panel, or the operator's line.
+      const ntu = this.ntus.has(port.device);
+      const peer = this.peerPanelPort(port);
+      if (peer) to = `${peer.device} · ${peer.port}`;
+      test = testCable({ type: null, panel: ntu ? 'ntu' : 'patch', strictMdix, ...(peer && !ntu ? { length: this.buildingRun(port, peer) } : {}) });
+    } else {
+      // From a panel with a cord, the tester reads the same cable as from the device the cord goes to.
+      const end = cord ? cord.end : port;
+      const here = { device: end.device, port: end.port };
+      const cable = this.net.cableAt(here);
+      const ntu = cord ? this.ntus.has(cord.panel.device) : false;
+      if (!cable && !cord) test = testCable({ type: null, strictMdix });
+      else if (!cable && cord) {
+        // A cord to a panel whose other side is not patched: the circuit stops at the far panel.
+        const peer = this.peerPanelPort(cord.panel);
+        const run = peer && !ntu ? this.buildingRun(cord.panel, peer) : 0;
+        test = testCable({ type: cord.type, open: !ntu, ...(ntu ? { panel: 'ntu' as const } : {}), strictMdix, length: sum(this.cables.cordsAt(here.device, here.port)) + run });
+      } else {
+        const c = cable as NonNullable<typeof cable>;
+        const isHere = c.a.device === here.device && c.a.port === here.port;
+        const far = isHere ? c.b : c.a;
+        let length = sum(this.cables.cordsAt(here.device, here.port));
+        const farCord = this.cordOf(far);
+        if (cord && farCord && !ntu) length += sum(this.cables.cordsAt(far.device, far.port)) + this.buildingRun(cord.panel, farCord.panel);
+        const near = this.net.portSpec(here);
+        const farSpec = this.net.portSpec(far);
+        test = testCable({ type: c.type, strictMdix, length, dceHere: isHere, ...(ntu ? { panel: 'ntu' as const } : {}), ...(near ? { near } : {}), ...(farSpec ? { far: farSpec } : {}) });
+      }
+    }
+    setTimeout(() => sound.play(test.verdict === 'fail' ? 'error' : 'tick'), 380);
+    showTester(where, test, this.exam, to);
+  }
+
   private select(type: CableType | null): void {
     if (type && this.left(type) === 0) {
       this.hud.toast(t('cable.none'), 'bad');
@@ -1886,10 +1956,12 @@ export class Mission {
       return;
     }
     if (this.firstEnd && type !== this.selected) this.hud.toast(t('cable.cancel'));
+    if (this.testing && type === null) this.hud.toast(t('tester.put'));
     this.selected = type;
+    this.testing = false;
     this.firstEnd = null;
     this.cables.showPreview('straight', null, null);
-    this.hud.setInventory(this.inventoryLeft(), this.selected);
+    this.hud.setInventory(this.inventoryLeft(), this.selected, this.testing);
     this.showHints();
     this.coach?.update();
   }
@@ -2032,7 +2104,7 @@ export class Mission {
     this.cables.sync(drawn, (device, port) => (this.devices.get(device) ?? this.panels.get(device))?.ports.get(port));
     this.updateLeds();
     this.consoles.collectSyslog();
-    this.hud.setInventory(this.inventoryLeft(), this.selected);
+    this.hud.setInventory(this.inventoryLeft(), this.selected, this.testing);
     const quiet = this.level.objectives.filter((o) => !TRAFFIC.has(o.type));
     const results = evaluate(this.net, quiet).results;
     const merged = [...results, ...this.trafficResults.values()];
