@@ -13,7 +13,7 @@ import { buildWhiteboard } from '../scene/details.js';
 import { buildAnnex, buildClassrooms, buildSite, buildWestWing } from '../scene/annex.js';
 import { applyLightmap } from '../scene/lightmaps.js';
 import { BUILDING, rackFillers, setMainDoorOpen } from '../scene/room.js';
-import { blockedAt, DOORS, groundAt, SITE_EXIT_X, SITE_Z, siteOf, ZONES, zoneOf, type SiteName, type ZoneName as Zone } from '../scene/building.js';
+import { blockedAt, DOORS, FLOOR_Y, groundAt, SITE_EXIT_X, SITE_Z, siteOf, ZONES, zoneOf, type SiteName, type ZoneName as Zone } from '../scene/building.js';
 import type { Quality, Stage } from '../scene/stage.js';
 import { AskAicha } from '../ui/askAicha.js';
 import { h } from '../ui/dom.js';
@@ -23,6 +23,7 @@ import { extraCables, tidiness, type Tidiness } from './cabling.js';
 import { clock, grade, type Grade } from './scoring.js';
 import { canListen, listenOnce } from '../voice.js';
 import { settings } from '../settings.js';
+import { say, stopVoice } from '../voiceover.js';
 import { Minimap } from '../ui/minimap.js';
 import { Person } from '../scene/people.js';
 import { COLLEAGUES, type Colleague } from './cast.js';
@@ -321,6 +322,8 @@ export class Mission {
 
   /** Take the player's eyes to what a stop of the tour is about, in whichever room it is. */
   private async showStop(stop: TourStop): Promise<void> {
+    // Aïcha says the stop aloud (the player has just asked for it), while the camera goes there.
+    void say(stop.text.fr);
     const f = stop.focus;
     if ('device' in f) {
       const view = this.devices.get(f.device) ?? this.panels.get(f.device);
@@ -328,10 +331,35 @@ export class Mission {
       const room = this.level.devices.find((d) => d.id === f.device)?.room ?? this.level.panels?.find((p) => p.id === f.device)?.room ?? '';
       await this.goToRoom(room, view.root.getWorldPosition(new THREE.Vector3()).x);
       this.focusOn(view, true);
+    } else if ('place' in f) {
+      await this.goToPlace(f.place.x, f.place.z, f.place.upstairs ? FLOOR_Y : 0, f.place.yaw, f.place.pitch ?? 0);
     } else {
       await this.goToRoom('');
       if ('board' in f) this.toggleBoard();
       else this.overview();
+    }
+  }
+
+  /** The tour goes to a spot of the building, in a short fade to black, and looks a given way. */
+  private async goToPlace(x: number, z: number, y: number, yaw: number, pitch: number): Promise<void> {
+    this.settle();
+    const fade = (this.fade ??= document.body.appendChild(h('div', { class: 'tour-fade', 'aria-hidden': 'true' })));
+    const quick = reducedMotion();
+    if (!quick) {
+      fade.classList.add('on');
+      await new Promise((r) => setTimeout(r, 240));
+    }
+    this.player.place(x, z, y);
+    this.player.yaw = yaw;
+    this.player.pitch = pitch;
+    this.settle();
+    this.followZone();
+    this.cull();
+    this.stage.camera.position.copy(this.player.eye);
+    sound.play('step');
+    if (!quick) {
+      await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 80)));
+      fade.classList.remove('on');
     }
   }
 
@@ -429,6 +457,7 @@ export class Mission {
   }
 
   dispose(): void {
+    stopVoice();
     this.disposed = true;
     // Back to the campus, indoors, whatever the player was doing.
     this.showTown('campus');
@@ -1042,14 +1071,17 @@ export class Mission {
     if (!p) return;
     const line = p.who.lines[p.line] ?? '';
     p.line = (p.line + 1) % p.who.lines.length;
-    p.talking = 7;
+    // As long as it takes to say it (their recorded voice reads it out), seven seconds at least.
+    const seconds = Math.max(7, line.length / 13);
+    p.talking = seconds;
+    void say(line);
     p.person.play(p.who.motion.startsWith('Sitting') ? 'Sitting_Talking_Loop' : 'Idle_Talking_Loop');
     this.talkBubble?.remove();
     this.talkBubble = h('div', { class: 'talk-bubble' }, h('strong', {}, p.who.name), h('small', {}, p.who.role), h('p', {}, line));
     document.body.append(this.talkBubble);
     const bubble = this.talkBubble;
-    setTimeout(() => bubble.classList.add('leaving'), 6400);
-    setTimeout(() => bubble.remove(), 7000);
+    setTimeout(() => bubble.classList.add('leaving'), seconds * 1000 - 600);
+    setTimeout(() => bubble.remove(), seconds * 1000);
     sound.play('click');
   }
 

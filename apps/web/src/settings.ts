@@ -11,9 +11,13 @@ interface Settings {
   thirdPerson: boolean;
   /** Which student: a young man or a young woman of the club. */
   character: 'student-m' | 'student-f';
+  /** The recorded voices (Aïcha in the guided tour, the colleagues) are played. */
+  voice: boolean;
+  /** Their volume (0 … 1). */
+  voiceVolume: number;
 }
 
-const DEFAULTS: Settings = { lookSpeed: 1, invertY: false, thirdPerson: true, character: 'student-m' };
+const DEFAULTS: Settings = { lookSpeed: 1, invertY: false, thirdPerson: true, character: 'student-m', voice: true, voiceVolume: 0.9 };
 
 function load(): Settings {
   try {
@@ -27,7 +31,7 @@ export const settings: Settings & { save(): void } = {
   ...load(),
   save(): void {
     try {
-      localStorage.setItem(KEY, JSON.stringify({ lookSpeed: this.lookSpeed, invertY: this.invertY, thirdPerson: this.thirdPerson, character: this.character }));
+      localStorage.setItem(KEY, JSON.stringify({ lookSpeed: this.lookSpeed, invertY: this.invertY, thirdPerson: this.thirdPerson, character: this.character, voice: this.voice, voiceVolume: this.voiceVolume }));
     } catch {
       // storage unavailable: the choice lasts until the page closes
     }

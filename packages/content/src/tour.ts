@@ -7,7 +7,7 @@ import type { Text } from '../../sim-core/src/index.js';
 
 export interface TourStop {
   /** What the camera looks at: a device or panel by its id, the whiteboard, the whole room, or the cable reserve. */
-  focus: { device: string } | { board: true } | { room: true } | { cables: true };
+  focus: { device: string } | { board: true } | { room: true } | { cables: true } | { place: { x: number; z: number; upstairs?: boolean; yaw: number; pitch?: number } };
   title: Text;
   text: Text;
 }
@@ -76,6 +76,48 @@ export const tour: TourStop[] = [
     title: { fr: 'Les autres salles du bâtiment' },
     text: {
       fr: "Le réseau ne s'arrête pas à cette pièce. La salle de TP, au bout du couloir, et l'administration, à l'étage, ont chacune leur baie et leur switch. Ils remontent jusqu'à la salle technique par les câbles posés dans les murs, puis par les panneaux de brassage. Les VLAN séparent ensuite les étudiants, les enseignants et l'administration sur le même matériel.",
+    },
+  },
+  {
+    focus: { place: { x: 4, z: -2.84, yaw: -Math.PI / 2, pitch: 0.02 } },
+    title: { fr: 'Se repérer dans le bâtiment' },
+    text: {
+      fr: "Le couloir dessert toutes les salles. Les panneaux verts au plafond indiquent où mène chaque direction, et chaque porte porte le nom de sa salle. En bas à droite, la mini-carte montre l'étage où tu te trouves et ta position. Tu te déplaces avec Z, Q, S, D, tu cours avec Maj, et tu regardes en glissant la souris.",
+    },
+  },
+  {
+    focus: { place: { x: -8.6, z: -4.5, yaw: Math.PI, pitch: -0.05 } },
+    title: { fr: 'Tes collègues' },
+    text: {
+      fr: "Le bâtiment vit : étudiants, enseignants et personnel vaquent à leurs occupations. Approche-toi de quelqu'un, regarde-le, et appuie sur E pour lui parler. Chacun te raconte sa journée et te glisse une astuce réseau utile, comme on en apprend dans les couloirs d'une vraie école.",
+    },
+  },
+  {
+    focus: { place: { x: -2, z: -5.2, upstairs: true, yaw: -2.7, pitch: -0.05 } },
+    title: { fr: "L'étage : les salles de cours" },
+    text: {
+      fr: "L'escalier mène à l'étage, avec deux salles de cours et l'administration. Voici la salle 101, où M. Kaboré prépare son cours de réseaux. Les câbles posés dans les murs relient chaque étage à la salle technique par les panneaux de brassage : c'est ce qu'on appelle le câblage structuré.",
+    },
+  },
+  {
+    focus: { place: { x: 0.5, z: 4.5, upstairs: true, yaw: -2.1, pitch: -0.08 } },
+    title: { fr: "L'administration" },
+    text: {
+      fr: "L'administration a son propre switch et ses postes, dans un réseau séparé de celui des étudiants. Mme Ouédraogo y gère le secrétariat. Séparer les réseaux par service, avec des VLAN ou des sous-réseaux, c'est la base de la sécurité d'une entreprise.",
+    },
+  },
+  {
+    focus: { place: { x: -11.6, z: -2.84, yaw: -Math.PI / 2, pitch: 0.02 } },
+    title: { fr: 'Les autres sites' },
+    text: {
+      fr: "Au bout du couloir, la porte de la rue. Dans les missions à plusieurs sites, l'IST a une agence à Bobo-Dioulasso et un opérateur loue la ligne entre les deux villes. Pour t'y rendre, sors par cette porte ou appuie sur G : tu suis le trajet sur la carte du Burkina Faso, puis tu entres dans l'autre bâtiment.",
+    },
+  },
+  {
+    focus: { room: true },
+    title: { fr: 'Travailler sans gêne' },
+    text: {
+      fr: "Tu vois ton personnage de dos quand tu marches. Dès que tu prends un câble, que tu branches ou que tu ouvres une console, la vue passe à la première personne : c'est le mode focus, pour voir chaque port sans que ton corps le cache. La touche F change la vue à tout moment.",
     },
   },
   {

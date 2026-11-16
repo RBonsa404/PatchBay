@@ -127,6 +127,10 @@ export function showSettings(stage: Stage, back: () => void): void {
       h('p', { class: 'muted small' }, t('settings.qualityNote')),
       toggle(t('hud.sound'), Volume2, () => !sound.isMuted, () => sound.toggleMute()),
       toggle(t('settings.music'), Music, () => sound.musicPlaying, () => sound.toggleMusic()),
+      toggle(t('settings.voice'), Volume2, () => settings.voice, () => {
+        settings.voice = !settings.voice;
+        settings.save();
+      }),
       h('div', { class: 'setting' }, icon(Mouse, 18), h('span', {}, t('settings.look')), speed, speedValue),
       ...(peopleOn()
         ? [
