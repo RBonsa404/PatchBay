@@ -315,7 +315,8 @@ const STAIRS_LANDING = { z0: -4.0, z1: -0.9 };
 /**
  * A window: a real opening in an outside wall, its centre (x, z) on the wall's line, its width, the height of its sill
  * above the floor `y` and its own height. `inside` is the side of the wall the room is on (+1 or -1 along the
- * wall's normal). `sun` lets a shaft of sunlight in.
+ * wall's normal). `sun`: a shaft of sunlight comes in when the sun of the mission's time of day faces the window
+ * (see `daytime.ts`).
  */
 export interface Window {
   x: number;
@@ -331,16 +332,16 @@ export interface Window {
 
 const win = (x: number, z: number, along: 'x' | 'z', inside: 1 | -1, y = 0, width = 1.5, sun = false): Window => ({ x, z, along, width, sill: 1.2, height: 1.3, y, inside, sun });
 export const WINDOWS: Window[] = [
-  // The lab's outside wall, east, in the morning sun.
+  // The lab's outside wall, east: the morning sun.
   ...[1.0, 3.2, 5.0].map((z) => win(ROOMS.lab.x1, LAB_Z + z, 'z', -1, 0, 1.5, true)),
   // The technical room, over its desk; the administration above it, three windows.
   win(-4.5, ROOMS.room.z1, 'x', -1, 0, 1.4),
-  ...[-3.0, 0, 3.0].map((x) => win(x, ROOMS.room.z1, 'x', -1, FLOOR_Y, 1.8)),
-  // Classroom 001, south; the lounge, north.
-  ...[-12.4, -9.9, -7.4].map((x) => win(x, ROOMS.classroom0.z1, 'x', -1, 0, 1.5)),
+  ...[-3.0, 0, 3.0].map((x) => win(x, ROOMS.room.z1, 'x', -1, FLOOR_Y, 1.8, true)),
+  // Classroom 001, south (the midday sun); the lounge, north.
+  ...[-12.4, -9.9, -7.4].map((x) => win(x, ROOMS.classroom0.z1, 'x', -1, 0, 1.5, true)),
   ...[-9.6, -7.9].map((x) => win(x, ROOMS.lounge.z0, 'x', 1, 0, 1.2, true)),
-  // Classrooms 101 (west wall) and 102 (east wall).
-  ...[-9.8, -7.8, -5.8].map((z) => win(ROOMS.classroom1.x0, z, 'z', 1, FLOOR_Y, 1.5)),
+  // Classrooms 101 (west wall: the evening sun) and 102 (east wall: the morning sun).
+  ...[-9.8, -7.8, -5.8].map((z) => win(ROOMS.classroom1.x0, z, 'z', 1, FLOOR_Y, 1.5, true)),
   ...[-9.8, -7.8, -5.8].map((z) => win(ROOMS.classroom2.x1, z, 'z', -1, FLOOR_Y, 1.5, true)),
   // The agency in Bobo-Dioulasso, its street front.
   ...[-3.0, 0, 3.0].map((x) => win(x, ROOMS.agence.z1, 'x', -1, 0, 1.6, true)),

@@ -10,6 +10,7 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { VignetteShader } from 'three/examples/jsm/shaders/VignetteShader.js';
 import { bakedOnly } from './lightmaps.js';
+import { daytime } from './daytime.js';
 
 export type Quality = 'low' | 'medium' | 'high';
 
@@ -335,7 +336,7 @@ export class Stage {
     // Fewer lights, the sky making up for them: a light costs on every pixel of the screen.
     for (const light of this.extraLights) light.visible = full && !this.baked;
     for (const light of this.accents) light.visible = full && !this.baked;
-    this.sky.intensity = full ? 0.74 : q === 'medium' ? 0.74 : 1.2;
+    this.sky.intensity = this.indoorSky();
     this.scene.traverse((o) => {
       const m = (o as THREE.Mesh).material as THREE.Material | undefined;
       if (m && !Array.isArray(m)) m.needsUpdate = true;
@@ -540,6 +541,17 @@ export class Stage {
   }
 
   private sun: THREE.DirectionalLight | null = null;
+
+  /** The sky's light indoors: stronger in low quality, where it stands in for the lights turned off; then the time of day. */
+  private indoorSky(): number {
+    return (this.quality === 'low' ? 1.2 : 0.74) * (daytime().skyIndoor / 0.74);
+  }
+
+  /** Take the time of day set for the mission (see `daytime.ts`): the sky's colour and strength. */
+  applyDaytime(): void {
+    this.sky.color.set(daytime().sky);
+    this.sky.intensity = this.indoorSky();
+  }
   private indoorFar: number | null = null;
 
   /**
@@ -559,15 +571,19 @@ export class Stage {
         this.scene.add(this.sun, this.sun.target);
       }
       this.sun.visible = true;
+      // The time of day: the sun's colour, strength and height over the street.
+      const look = daytime();
+      this.sun.color.set(look.sunColour);
+      this.sun.intensity = look.sunIntensity;
       this.sun.target.position.copy(focus);
-      this.sun.position.copy(focus).addScaledVector(from.clone().normalize(), 60);
+      this.sun.position.copy(focus).addScaledVector(from.clone().setY(from.y * look.sunHeight).normalize(), 60);
       this.sky.intensity = 1.5;
       // Outside, the town around is far: the view reaches it (inside, a short view keeps the depth precise).
       this.indoorFar ??= this.camera.far;
       this.camera.far = 400;
     } else {
       if (this.sun) this.sun.visible = false;
-      this.sky.intensity = 0.74;
+      this.sky.intensity = this.indoorSky();
       if (this.indoorFar !== null) this.camera.far = this.indoorFar;
     }
     this.camera.updateProjectionMatrix();

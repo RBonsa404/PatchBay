@@ -24,6 +24,7 @@ const fr = {
   'hud.menu': 'Menu',
   'hud.quality': 'Qualité',
   'hud.view': 'Vue d’ensemble',
+  'hud.hour': 'Heure de la mission : la lumière du jour par les fenêtres suit l’heure',
   'hud.toolHint': 'ZQSD : marcher. Glisser : regarder. Molette : zoomer. F1 : toutes les commandes.',
   'timer.label': 'Temps restant',
   'timer.lastMinute': 'Plus qu’une minute !',

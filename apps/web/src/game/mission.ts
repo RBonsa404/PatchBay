@@ -22,6 +22,7 @@ import { closePanel, Consoles, openPanelKey, resetHostShells, showHostPanel, sho
 import { extraCables, tidiness, type Tidiness } from './cabling.js';
 import { testCable, type CableTest } from './tester.js';
 import { showTester } from '../ui/tester.js';
+import { daytime, daytimeOf, setDaytime } from '../scene/daytime.js';
 import { clock, grade, type Grade } from './scoring.js';
 import { canListen, listenOnce } from '../voice.js';
 import { settings } from '../settings.js';
@@ -209,6 +210,9 @@ export class Mission {
 
   constructor(private readonly stage: Stage, readonly level: Level, private readonly events: MissionEvents, index = 0, private readonly exam = false, tour: TourStop[] | null = null) {
     this.tour = tour !== null;
+    // The time of day, before the rooms are built: their shafts of sun are cut for it.
+    setDaytime(daytimeOf(level.id, index, this.tour));
+    stage.applyDaytime();
     this.clockAt = performance.now();
     this.limit = Math.round((level.timeLimit ?? DEFAULT_LIMIT) * (exam ? EXAM_TIME : 1));
     this.remaining = this.limit;
@@ -320,7 +324,7 @@ export class Mission {
       listen: () => this.listenVoice(),
       selectCable: (type) => this.select(type),
       tester: () => this.toggleTester(),
-    }, stage.currentQuality, index, exam, this.tour);
+    }, stage.currentQuality, index, exam, this.tour, daytime().hour);
     setTimeout(() => (this.tour ? this.hud.banner(t('tour.title'), t('tour.banner')) : this.hud.banner(`${t('briefing.mission')} ${String(index + 1).padStart(2, '0')}`, exam ? t('exam.start') : this.coach?.active ? t('timer.tutorial') : t('timer.start'))), this.entrance * 1000);
     stage.onQualityLowered = (q) => this.hud.showQuality(q);
     this.cleanup.push(() => {

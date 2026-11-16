@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { townMaterial } from './daytime.js';
 
 /**
  * What lies beyond the windows: a photographed panorama (Poly Haven, CC0) on a wide cylinder around the building,
@@ -35,7 +36,7 @@ export function panorama(view: 'campus' | 'agence' | 'datacenter', cx: number, c
     uv.setY(i, (angle + DOWN) / (UP + DOWN));
     uv.setX(i, 1 - uv.getX(i));
   }
-  const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ map: texture, color: new THREE.Color(1.45, 1.42, 1.36), side: THREE.BackSide, depthWrite: false, fog: false, toneMapped: false }));
+  const mesh = new THREE.Mesh(geometry, townMaterial(new THREE.MeshBasicMaterial({ map: texture, side: THREE.BackSide, depthWrite: false, fog: false, toneMapped: false })));
   mesh.position.set(cx, eye + (top - bottom) / 2, cz);
   mesh.rotation.y = turn;
   mesh.renderOrder = -10;

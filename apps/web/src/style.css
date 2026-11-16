@@ -198,6 +198,7 @@ h1, h2, h3 { font-family: var(--font-heading); margin: 0; line-height: 1.2; font
 .cable-slot .name { font-weight: 600; font-size: 13.5px; }
 .cable-slot .count { font: 500 12px var(--font-mono); color: var(--text-3); }
 .cable-slot kbd { position: absolute; top: 4px; right: 6px; font: 500 10px var(--font-mono); color: var(--text-3); }
+.mission-hour { text-transform: none; margin-left: 8px; padding-left: 8px; border-left: 1px solid var(--line-strong); color: var(--cyan); font-family: var(--font-mono); letter-spacing: 0.04em; }
 .inventory .slot-sep { width: 1px; margin: 6px 2px; background: var(--line); }
 .cable-slot.tester-slot { min-width: 118px; }
 

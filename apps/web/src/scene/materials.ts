@@ -138,12 +138,14 @@ export function outsideTexture(kind: OutsideView = 'quad'): THREE.Texture {
   return t;
 }
 
-/** A soft warm patch: daylight falling on the floor from a window. */
+let sunPatch: THREE.CanvasTexture | null = null;
+/** A soft patch: daylight falling on the floor from a window (its colour comes from the time of day). One for all. */
 export function sunPatchTexture(): THREE.CanvasTexture {
+  if (sunPatch) return sunPatch;
   const [c, g] = canvas(256, 256);
   const r = g.createLinearGradient(0, 0, 0, 256);
-  r.addColorStop(0, 'rgba(255, 236, 200, 0.5)');
-  r.addColorStop(1, 'rgba(255, 236, 200, 0)');
+  r.addColorStop(0, 'rgba(255, 255, 255, 0.5)');
+  r.addColorStop(1, 'rgba(255, 255, 255, 0)');
   g.fillStyle = r;
   g.fillRect(28, 0, 200, 256);
   g.globalCompositeOperation = 'destination-in';
@@ -156,6 +158,7 @@ export function sunPatchTexture(): THREE.CanvasTexture {
   g.fillRect(0, 0, 256, 256);
   const t = texture(c, 1, 1);
   t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  sunPatch = t;
   return t;
 }
 

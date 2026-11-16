@@ -74,7 +74,7 @@ export class Hud {
   private readonly qualityButton: HTMLElement;
   private readonly micButton: HTMLButtonElement | null;
 
-  constructor(private readonly level: Level, private readonly actions: HudActions, quality: Quality, index = 0, private readonly exam = false, tour = false) {
+  constructor(private readonly level: Level, private readonly actions: HudActions, quality: Quality, index = 0, private readonly exam = false, tour = false, hour = '') {
     const multiSite = level.devices.some((d) => d.room === 'agence' || d.room === 'datacenter');
     this.objectivesList = h('ol', { class: 'objective-list' });
     this.scoreLabel = h('span', { class: 'score' }, '0');
@@ -103,7 +103,7 @@ export class Hud {
       h(
         'header',
         { class: 'hud-top' },
-        h('div', { class: 'mission-chip panel-solid' }, h('span', { class: 'label' }, tour ? t('tour.title') : `${t('briefing.mission')} ${String(index + 1).padStart(2, '0')}`), h('strong', {}, tour ? t('tour.chip') : tx(level.title))),
+        h('div', { class: 'mission-chip panel-solid' }, h('span', { class: 'label' }, tour ? t('tour.title') : `${t('briefing.mission')} ${String(index + 1).padStart(2, '0')}`, hour ? h('span', { class: 'mission-hour', title: t('hud.hour') }, hour) : null), h('strong', {}, tour ? t('tour.chip') : tx(level.title))),
         h(
           'div',
           { class: 'toolbar panel-solid' },

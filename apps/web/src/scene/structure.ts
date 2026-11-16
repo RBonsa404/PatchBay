@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { DOOR_HEIGHT, DOORS, FLOOR_Y, inside, ROOM_HEIGHT, STAIRS, WALL, WALLS, wallPieces, WINDOWS, ZONES, type Flight, type Rect, type Window, type ZoneName } from './building.js';
+import { daytime } from './daytime.js';
 import { ceilingTexture, outsideTexture, paintTexture, photo, photoRelief, raisedFloorNormal, raisedFloorTexture, sunPatchTexture } from './materials.js';
 
 /**
@@ -151,13 +152,13 @@ function walls(zone: ZoneName): THREE.Group {
   return g;
 }
 
-/** The way the sun comes in: towards the room, downwards, a little sideways (local frame of a window). */
-const SUN = new THREE.Vector3(0.28, -0.62, 0.73).normalize();
-
 /**
  * A window in its opening: the reveals through the wall, the aluminium frame with its mullion and transom, the glass,
  * the inside sill; the daylight it gives to the light bake; a shaft of sun and its patch on the floor when `sun`.
  */
+/** Below this share of the sun's travel going into the room, its light only grazes the wall: no shaft. */
+const SUN_GRAZING = 0.25;
+
 function windowAssembly(w: Window, room?: Rect): THREE.Group {
   const g = new THREE.Group();
   const m = M();
@@ -196,11 +197,14 @@ function windowAssembly(w: Window, room?: Rect): THREE.Group {
   g.add(light);
   g.rotation.y = w.along === 'x' ? (w.inside > 0 ? 0 : Math.PI) : w.inside > 0 ? Math.PI / 2 : -Math.PI / 2;
   g.position.set(w.x, w.y + w.sill, w.z);
-  if (w.sun) {
+  // The sun of the mission's time of day, in the window's own frame: it comes in only through a window facing it.
+  const look = daytime();
+  const sun = new THREE.Vector3(look.sun.dot(new THREE.Vector3(1, 0, 0).applyEuler(g.rotation)), look.sun.y, look.sun.dot(new THREE.Vector3(0, 0, 1).applyEuler(g.rotation)));
+  if (w.sun && sun.z > SUN_GRAZING) {
     // The sun stops at the room's walls: the shaft and its patch are cut at their inside faces.
     g.updateMatrix();
     const inner = room && { x0: room.x0 + WALL / 2, x1: room.x1 - WALL / 2, z0: room.z0 + WALL / 2, z1: room.z1 - WALL / 2 };
-    g.add(sunlight(W, H, w.sill, inner ? { matrix: g.matrix, rect: inner } : undefined));
+    g.add(sunlight(W, H, w.sill, sun, inner ? { matrix: g.matrix, rect: inner } : undefined));
   }
   return g;
 }
@@ -254,14 +258,16 @@ function fan(polygon: Corner[], positions: number[], extras: number[]): void {
  * The shaft of sunlight through an opening W × H whose sill is `sill` above the floor, and the patch it makes there;
  * both cut at the walls of the room when `clip` gives them.
  */
-function sunlight(W: number, H: number, sill: number, clip?: { matrix: THREE.Matrix4; rect: Rect }): THREE.Group {
+function sunlight(W: number, H: number, sill: number, sun: THREE.Vector3, clip?: { matrix: THREE.Matrix4; rect: Rect }): THREE.Group {
   const g = new THREE.Group();
+  const look = daytime();
+  const SUN = sun.clone().normalize();
   const corners = [new THREE.Vector3(-W / 2, 0, 0), new THREE.Vector3(W / 2, 0, 0), new THREE.Vector3(W / 2, H, 0), new THREE.Vector3(-W / 2, H, 0)];
   // Where each corner's ray meets the floor (local y = -sill).
   const floor = corners.map((c) => c.clone().addScaledVector(SUN, (c.y + sill) / -SUN.y));
   const positions: number[] = [];
   const colours: number[] = [];
-  const warm = new THREE.Color('#ffe2b0');
+  const warm = new THREE.Color(look.light);
   const tint = (fade: number): number[] => [warm.r * fade, warm.g * fade, warm.b * fade];
   for (let i = 0; i < 4; i++) {
     const [a, b] = [corners[i] as THREE.Vector3, corners[(i + 1) % 4] as THREE.Vector3];
@@ -277,7 +283,7 @@ function sunlight(W: number, H: number, sill: number, clip?: { matrix: THREE.Mat
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colours, 3));
-  const shaft = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.06, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false, fog: false }));
+  const shaft = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: look.shaft, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false, fog: false }));
   shaft.userData.dynamic = true;
   shaft.renderOrder = 5;
   const uvs = [
@@ -293,7 +299,7 @@ function sunlight(W: number, H: number, sill: number, clip?: { matrix: THREE.Mat
   const patchGeometry = new THREE.BufferGeometry();
   patchGeometry.setAttribute('position', new THREE.Float32BufferAttribute(patchPositions, 3));
   patchGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(patchUvs, 2));
-  const patch = new THREE.Mesh(patchGeometry, new THREE.MeshBasicMaterial({ map: sunPatchTexture(), transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }));
+  const patch = new THREE.Mesh(patchGeometry, new THREE.MeshBasicMaterial({ map: sunPatchTexture(), color: look.light, transparent: true, opacity: look.patch, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }));
   patch.userData.dynamic = true;
   patch.renderOrder = -1;
   g.add(shaft, patch);
