@@ -653,6 +653,38 @@ export class Stage {
     this.composer.setPixelRatio(this.renderer.getPixelRatio());
   }
 
+  /**
+   * A photo of what the camera sees now, with every filter of the current quality, drawn once more at a higher
+   * resolution (at least 1920 pixels wide, twice the screen at most) and copied out before the browser clears it.
+   */
+  snapshot(): HTMLCanvasElement {
+    const w = this.container.clientWidth || window.innerWidth;
+    const h = this.container.clientHeight || window.innerHeight;
+    const before = this.renderer.getPixelRatio();
+    const ratio = Math.min(2 * (window.devicePixelRatio || 1), Math.max(before, 1920 / w));
+    const sharper = ratio > before + 0.01;
+    if (sharper) {
+      this.renderer.setPixelRatio(ratio);
+      this.renderer.setSize(w, h, false);
+      this.composer.setPixelRatio(ratio);
+      this.composer.setSize(w, h);
+    }
+    this.camera.updateMatrixWorld();
+    if (this.quality !== 'low') this.composer.render(0);
+    else this.renderer.render(this.scene, this.camera);
+    const source = this.renderer.domElement;
+    const shot = document.createElement('canvas');
+    shot.width = source.width;
+    shot.height = source.height;
+    shot.getContext('2d')?.drawImage(source, 0, 0);
+    if (sharper) {
+      this.renderer.setPixelRatio(before);
+      this.resize();
+    }
+    this.wake();
+    return shot;
+  }
+
   private applyFov(): void {
     // Keep the bench's width in frame on narrow screens (phone in portrait): widen the vertical angle instead of
     // cropping the sides.

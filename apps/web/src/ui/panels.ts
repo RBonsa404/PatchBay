@@ -299,6 +299,7 @@ const CONTROLS: [string, string][] = [
   ['P', 'liste des ports, pour tout faire au clavier'],
   ['M / N', 'couper la musique / morceau suivant'],
   ['L', 'testeur de câble : lire le câble d’un port'],
+  ['K', 'mode photo : caméra libre, filtres, photo signée'],
   ['Échap', 'fermer, reposer le câble ou le testeur, revenir'],
 ];
 

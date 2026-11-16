@@ -6,7 +6,7 @@
  * machine noises) and the music: a shuffled playlist of free tracks (`public/music`, see ASSETS.md) with an original
  * generative piece among them, quieter during a mission.
  */
-export type SoundName = 'plug' | 'unplug' | 'error' | 'objective' | 'success' | 'click' | 'packet' | 'step' | 'tick' | 'timeout';
+export type SoundName = 'plug' | 'unplug' | 'error' | 'objective' | 'success' | 'click' | 'packet' | 'step' | 'tick' | 'timeout' | 'shutter';
 export type Mood = 'menu' | 'mission';
 
 const STORAGE_KEY = 'patchbay.muted';
@@ -505,6 +505,11 @@ class Sound {
       case 'timeout': // the buzzer
         this.tone(196, t, 0.5, 'sawtooth', 0.12, 130);
         this.tone(147, t, 0.6, 'square', 0.05, 98);
+        break;
+      case 'shutter': // a camera's shutter: the blades, then the mirror falling back
+        this.burst(t, 0.025, 0.4, 3200);
+        this.burst(t + 0.07, 0.04, 0.3, 1400);
+        this.tone(2100, t, 0.02, 'square', 0.03);
         break;
       case 'step': // a soft footfall on the raised floor, hollow underneath
         this.tone(95 + Math.random() * 20, t, 0.09, 'sine', 0.16, 60);

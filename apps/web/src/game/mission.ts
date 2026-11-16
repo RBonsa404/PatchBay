@@ -37,6 +37,7 @@ import { journeyMap, journeyPath, journeyTrail, JOURNEY_ORIGIN } from '../scene/
 import { distanceKm, SITES } from '../ui/travel.js';
 import { pauseOpen, showPause } from '../ui/pause.js';
 import { understand, type VoiceCommand } from '../voice-commands.js';
+import { PhotoOverlay } from '../ui/photo.js';
 
 const HOME = { position: new THREE.Vector3(0, 1.78, 2.45), target: new THREE.Vector3(0, 0.86, 0.02) };
 /** How far the player can reach a device from, in metres (seen from above). */
@@ -495,6 +496,7 @@ export class Mission {
     this.guide?.dispose();
     this.fade?.remove();
     this.cables.showPreview('straight', null, null);
+    this.closePhoto();
     this.hud.destroy();
     this.minimap?.destroy();
     this.talkBubble?.remove();
@@ -625,6 +627,11 @@ export class Mission {
         e.preventDefault();
       }
       if (e.code.startsWith('Shift')) this.held.add('Shift');
+      if (this.photo) {
+        if (!typing) this.photoKey(e);
+        return;
+      }
+      if (e.code === 'KeyK' && !typing && !e.repeat) this.openPhoto();
       if (e.key === 'Escape') {
         // Close what is open first; with nothing open, Escape pauses the game.
         if (pauseOpen()) return;
@@ -771,6 +778,7 @@ export class Mission {
   }
 
   private onClick(): void {
+    if (this.photo) return;
     const { port, device, board, exit } = this.pick();
     if (board) return this.toggleBoard();
     if (exit) return this.openTravel();
@@ -1474,6 +1482,11 @@ export class Mission {
       },
       brief: () => this.showBrief(),
       help: () => showHelp(),
+      photo: () => {
+        this.paused = false;
+        this.clockAt = performance.now();
+        this.openPhoto();
+      },
       quit: () => {
         this.paused = false;
         this.leave();
@@ -1840,6 +1853,7 @@ export class Mission {
   /** Every frame: walk, turn the head, and put the camera where the eyes are. */
   private walk(dt: number): void {
     this.tickClock(dt);
+    if (this.photo) return this.photoFrame(dt);
     if (this.paused) return;
     this.minimap?.update(this.player.x, this.player.z, this.player.yaw, this.player.floorY, zoneOf(this.player.x, this.player.floorY + 0.1, this.player.z));
     const camera = this.stage.camera;
@@ -1891,6 +1905,134 @@ export class Mission {
     this.followZone();
     // After the camera has turned for this frame: what it sees now, not what it saw a frame ago.
     camera.lookAt(this.stage.controls.target);
+    this.cull();
+  }
+
+  /** Photo mode: the free camera, its lens and the overlay of tools; null when not taking photos. */
+  private photo: { overlay: PhotoOverlay; pos: THREE.Vector3; yaw: number; pitch: number; roll: number; zoom: number; avatar: boolean } | null = null;
+
+  /** Into photo mode: the clock stops, whatever was in hand is put down, the camera starts where it is. */
+  private openPhoto(): void {
+    if (this.photo || this.finished || this.disposed) return;
+    if (this.travelling || this.flying || this.tour || this.entrance > 0) {
+      this.hud.toast(t('photo.unavailable'));
+      return;
+    }
+    closePanel();
+    this.select(null);
+    this.anchor = null;
+    this.following = true;
+    this.paused = true;
+    this.held.clear();
+    this.talkBubble?.remove();
+    this.hud.showTooltip(null);
+    const camera = this.stage.camera;
+    const dir = camera.getWorldDirection(new THREE.Vector3());
+    const place = t(`zone.${zoneOf(this.player.x, this.player.floorY + 0.1, this.player.z)}` as Parameters<typeof t>[0]);
+    const overlay = new PhotoOverlay(this.stage.renderer.domElement, {
+      look: (dx, dy) => {
+        const p = this.photo;
+        if (!p) return;
+        const speed = (LOOK_SPEED * settings.lookSpeed) / p.zoom;
+        p.yaw -= dx * speed;
+        p.pitch = THREE.MathUtils.clamp(p.pitch - dy * speed * (settings.invertY ? -1 : 1), -1.45, 1.45);
+      },
+      zoom: (factor) => {
+        if (this.photo) this.photo.zoom = THREE.MathUtils.clamp(this.photo.zoom * factor, 0.45, 5);
+      },
+      showAvatar: (on) => {
+        if (this.photo) this.photo.avatar = on;
+      },
+      capture: () => {
+        this.photoFrame(0);
+        return this.stage.snapshot();
+      },
+      close: () => this.closePhoto(),
+    }, place);
+    this.photo = { overlay, pos: camera.position.clone(), yaw: Math.atan2(dir.x, dir.z), pitch: Math.asin(THREE.MathUtils.clamp(dir.y, -1, 1)), roll: 0, zoom: this.stage.zoom, avatar: PEOPLE };
+    sound.play('click');
+  }
+
+  private closePhoto(): void {
+    const p = this.photo;
+    if (!p) return;
+    p.overlay.destroy();
+    this.photo = null;
+    this.held.clear();
+    this.paused = false;
+    this.clockAt = performance.now();
+    if (this.avatar) this.avatar.root.visible = this.backView();
+  }
+
+  /** The keys of photo mode; the walking keys are held as usual and move the camera in `photoFrame`. */
+  private photoKey(e: KeyboardEvent): void {
+    const p = this.photo;
+    if (!p) return;
+    if (e.key === 'Escape' || (e.code === 'KeyK' && !e.repeat)) return this.closePhoto();
+    if (e.code === 'Enter' || e.code === 'NumpadEnter') {
+      e.preventDefault();
+      if (!e.repeat) p.overlay.shoot();
+    }
+    if (e.code === 'KeyH') p.overlay.toggleBar();
+    if (e.code === 'KeyR') p.roll = 0;
+    if (e.code === 'Space' || e.code === 'KeyC' || e.code === 'KeyQ' || e.code === 'KeyE') {
+      e.preventDefault();
+      this.held.add(e.code);
+    }
+  }
+
+  /**
+   * Every frame of photo mode: the camera flies where the keys push it, never through a wall nor more than 6 m from the
+   * student (the rooms beyond are not all built or drawn), between the floor and the ceiling; the people go on living.
+   */
+  private photoFrame(dt: number): void {
+    const p = this.photo;
+    if (!p) return;
+    const camera = this.stage.camera;
+    let [side, ahead, rise] = [0, 0, 0];
+    for (const code of this.held) {
+      const k = KEYS[code];
+      if (k) {
+        side += k[0];
+        ahead += k[1];
+      }
+      const turn = TURN_KEYS[code];
+      if (turn) p.yaw += (turn * dt) / p.zoom;
+    }
+    if (this.held.has('Space')) rise += 1;
+    if (this.held.has('KeyC')) rise -= 1;
+    if (this.held.has('KeyQ')) p.roll = Math.max(-0.6, p.roll - dt * 0.6);
+    if (this.held.has('KeyE')) p.roll = Math.min(0.6, p.roll + dt * 0.6);
+    const speed = (this.held.has('Shift') ? 2.6 : 1.1) * dt;
+    const forward = new THREE.Vector3(Math.sin(p.yaw), 0, Math.cos(p.yaw));
+    const right = new THREE.Vector3(-Math.cos(p.yaw), 0, Math.sin(p.yaw));
+    const step = forward.multiplyScalar(ahead * speed).addScaledVector(right, side * speed);
+    const floor = this.player.floorY;
+    const next = p.pos.clone().add(step);
+    next.y = THREE.MathUtils.clamp(p.pos.y + rise * speed, floor + 0.15, floor + 2.7);
+    if (this.building) {
+      // Slide along a wall rather than stop dead: the whole step, else each axis alone.
+      const free = (x: number, z: number): boolean => !blockedAt(x, z, next.y - 0.05, 0.14) && Math.hypot(x - this.player.x, z - this.player.z) <= 6;
+      if (step.lengthSq() === 0) p.pos.y = next.y;
+      else if (free(next.x, next.z)) p.pos.set(next.x, next.y, next.z);
+      else if (free(next.x, p.pos.z)) p.pos.set(next.x, next.y, p.pos.z);
+      else if (free(p.pos.x, next.z)) p.pos.set(p.pos.x, next.y, next.z);
+      else p.pos.y = next.y;
+    } else {
+      p.pos.set(THREE.MathUtils.clamp(next.x, -3.35, 3.35), THREE.MathUtils.clamp(next.y, 0.3, 2.85), THREE.MathUtils.clamp(next.z, -1.45, 3.45));
+    }
+    camera.position.copy(p.pos);
+    const c = Math.cos(p.pitch);
+    this.stage.controls.target.copy(p.pos).add(new THREE.Vector3(Math.sin(p.yaw) * c, Math.sin(p.pitch), Math.cos(p.yaw) * c));
+    camera.lookAt(this.stage.controls.target);
+    if (p.roll !== 0) camera.rotateZ(p.roll);
+    this.stage.zoom += (p.zoom - this.stage.zoom) * (dt > 0 ? 1 - Math.exp(-dt * 10) : 1);
+    p.overlay.setFov(camera.fov, camera.aspect);
+    if (this.avatar) {
+      this.avatar.update(dt);
+      this.avatar.root.visible = p.avatar;
+    }
+    if (dt > 0) this.livePeople(dt);
     this.cull();
   }
 

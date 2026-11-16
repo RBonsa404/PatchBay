@@ -665,3 +665,46 @@ body.cinematic .tour-fade { z-index: 80; }
 .talk-bubble small { margin-left: 10px; color: var(--text-3); font-size: 12.5px; }
 .talk-bubble p { margin: 6px 0 0; font-size: 15px; line-height: 1.5; }
 .talk-bubble.leaving { animation: fade-out 0.6s var(--ease-out) forwards; }
+
+/* Photo mode (K): the interface gone, a thin bar of tools at the bottom, a grid of thirds over the frame. */
+body.photo-on .hud, body.photo-on .minimap, body.photo-on .toasts, body.photo-on .talk-bubble, body.photo-on .tester-card { display: none !important; }
+.photo-mode { position: fixed; inset: 0; z-index: 60; }
+.photo-surface { position: absolute; inset: 0; cursor: grab; touch-action: none; }
+.photo-surface:active { cursor: grabbing; }
+.photo-guides { position: absolute; inset: 0; pointer-events: none; }
+.photo-guides i { position: absolute; background: rgba(255, 255, 255, 0.28); box-shadow: 0 0 2px rgba(0, 0, 0, 0.4); }
+.photo-guides i:nth-child(1), .photo-guides i:nth-child(2) { top: 0; bottom: 0; width: 1px; }
+.photo-guides i:nth-child(1) { left: 33.333%; }
+.photo-guides i:nth-child(2) { left: 66.667%; }
+.photo-guides i:nth-child(3), .photo-guides i:nth-child(4) { left: 0; right: 0; height: 1px; }
+.photo-guides i:nth-child(3) { top: 33.333%; }
+.photo-guides i:nth-child(4) { top: 66.667%; }
+.photo-guides[hidden] { display: none; }
+.photo-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+.photo-flash.go { animation: photo-flash 0.45s ease-out; }
+@keyframes photo-flash { 0% { opacity: 0.85; } 100% { opacity: 0; } }
+.photo-bar { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); width: min(980px, calc(100vw - 32px)); display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 10px 16px; padding: 12px 16px; border: 1px solid var(--line-strong); border-radius: 12px; background: rgba(7, 13, 30, 0.86); backdrop-filter: blur(8px); color: var(--text); box-shadow: var(--shadow); }
+.photo-bar[hidden] { display: none; }
+.photo-title { display: flex; align-items: center; gap: 8px; color: var(--cyan); }
+.photo-title strong { font: 600 15px var(--font-heading); color: var(--text); }
+.photo-focal { font: 500 12px var(--font-mono); color: var(--text-3); min-width: 48px; }
+.photo-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.photo-chip { padding: 5px 11px; border: 1px solid var(--line-strong); border-radius: 999px; background: transparent; color: var(--text-2); font: 500 13px var(--font-body); cursor: pointer; }
+.photo-chip:hover { border-color: var(--cyan); color: var(--text); }
+.photo-chip.on { background: var(--blue-royal); border-color: var(--blue-royal); color: #fff; }
+.photo-tools { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.photo-shoot { margin-left: auto; }
+.photo-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: transparent; color: var(--text-3); font: 500 13px var(--font-body); cursor: pointer; }
+.photo-toggle[aria-pressed='true'] { color: var(--text); border-color: var(--line-strong); background: var(--panel-up); }
+.photo-toggle[aria-pressed='true'] .icon { color: var(--cyan); }
+.photo-shoot .icon, .photo-bar .btn .icon { margin-right: 6px; vertical-align: -3px; }
+.photo-keys { grid-column: 1 / -1; margin: 0; font-size: 12px; color: var(--text-3); }
+.photo-saved { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 9px 14px; border: 1px solid var(--line-strong); border-radius: 10px; background: rgba(7, 13, 30, 0.9); color: var(--text); font-size: 14px; animation: fade-in 0.25s var(--ease-out); pointer-events: none; }
+.photo-saved .icon { color: var(--success); }
+.photo-saved code { font: 12px var(--font-mono); color: var(--text-3); }
+.photo-saved.leaving { animation: fade-out 0.6s var(--ease-out) forwards; }
+@media (max-width: 760px) {
+  .photo-bar { grid-template-columns: 1fr; bottom: 10px; padding: 10px 12px; }
+  .photo-tools { justify-content: flex-start; }
+  .photo-keys { display: none; }
+}

@@ -1,4 +1,4 @@
-import { BookOpen, Gauge, Keyboard, LogOut, Mouse, Music, Play, Settings, User, Volume2 } from 'lucide';
+import { BookOpen, Camera, Gauge, Keyboard, LogOut, Mouse, Music, Play, Settings, User, Volume2 } from 'lucide';
 import { sound } from '../audio.js';
 import type { Quality, Stage } from '../scene/stage.js';
 import { settings } from '../settings.js';
@@ -35,6 +35,8 @@ export interface PauseActions {
   resume(): void;
   brief(): void;
   help(): void;
+  /** Photo mode, where the mission allows it. */
+  photo?: () => void;
   quit(): void;
 }
 
@@ -67,6 +69,11 @@ export function showPause(stage: Stage, actions: PauseActions, title: string): v
           resume();
           actions.help();
         }),
+        actions.photo &&
+          item(t('photo.tool'), Camera, () => {
+            close();
+            actions.photo?.();
+          }),
         item(t('settings.title'), Settings, () => showSettings(stage, () => showPause(stage, actions, title))),
         item(t('pause.quit'), LogOut, () => {
           close();
