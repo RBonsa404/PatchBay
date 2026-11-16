@@ -27,11 +27,13 @@ function lines(): Promise<Record<string, string>> {
 }
 
 /** Say `text` if it was recorded (nothing otherwise, or when the voices are switched off). */
-export async function say(text: string): Promise<void> {
+export async function say(text: string, voice?: 'man' | 'woman'): Promise<void> {
   stopVoice();
   if (!settings.voice) return;
-  const k = key(text);
-  if (!(k in (await lines()))) return;
+  const known = await lines();
+  // Lines several people may say (the reactions) are recorded once per voice.
+  const k = voice && key(`${voice}|${text}`) in known ? key(`${voice}|${text}`) : key(text);
+  if (!(k in known)) return;
   const audio = new Audio(`${import.meta.env.BASE_URL}voice/${k}.ogg`);
   audio.volume = Math.max(0, Math.min(1, settings.voiceVolume));
   playing = audio;

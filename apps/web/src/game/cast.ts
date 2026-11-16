@@ -133,3 +133,18 @@ export const COLLEAGUES: Colleague[] = [
     ],
   },
 ];
+
+/**
+ * What colleagues say once the player's work shows: the first time they are spoken to after most of the mission's
+ * objectives are met (one line each, then their usual lines again). Recorded like the others (`tools/voice.cjs`).
+ */
+/** Colleagues spoken with a woman's voice (the others with a man's). */
+export const WOMEN = new Set(['awa', 'mme-ouedraogo', 'fatim', 'mariam', 'student-f']);
+
+export const REACTIONS: string[] = [
+  'Ça y est, le réseau remarche ! On vient de recevoir nos courriels d’un coup. Merci, beau travail.',
+  'J’ai vu les voyants passer au vert dans la salle technique. Propre, le câblage, on s’y retrouve tout de suite.',
+  'Bravo ! Un réseau qui marche, c’est un réseau qu’on oublie. C’est le plus beau compliment pour un technicien.',
+  'Le ping passe enfin jusqu’au bout. Tu as pensé à enregistrer la configuration avec copy run start ?',
+];
+

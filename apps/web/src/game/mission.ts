@@ -27,7 +27,7 @@ import { screenTexture } from '../scene/textures.js';
 import { say, stopVoice } from '../voiceover.js';
 import { Minimap } from '../ui/minimap.js';
 import { Person } from '../scene/people.js';
-import { COLLEAGUES, type Colleague } from './cast.js';
+import { COLLEAGUES, REACTIONS, WOMEN, type Colleague } from './cast.js';
 import { playTrip, showSiteChooser } from '../ui/travel.js';
 import { buildExterior, buildStreet, ENTRANCES } from '../scene/exterior.js';
 import { journeyMap, journeyPath, journeyTrail, JOURNEY_ORIGIN } from '../scene/journey.js';
@@ -1070,12 +1070,15 @@ export class Mission {
   private talk(): void {
     const p = this.nearPerson;
     if (!p) return;
-    const line = p.who.lines[p.line] ?? '';
-    p.line = (p.line + 1) % p.who.lines.length;
+    // Once most of the work is done, each colleague first says so (once), then goes back to their usual lines.
+    const reacts = this.progress >= 0.75 && !this.congratulated.has(p.who.model);
+    if (reacts) this.congratulated.add(p.who.model);
+    const line = reacts ? (REACTIONS[this.congratulated.size % REACTIONS.length] as string) : (p.who.lines[p.line] ?? '');
+    if (!reacts) p.line = (p.line + 1) % p.who.lines.length;
     // As long as it takes to say it (their recorded voice reads it out), seven seconds at least.
     const seconds = Math.max(7, line.length / 13);
     p.talking = seconds;
-    void say(line);
+    void say(line, WOMEN.has(p.who.model) ? 'woman' : 'man');
     p.person.play(p.who.motion.startsWith('Sitting') ? 'Sitting_Talking_Loop' : 'Idle_Talking_Loop');
     this.talkBubble?.remove();
     this.talkBubble = h('div', { class: 'talk-bubble' }, h('strong', {}, p.who.name), h('small', {}, p.who.role), h('p', {}, line));
@@ -1908,6 +1911,10 @@ export class Mission {
     }
   }
 
+  /** Share of the mission's objectives met (the colleagues notice when the network works again). */
+  private progress = 0;
+  private readonly congratulated = new Set<string>();
+
   private afterChange(): void {
     this.superviseLines();
     this.showHints();
@@ -1924,6 +1931,7 @@ export class Mission {
     const results = evaluate(this.net, quiet).results;
     const merged = [...results, ...this.trafficResults.values()];
     this.celebrate(merged);
+    this.progress = merged.length ? merged.filter((r) => r.passed).length / merged.length : 0;
     this.hud.setObjectives(merged);
     this.coach?.update();
   }

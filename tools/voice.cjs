@@ -30,7 +30,7 @@ const esbuild = require(path.join(root, 'node_modules/esbuild'));
 const tmp = path.join(os.tmpdir(), 'ist-voice-texts.cjs');
 esbuild.buildSync({
   stdin: {
-    contents: "export { tour } from './packages/content/src/tour.ts'; export { COLLEAGUES } from './apps/web/src/game/cast.ts';",
+    contents: "export { tour } from './packages/content/src/tour.ts'; export { COLLEAGUES, REACTIONS, WOMEN } from './apps/web/src/game/cast.ts';",
     resolveDir: root,
     loader: 'ts',
   },
@@ -41,18 +41,19 @@ esbuild.buildSync({
   logLevel: 'error',
   define: { 'import.meta.env': '{}' },
 });
-const { tour, COLLEAGUES } = require(tmp);
+const { tour, COLLEAGUES, REACTIONS, WOMEN } = require(tmp);
 
-const WOMEN = new Set(['awa', 'mme-ouedraogo', 'fatim', 'mariam', 'student-f']);
 const VOICE = { aicha: 'fr_FR-siwis-medium', man: 'fr_FR-tom-medium', woman: 'fr_FR-upmc-medium' };
 const lines = [];
 for (const stop of tour) lines.push({ voice: 'aicha', text: stop.text.fr });
 for (const who of COLLEAGUES) for (const line of who.lines) lines.push({ voice: WOMEN.has(who.model) ? 'woman' : 'man', text: line });
+// The reactions, said by anyone: once in each voice, keyed by voice and text.
+for (const line of REACTIONS) for (const voice of ['man', 'woman']) lines.push({ voice, text: line, as: `${voice}|${line}` });
 
 const index = {};
 let made = 0;
-for (const { voice, text } of lines) {
-  const k = key(text);
+for (const { voice, text, as } of lines) {
+  const k = key(as ?? text);
   index[k] = voice;
   const file = path.join(out, `${k}.ogg`);
   if (fs.existsSync(file)) continue;
