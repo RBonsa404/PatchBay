@@ -55,7 +55,7 @@ Convertis en GLB, textures réduites à 512 px en WebP.
 
 ## Vues des fenêtres (Poly Haven, CC0)
 
-Bandes de panoramas photographiés, posées sur un grand cylindre autour de chaque bâtiment (`public/textures/outside/`) : `panorama-campus` d'après https://polyhaven.com/a/pretville_street, `panorama-agence` d'après https://polyhaven.com/a/wide_street_01, `panorama-datacenter` d'après https://polyhaven.com/a/factory_yard ; `quad-1` (couleur moyenne du jour pour le calcul de la lumière) d'après https://polyhaven.com/a/quadrangle_sunny.
+Bandes de panoramas photographiés, posées sur un grand cylindre autour de chaque bâtiment (`public/textures/outside/`) : `panorama-campus` calculé par le jeu depuis sa rue modélisée (`tools/street-panorama.cjs`), `panorama-agence` d'après https://polyhaven.com/a/wide_street_01, `panorama-datacenter` d'après https://polyhaven.com/a/factory_yard ; `quad-1` (couleur moyenne du jour pour le calcul de la lumière) d'après https://polyhaven.com/a/quadrangle_sunny.
 
 ## Modèles faits pour le jeu
 

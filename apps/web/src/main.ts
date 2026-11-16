@@ -213,6 +213,12 @@ if (import.meta.env.DEV) {
     sound,
     mission: () => mission,
     zones: async () => (await import('./scene/building.js')).ZONES,
+    /** The campus's town through the windows, photographed from the modelled street (`tools/street-panorama.cjs`). */
+    streetPanorama: async () => {
+      const m = mission as unknown as { goOutside(site: 'campus', on: boolean): void } | null;
+      if (!m) throw new Error('start a mission first');
+      return (await import('./scene/street-panorama.js')).streetPanorama(stage, (on) => m.goOutside('campus', on), new THREE.Vector3(-0.7, 1.6, -2.8));
+    },
     exportStatic: async () => {
       mission?.buildEverything();
       return (await import('./scene/lightmap-export.js')).exportStatic(stage.scene);

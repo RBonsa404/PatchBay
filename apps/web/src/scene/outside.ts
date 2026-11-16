@@ -12,6 +12,7 @@ const textures = new Map<string, THREE.Texture>();
 /** Angles the band covers above and below the horizon (see how `panorama.jpg` is cut). */
 const UP = (60 * Math.PI) / 180;
 const DOWN = (35 * Math.PI) / 180;
+export const [PANORAMA_UP, PANORAMA_DOWN] = [UP, DOWN];
 
 /** `view`: the town around this site (campus: a street of Ouagadougou; agency: an avenue; operator: its industrial zone). */
 export function panorama(view: 'campus' | 'agence' | 'datacenter', cx: number, cz: number, radius: number, eye = 1.6, turn = 0): THREE.Mesh {

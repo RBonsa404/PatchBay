@@ -417,7 +417,7 @@ export function buildStreet(site: SiteName, footprint: Rect): THREE.Group {
   g.add(road, line);
   g.add(boundary(e, footprint));
   // Across the campus street, the town is modelled (the photographed one was a foreign shopping street).
-  if (site === 'campus') g.add(facingStreet(site));
+  if (site === 'campus') g.add(facingStreet(site, footprint));
   return g;
 }
 
@@ -587,7 +587,7 @@ function hazySky(radius: number): THREE.Mesh {
  * in faded paints, roller shutters, painted sign boards, sheet-metal awnings on posts) on both sides, neem trees in
  * the gaps, the concrete poles of the electricity line with their wires and street lamps, under a hazy sky.
  */
-function facingStreet(site: SiteName): THREE.Group {
+function facingStreet(site: SiteName, footprint: Rect): THREE.Group {
   const g = new THREE.Group();
   g.name = `facing-${site}`;
   const e = ENTRANCES[site];
@@ -643,6 +643,15 @@ function facingStreet(site: SiteName): THREE.Group {
   for (let u = -74; u < 74; u += 4.5 + rnd() * 3) {
     closed.push({ ...at(u, FAR + 9 + rnd() * 7, across + Math.PI), scale: 0.95 + rnd() * 0.65, tint: PAINTS[Math.floor(rnd() * PAINTS.length)] as string });
     if (rnd() > 0.62) trees.push({ ...at(u + 2, FAR + 7 + rnd() * 10), turn: rnd() * 6, scale: 0.85 + rnd() * 0.4 });
+  }
+  // And all round the campus plot on its three other sides, the houses and yards of the quarter (what the windows at
+  // the back and the ends of the building look out on), never nearer than 9 m to its walls, their blank backs to it.
+  const ring: [number, number][] = [];
+  for (let z = footprint.z0 - 26; z < footprint.z1 + 26; z += 5 + rnd() * 3) ring.push([footprint.x1 + 10 + rnd() * 9, z]);
+  for (let x = footprint.x0 - 2; x < footprint.x1 + 8; x += 5 + rnd() * 3) ring.push([x, footprint.z0 - 10 - rnd() * 9], [x + 2, footprint.z1 + 10 + rnd() * 9]);
+  for (const [x, z] of ring) {
+    closed.push({ x, y: 0, z, turn: Math.round(Math.atan2(x - (footprint.x0 + footprint.x1) / 2, z - (footprint.z0 + footprint.z1) / 2) / (Math.PI / 2)) * (Math.PI / 2), scale: 0.95 + rnd() * 0.7, tint: PAINTS[Math.floor(rnd() * PAINTS.length)] as string });
+    if (rnd() > 0.55) trees.push({ x: x + (rnd() - 0.5) * 6, y: 0, z: z + (rnd() - 0.5) * 6, turn: rnd() * 6, scale: 0.85 + rnd() * 0.45 });
   }
   placeMany(g, 'shop_open', open);
   placeMany(g, 'shop_closed', closed);
