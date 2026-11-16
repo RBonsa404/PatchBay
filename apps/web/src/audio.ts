@@ -207,6 +207,18 @@ class Sound {
     this.applyMood();
   }
 
+  private presence = 1;
+
+  /**
+   * How much of the machines' hum the place where the player stands lets through (0 … 1.6): full by the racks,
+   * faint in a classroom, almost nothing in the toilets.
+   */
+  setPresence(level: number): void {
+    if (Math.abs(level - this.presence) < 0.01) return;
+    this.presence = level;
+    this.applyMood();
+  }
+
   /** Current loudness of the whole mix, in dB relative to full scale (for automated checks). */
   level(): number {
     if (!this.analyser) return -Infinity;
@@ -219,7 +231,7 @@ class Sound {
     const ctx = this.ctx;
     if (!ctx) return;
     this.music?.gain.setTargetAtTime(this.musicOn ? MUSIC_LEVEL[this.mood] : 0, ctx.currentTime, 0.6);
-    this.room?.gain.setTargetAtTime(ROOM_LEVEL[this.mood], ctx.currentTime, 0.6);
+    this.room?.gain.setTargetAtTime(ROOM_LEVEL[this.mood] * this.presence, ctx.currentTime, 0.9);
   }
 
   private ensure(): AudioContext | null {

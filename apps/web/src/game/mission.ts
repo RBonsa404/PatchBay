@@ -23,6 +23,7 @@ import { extraCables, tidiness, type Tidiness } from './cabling.js';
 import { clock, grade, type Grade } from './scoring.js';
 import { canListen, listenOnce } from '../voice.js';
 import { settings } from '../settings.js';
+import { screenTexture } from '../scene/textures.js';
 import { say, stopVoice } from '../voiceover.js';
 import { Minimap } from '../ui/minimap.js';
 import { Person } from '../scene/people.js';
@@ -1232,6 +1233,17 @@ export class Mission {
     const look = new THREE.Vector3();
     const [height, back] = far ? [46, 58] : [9, 14];
     const clouds = map.children.filter((c) => c.name === 'cloud');
+    // The leased line is alive: packets run along the part already drawn, out in cyan and their replies back in amber,
+    // as the pings of the mission would.
+    const size = far ? 0.8 : 0.25;
+    const packets = [...Array(8).keys()].map((i) => {
+      const reply = i % 2 === 1;
+      const dot = new THREE.Mesh(new THREE.SphereGeometry(size, 12, 8), new THREE.MeshBasicMaterial({ color: reply ? '#fbbf24' : '#38bdf8', toneMapped: false, fog: false }));
+      dot.userData = { phase: i / 8, reply };
+      trail.group.add(dot);
+      return dot;
+    });
+    const along = new THREE.Vector3();
     await this.blackout(false);
     let last = 0;
     await stage.animate(far ? 6.5 : 4.2, (t) => {
@@ -1246,6 +1258,13 @@ export class Mission {
       camera.lookAt(look);
       (card.querySelector('.journey-km') as HTMLElement).textContent = `${Math.round(km * t)} km`;
       for (const c of clouds) c.position.x += (t - last) * 30 * (c.userData.drift as number);
+      for (const dot of packets) {
+        const phase = (t * 4 + (dot.userData.phase as number)) % 1;
+        const u = Math.max(0.001, (dot.userData.reply ? 1 - phase : phase) * t);
+        curve.getPointAt(Math.min(0.999, u), along);
+        dot.position.copy(along).setY(along.y + size * 1.4);
+        dot.visible = t > 0.04;
+      }
       last = t;
     });
     await new Promise((r) => setTimeout(r, 300));
@@ -1363,6 +1382,9 @@ export class Mission {
     if (site === 'campus' || this.builtSites.has(site) || !this.building) return;
     this.builtSites.add(site);
     this.addParts(site, buildSite(site));
+    // Its screens show the lines as they are now.
+    this.supervised = '';
+    this.superviseLines();
   }
 
   /** Build one waiting part when the browser has a moment, then the next: the frame rate never drops for it. */
@@ -1668,6 +1690,9 @@ export class Mission {
     if (this.lastZone !== null) this.hud.toast(t(`zone.${zone}`));
     this.showTown(siteOf(this.player.z));
     this.lastZone = zone;
+    // The machines' hum: strongest by the racks and in the operator's server room, faint where people sit.
+    const hum = /^(room|lab|agence|datacenter)$/.test(zone) ? (zone === 'datacenter' ? 1.5 : 1) : /corridor|stairs|hall/.test(zone) ? 0.45 : 0.2;
+    sound.setPresence(hum);
     const floor = this.player.floorY > BUILDING.floorY - 0.5 ? BUILDING.floorY : 0;
     const hall = (BUILDING.corridor.back + BUILDING.corridor.front) / 2;
     const hallLamp = (x: number, y = floor): [number, number, number, number] => [x, y + 2.25, hall, 3.2];
@@ -1836,7 +1861,55 @@ export class Mission {
   }
 
   /** After every cable or command: redraw cables, LEDs, inventory, and the objectives that need no traffic. */
+  private supervised = '';
+
+  /**
+   * The operator's wall of screens follows the mission: each leased line with its real state (both routers' serial
+   * interfaces up, or down and why), and an alarm for each line that is down.
+   */
+  private superviseLines(): void {
+    const leased = this.net.cables.filter((c) => c.leased);
+    if (!leased.length && !this.ntus.size) return;
+    const place = (device: string): string => {
+      const room = this.level.devices.find((d) => d.id === device)?.room ?? '';
+      return room === 'agence' ? 'BOBO' : room === 'datacenter' ? 'OPÉRATEUR' : 'CAMPUS';
+    };
+    const up = (device: string, port: string): boolean => {
+      try {
+        return this.net.linkState(device, port).status === 'up';
+      } catch {
+        return false;
+      }
+    };
+    const rows = leased.map((c, i) => {
+      const ok = up(c.a.device, c.a.port) && up(c.b.device, c.b.port);
+      return { name: `LS-03${31 + i} ${place(c.a.device)} ↔ ${place(c.b.device)}`, ok };
+    });
+    // A line the client has not yet plugged in at both ends: down at the operator too.
+    if (!rows.length) {
+      for (const [i, site] of this.sites().filter((x) => x !== 'campus').entries()) rows.push({ name: `LS-03${31 + i} CAMPUS ↔ ${site === 'agence' ? 'BOBO' : 'OPÉRATEUR'}`, ok: false });
+    }
+    const key = rows.map((r) => `${r.name}${r.ok}`).join();
+    if (key === this.supervised) return;
+    this.supervised = key;
+    const down = rows.filter((r) => !r.ok);
+    const screens: [string, string[], string][] = [
+      ['supervision-0', ['SUPERVISION · LIGNES LOUÉES', '', ...rows.map((r) => `${r.name.padEnd(28)}${r.ok ? 'UP' : 'DOWN'}`)], down.length ? '#f87171' : '#38bdf8'],
+      ['supervision-2', down.length ? ['ALARMES', '', ...down.map((r) => `! ${r.name} : DOWN`), '', 'Câble série absent côté client', 'ou interface série éteinte'] : ['ALARMES', '', 'Aucune alarme active', '', 'Toutes les lignes en service'], down.length ? '#f87171' : '#38bdf8'],
+    ];
+    for (const [name, lines, accent] of screens) {
+      this.stage.scene.traverse((o) => {
+        if (o.name !== name) return;
+        const mat = (o as THREE.Mesh).material as THREE.MeshBasicMaterial;
+        mat.map?.dispose();
+        mat.map = screenTexture(lines, accent);
+        mat.needsUpdate = true;
+      });
+    }
+  }
+
   private afterChange(): void {
+    this.superviseLines();
     this.showHints();
     const drawn = [
       ...this.net.cables.filter((c) => !this.cordOf(c.a)),

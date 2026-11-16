@@ -455,6 +455,9 @@ function siteWing(site: 'agence' | 'datacenter', props: Placed[]): THREE.Group {
       ][i] as string[];
       const screen = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 0.64), new THREE.MeshBasicMaterial({ map: screenTexture(lines), color: '#ffffff', toneMapped: false }));
       screen.rotation.y = Math.PI / 2;
+      // The game rewrites the first and the last with the real state of the mission's leased lines.
+      screen.name = `supervision-${i}`;
+      screen.userData.dynamic = true;
       screen.position.set(w.office.x0 + WALL_T / 2 + 0.045, 1.75, -6.6 + z0 + dz);
       g.add(box(0.04, 0.7, 1.16, BLACK, w.office.x0 + WALL_T / 2 + 0.02, 1.75, -6.6 + z0 + dz), screen);
     }
