@@ -105,6 +105,11 @@ export class Stage {
    */
   private readonly lamps = [new THREE.PointLight('#fff4e4', 6, 9, 1.5), new THREE.PointLight('#fff4e4', 6, 9, 1.5)] as const;
   private drawnAt = 0;
+  /** The screen's refresh period (ms), measured from the browser's frame ticks: see `frame`. */
+  private refresh = 1000 / 60;
+  private readonly ticks = new Float32Array(31);
+  private tickCount = 0;
+  private tickAt = 0;
   private readonly plainEnvironment: THREE.Texture;
   /** Shaders are being compiled in the background: drawing now would freeze the page until they are ready. */
   private preparing = false;
@@ -642,11 +647,28 @@ export class Stage {
     this.camera.updateProjectionMatrix();
   }
 
+  /** The median gap between the browser's frame ticks over the last 31, refreshed every 31 ticks. */
+  private measureRefresh(now: number): void {
+    const gap = now - this.tickAt;
+    this.tickAt = now;
+    if (gap <= 0 || gap > 100) return;
+    this.ticks[this.tickCount++] = gap;
+    if (this.tickCount < this.ticks.length) return;
+    this.tickCount = 0;
+    const sorted = Float32Array.from(this.ticks).sort();
+    this.refresh = Math.min(1000 / 30, Math.max(1000 / 360, sorted[sorted.length >> 1]!));
+  }
+
   private frame(now: number): void {
+    this.measureRefresh(now);
     if (this.preparing) return;
     const awake = now < this.awakeUntil;
     const pace = !awake ? REST_FPS : this.manualCamera ? ACTIVE_FPS : MENU_FPS;
-    if (now - this.drawnAt < 1000 / pace - 2) return;
+    // Draw on every n-th refresh of the screen, never "whenever 16 ms have passed": on a 144 Hz screen that skipped
+    // two refreshes out of three (48 images per second, uneven), on 75 Hz one out of two (37, and the quality went down
+    // by itself). A whole number of refreshes keeps the motion even: 60 Hz → 60, 120 → 60, 144 → 72, 165 → 82.
+    const every = Math.max(1, Math.floor(1000 / pace / this.refresh + 0.15));
+    if (now - this.drawnAt < (every - 0.5) * this.refresh) return;
     const gap = (now - this.drawnAt) / 1000;
     this.drawnAt = now;
     const dt = Math.min(this.clock.getDelta(), 0.1);

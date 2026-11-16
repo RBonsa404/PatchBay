@@ -16,10 +16,31 @@ export function onPropAppeared(fn: () => void): void {
   appeared = fn;
 }
 
+/**
+ * Glass that refracts what is behind it (`transmission`) makes the renderer draw the whole room a second time, every
+ * frame it is in sight, for one clock face: plain see-through glass looks the same at this size and costs nothing.
+ */
+export function withoutTransmission<T extends THREE.Object3D>(root: T): T {
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+      const glass = material as THREE.MeshPhysicalMaterial;
+      if (!glass.isMeshPhysicalMaterial || !(glass.transmission > 0)) continue;
+      glass.opacity = Math.min(glass.opacity, 1 - glass.transmission * 0.8);
+      glass.transmission = 0;
+      glass.transparent = true;
+      glass.depthWrite = false;
+      glass.needsUpdate = true;
+    }
+  });
+  return root;
+}
+
 export function loadProp(name: string): Promise<THREE.Group> {
   let model = models.get(name);
   if (!model) {
-    model = loader.loadAsync(`${import.meta.env.BASE_URL}models/${name}.glb`).then((gltf) => gltf.scene);
+    model = loader.loadAsync(`${import.meta.env.BASE_URL}models/${name}.glb`).then((gltf) => withoutTransmission(gltf.scene));
     models.set(name, model);
   }
   return model;

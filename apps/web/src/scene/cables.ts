@@ -209,11 +209,18 @@ function segmentHitsRect(a: THREE.Vector3, b: THREE.Vector3, x0: number, x1: num
   return t0;
 }
 
+/**
+ * The clear polycarbonate of an RJ45 plug. See-through, not refracting: refraction (`transmission`) would make the
+ * renderer draw the whole room twice in every frame where a plug shows.
+ */
+const CLEAR_PLUG = new THREE.MeshPhysicalMaterial({ color: '#dbeafe', roughness: 0.25, transparent: true, opacity: 0.55, clearcoat: 0.6, clearcoatRoughness: 0.2 });
+const SERIAL_SHELL = new THREE.MeshPhysicalMaterial({ color: '#1e293b', roughness: 0.25 });
+
 function plug(type: CableType, colour = CABLE_STYLE[type].colour): THREE.Group {
   const g = new THREE.Group();
   const body = new THREE.Mesh(
     new THREE.BoxGeometry(type === 'serial' ? 0.024 : 0.013, type === 'serial' ? 0.009 : 0.011, 0.022),
-    new THREE.MeshPhysicalMaterial({ color: type === 'serial' ? '#1e293b' : '#dbeafe', roughness: 0.25, transmission: type === 'serial' ? 0 : 0.6, thickness: 0.01 }),
+    type === 'serial' ? SERIAL_SHELL : CLEAR_PLUG,
   );
   body.position.z = 0.009;
   const boot = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.0055, 0.016, 12), new THREE.MeshStandardMaterial({ color: colour, roughness: 0.5 }));

@@ -9,7 +9,7 @@ const VIEWS = {
   'data centre': [3.6, 800.8, -0.3, -0.05, 0, 0.82],
 };
 (async () => {
-  const { browser, page } = await open({ uncapped: true });
+  const { browser, page } = await open({ uncapped: process.env.QA_VSYNC !== '1' });
   await startMission(page, 4);
   for (const quality of ['high', 'medium']) {
     await page.evaluate((q) => window.__patchbay.stage.chooseQuality(q), quality);

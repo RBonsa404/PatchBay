@@ -13,7 +13,7 @@ import { buildWhiteboard } from '../scene/details.js';
 import { buildAnnex, buildClassrooms, buildSite, buildWestWing } from '../scene/annex.js';
 import { applyLightmap } from '../scene/lightmaps.js';
 import { BUILDING, rackFillers, setMainDoorOpen } from '../scene/room.js';
-import { blockedAt, DOORS, FLOOR_Y, groundAt, SITE_EXIT_X, SITE_Z, siteOf, ZONES, zoneOf, type SiteName, type ZoneName as Zone } from '../scene/building.js';
+import { blockedAt, DOORS, FLOOR_Y, groundAt, SITE_EXIT_X, SITE_Z, siteOf, WINDOWS, ZONES, zoneOf, type SiteName, type ZoneName as Zone } from '../scene/building.js';
 import type { Quality, Stage } from '../scene/stage.js';
 import { AskAicha } from '../ui/askAicha.js';
 import { h } from '../ui/dom.js';
@@ -69,6 +69,18 @@ const PEOPLE = ((): boolean => {
     return true;
   }
 })();
+
+/** A rectangle on screen in normalised coordinates: left, bottom, right, top (-1…1). */
+type Rect = [number, number, number, number];
+const FULL_SCREEN: Rect = [-1, -1, 1, 1];
+/** Where two rectangles on screen overlap, or null when they do not. */
+function overlap(a: Rect, b: Rect): Rect | null {
+  const x0 = Math.max(a[0], b[0]);
+  const y0 = Math.max(a[1], b[1]);
+  const x1 = Math.min(a[2], b[2]);
+  const y1 = Math.min(a[3], b[3]);
+  return x0 < x1 && y0 < y1 ? [x0, y0, x1, y1] : null;
+}
 
 /** Which part of the building a zone is drawn in (see `buildAnnex` and the parts built later). */
 function partOf(zone: Zone): string {
@@ -1617,12 +1629,10 @@ export class Mission {
   }
 
   /** Walls hide everything beyond them: draw only the parts of the building that can be seen from here. */
-  private readonly frustum = new THREE.Frustum();
-  private readonly viewMatrix = new THREE.Matrix4();
-  private portals: { a: Zone; b: Zone; box: THREE.Box3; centre: THREE.Vector3 }[] | null = null;
+  private portals: { a: Zone; b: Zone; box: THREE.Box3 }[] | null = null;
 
   /** Every doorway, the two rooms it joins, and the box of its opening (a little wider, for the frame's lag). */
-  private portalList(): { a: Zone; b: Zone; box: THREE.Box3; centre: THREE.Vector3 }[] {
+  private portalList(): { a: Zone; b: Zone; box: THREE.Box3 }[] {
     this.portals ??= DOORS.map((d) => {
       const [nx, nz] = d.along === 'x' ? [0, 0.3] : [0.3, 0];
       const a = zoneOf(d.x - nx, d.y + 0.1, d.z - nz);
@@ -1630,38 +1640,133 @@ export class Mission {
       const half = d.width / 2 + 0.3;
       const [hx, hz] = d.along === 'x' ? [half, 0.3] : [0.3, half];
       const box = new THREE.Box3(new THREE.Vector3(d.x - hx, d.y, d.z - hz), new THREE.Vector3(d.x + hx, d.y + 2.4, d.z + hz));
-      return { a, b, box, centre: new THREE.Vector3(d.x, d.y + 1.2, d.z) };
+      return { a, b, box };
     });
     return this.portals;
   }
 
+  private panes: { zone: Zone; box: THREE.Box3 }[] | null = null;
+
+  /** Every outside window, the room it lights and the box of its opening: the rest of the building shows through it. */
+  private windowList(): { zone: Zone; box: THREE.Box3 }[] {
+    this.panes ??= WINDOWS.map((w) => {
+      const [nx, nz] = w.along === 'z' ? [0.3, 0] : [0, 0.3];
+      const zone = zoneOf(w.x + nx * w.inside, w.y + 0.1, w.z + nz * w.inside);
+      const half = w.width / 2;
+      const [hx, hz] = w.along === 'z' ? [0.3, half] : [half, 0.3];
+      const box = new THREE.Box3(new THREE.Vector3(w.x - hx, w.y + w.sill, w.z - hz), new THREE.Vector3(w.x + hx, w.y + w.sill + w.height, w.z + hz));
+      return { zone, box };
+    });
+    return this.panes;
+  }
+
+  /** Each built part's bounds, worked out once (a part never moves). */
+  private readonly partBoxes = new WeakMap<THREE.Object3D[], THREE.Box3>();
+  private partBox(objects: THREE.Object3D[]): THREE.Box3 {
+    let box = this.partBoxes.get(objects);
+    if (!box) {
+      box = new THREE.Box3();
+      for (const o of objects) box.expandByObject(o);
+      this.partBoxes.set(objects, box);
+    }
+    return box;
+  }
+
+  private readonly corners = Array.from({ length: 8 }, () => new THREE.Vector3());
+  private readonly corner = new THREE.Vector3();
+
+  /**
+   * Where a doorway is on screen, as a rectangle in normalised coordinates (-1…1), null when it is off screen. A box
+   * partly behind the camera is cut at the near plane first: only what is in front of the eye counts.
+   */
+  private doorRect(box: THREE.Box3): Rect | null {
+    const camera = this.stage.camera;
+    if (box.distanceToPoint(camera.position) < 0.45) return FULL_SCREEN;
+    const near = -camera.near * 1.01;
+    const c = this.corners;
+    for (let i = 0; i < 8; i++) {
+      c[i]!.set(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z).applyMatrix4(camera.matrixWorldInverse);
+    }
+    const rect: Rect = [Infinity, Infinity, -Infinity, -Infinity];
+    const add = (p: THREE.Vector3): void => {
+      const s = this.corner.copy(p).applyMatrix4(camera.projectionMatrix);
+      rect[0] = Math.min(rect[0], s.x);
+      rect[1] = Math.min(rect[1], s.y);
+      rect[2] = Math.max(rect[2], s.x);
+      rect[3] = Math.max(rect[3], s.y);
+    };
+    for (const p of c) if (p.z <= near) add(p);
+    // Where one of the box's twelve edges crosses the near plane, that point is on screen too.
+    for (let i = 0; i < 8; i++) {
+      for (const bit of [1, 2, 4]) {
+        if (i & bit) continue;
+        const a = c[i]!;
+        const b = c[i | bit]!;
+        if (a.z <= near === b.z <= near) continue;
+        add(this.corner.lerpVectors(a, b, (near - a.z) / (b.z - a.z)));
+      }
+    }
+    if (rect[0] === Infinity) return null;
+    return rect[2] < -1 || rect[0] > 1 || rect[3] < -1 || rect[1] > 1 ? null : rect;
+  }
+
   private cull(): void {
     if (!this.building) return;
-    const zone = zoneOf(this.player.x, this.player.floorY + 0.1, this.player.z);
-    // What can be seen: the room the player is in, then through each doorway in sight the room beyond, and through
-    // that room's doorways in sight the next, three doors deep. A room seen across a corridor is drawn; one behind
-    // the player's back is not.
+    const floorY = this.player.floorY + 0.1;
+    const zone = zoneOf(this.player.x, floorY, this.player.z);
+    // What can be seen (portal culling): the room the player is in and the one the camera is in, then each room whose
+    // doorway shows on screen, and beyond it only the rooms whose doorways show *through* that doorway (the two
+    // rectangles on screen overlap), three doors deep. A room behind the player's back, or beside a door seen at an
+    // angle, is not drawn.
     const camera = this.stage.camera;
     camera.updateMatrixWorld();
-    this.frustum.setFromProjectionMatrix(this.viewMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
-    const eye = this.player.eye;
-    const seenZones = new Set<Zone>([zone]);
-    let frontier: Zone[] = [zone];
+    const seen = new Map<Zone, Rect>([[zone, FULL_SCREEN]]);
+    const cameraZone = zoneOf(camera.position.x, floorY, camera.position.z);
+    seen.set(cameraZone, FULL_SCREEN);
+    let frontier: Zone[] = [...seen.keys()];
     for (let depth = 0; depth < 3 && frontier.length; depth++) {
       const next: Zone[] = [];
       for (const here of frontier) {
+        const through = seen.get(here) as Rect;
         for (const d of this.portalList()) {
           const other = d.a === here ? d.b : d.b === here ? d.a : null;
           // A door to a zone this mission keeps shut is a closed door: nothing is seen through it.
-          if (!other || seenZones.has(other) || !this.player.canEnter(other)) continue;
-          if (!this.frustum.intersectsBox(d.box) && d.centre.distanceTo(eye) > 1.6) continue;
-          seenZones.add(other);
+          if (!other || !this.player.canEnter(other)) continue;
+          const rect = this.doorRect(d.box);
+          const clipped = rect && overlap(rect, through);
+          if (!clipped) continue;
+          // Seen through another doorway already: keep the union of the two, and look again from there if it grew.
+          const before = seen.get(other);
+          const grown: Rect = before ? [Math.min(before[0], clipped[0]), Math.min(before[1], clipped[1]), Math.max(before[2], clipped[2]), Math.max(before[3], clipped[3])] : clipped;
+          if (before && grown.every((v, i) => v === before[i])) continue;
+          seen.set(other, grown);
           next.push(other);
         }
       }
       frontier = next;
     }
-    const shown = [...new Set([...seenZones].map(partOf))].sort();
+    const parts = new Set([...seen.keys()].map(partOf));
+    // Out of the windows, and down or up the open stair well: the rest of the building is seen from outside. A built
+    // part whose bounds show through one of those openings is drawn too (else its outside walls would be missing).
+    const views: { rect: Rect; only?: string[] }[] = [];
+    for (const w of this.windowList()) {
+      const through = seen.get(w.zone);
+      const rect = through && this.doorRect(w.box);
+      const clipped = rect && overlap(rect, through);
+      if (clipped) views.push({ rect: clipped });
+    }
+    const well = seen.get('stairs');
+    if (well) views.push({ rect: well, only: ['lower', 'upper'] });
+    if (views.length) {
+      for (const [part, objects] of this.parts) {
+        if (parts.has(part)) continue;
+        const box = this.partBox(objects);
+        if (box.isEmpty() || box.distanceToPoint(camera.position) > 60) continue;
+        const rect = this.doorRect(box);
+        if (rect && views.some((v) => (!v.only || v.only.includes(part)) && overlap(rect, v.rect))) parts.add(part);
+      }
+    }
+    const shown = [...parts].sort();
     // Never a room in sight that is not built yet (it would leave the street showing through it): what is still
     // waiting for an idle moment is built right now, before this frame is drawn.
     if (shown.some((part) => !this.parts.has(part)) && this.buildNow(shown)) return;
@@ -1769,8 +1874,9 @@ export class Mission {
       );
     }
     this.followZone();
-    this.cull();
+    // After the camera has turned for this frame: what it sees now, not what it saw a frame ago.
     camera.lookAt(this.stage.controls.target);
+    this.cull();
   }
 
   private select(type: CableType | null): void {

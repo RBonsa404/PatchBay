@@ -146,7 +146,7 @@ function walls(zone: ZoneName): THREE.Group {
   }
   for (const w of WINDOWS) {
     const probe = w.along === 'x' ? [w.x, w.y + 0.5, w.z + w.inside * (WALL / 2 + 0.05)] : [w.x + w.inside * (WALL / 2 + 0.05), w.y + 0.5, w.z];
-    if (zoneAt(probe[0] as number, probe[1] as number, probe[2] as number) === zone) g.add(windowAssembly(w));
+    if (zoneAt(probe[0] as number, probe[1] as number, probe[2] as number) === zone) g.add(windowAssembly(w, ZONES.find((z) => z.name === zone)?.rect));
   }
   return g;
 }
@@ -158,7 +158,7 @@ const SUN = new THREE.Vector3(0.28, -0.62, 0.73).normalize();
  * A window in its opening: the reveals through the wall, the aluminium frame with its mullion and transom, the glass,
  * the inside sill; the daylight it gives to the light bake; a shaft of sun and its patch on the floor when `sun`.
  */
-function windowAssembly(w: Window): THREE.Group {
+function windowAssembly(w: Window, room?: Rect): THREE.Group {
   const g = new THREE.Group();
   const m = M();
   const [W, H, T] = [w.width, w.height, WALL];
@@ -194,14 +194,67 @@ function windowAssembly(w: Window): THREE.Group {
   light.userData.dynamic = true;
   light.userData.windowLight = true;
   g.add(light);
-  if (w.sun) g.add(sunlight(W, H, w.sill));
   g.rotation.y = w.along === 'x' ? (w.inside > 0 ? 0 : Math.PI) : w.inside > 0 ? Math.PI / 2 : -Math.PI / 2;
   g.position.set(w.x, w.y + w.sill, w.z);
+  if (w.sun) {
+    // The sun stops at the room's walls: the shaft and its patch are cut at their inside faces.
+    g.updateMatrix();
+    const inner = room && { x0: room.x0 + WALL / 2, x1: room.x1 - WALL / 2, z0: room.z0 + WALL / 2, z1: room.z1 - WALL / 2 };
+    g.add(sunlight(W, H, w.sill, inner ? { matrix: g.matrix, rect: inner } : undefined));
+  }
   return g;
 }
 
-/** The shaft of sunlight through an opening W × H whose sill is `sill` above the floor, and the patch it makes there. */
-function sunlight(W: number, H: number, sill: number): THREE.Group {
+/** A corner of a polygon being cut: where it is, and what it carries (colour or texture coordinates). */
+interface Corner {
+  p: THREE.Vector3;
+  extra: number[];
+}
+
+/**
+ * Cut a flat polygon (in the window's own frame) to a room's floor plan: what lies beyond its walls is dropped. The
+ * cut is done in the building's frame (`matrix` takes the window's frame there), one wall at a time.
+ */
+function cutToRoom(polygon: Corner[], clip: { matrix: THREE.Matrix4; rect: Rect } | undefined): Corner[] {
+  if (!clip) return polygon;
+  const back = clip.matrix.clone().invert();
+  let poly = polygon.map((c) => ({ p: c.p.clone().applyMatrix4(clip.matrix), extra: c.extra }));
+  const { x0, x1, z0, z1 } = clip.rect;
+  const sides: ((p: THREE.Vector3) => number)[] = [(p) => p.x - x0, (p) => x1 - p.x, (p) => p.z - z0, (p) => z1 - p.z];
+  for (const inside of sides) {
+    const out: Corner[] = [];
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i] as Corner;
+      const b = poly[(i + 1) % poly.length] as Corner;
+      const da = inside(a.p);
+      const db = inside(b.p);
+      if (da >= 0) out.push(a);
+      if (da >= 0 !== db >= 0) {
+        const t = da / (da - db);
+        out.push({ p: a.p.clone().lerp(b.p, t), extra: a.extra.map((v, k) => v + ((b.extra[k] as number) - v) * t) });
+      }
+    }
+    poly = out;
+    if (poly.length < 3) return [];
+  }
+  return poly.map((c) => ({ p: c.p.applyMatrix4(back), extra: c.extra }));
+}
+
+/** Triangles of a convex polygon, as a fan: positions, and what each corner carries. */
+function fan(polygon: Corner[], positions: number[], extras: number[]): void {
+  for (let i = 1; i + 1 < polygon.length; i++) {
+    for (const c of [polygon[0], polygon[i], polygon[i + 1]] as Corner[]) {
+      positions.push(c.p.x, c.p.y, c.p.z);
+      extras.push(...c.extra);
+    }
+  }
+}
+
+/**
+ * The shaft of sunlight through an opening W × H whose sill is `sill` above the floor, and the patch it makes there;
+ * both cut at the walls of the room when `clip` gives them.
+ */
+function sunlight(W: number, H: number, sill: number, clip?: { matrix: THREE.Matrix4; rect: Rect }): THREE.Group {
   const g = new THREE.Group();
   const corners = [new THREE.Vector3(-W / 2, 0, 0), new THREE.Vector3(W / 2, 0, 0), new THREE.Vector3(W / 2, H, 0), new THREE.Vector3(-W / 2, H, 0)];
   // Where each corner's ray meets the floor (local y = -sill).
@@ -209,14 +262,17 @@ function sunlight(W: number, H: number, sill: number): THREE.Group {
   const positions: number[] = [];
   const colours: number[] = [];
   const warm = new THREE.Color('#ffe2b0');
+  const tint = (fade: number): number[] => [warm.r * fade, warm.g * fade, warm.b * fade];
   for (let i = 0; i < 4; i++) {
     const [a, b] = [corners[i] as THREE.Vector3, corners[(i + 1) % 4] as THREE.Vector3];
     const [fa, fb] = [floor[i] as THREE.Vector3, floor[(i + 1) % 4] as THREE.Vector3];
-    for (const v of [a, b, fb, a, fb, fa]) {
-      positions.push(v.x, v.y, v.z);
-      const fade = v === a || v === b ? 1 : 0.15;
-      colours.push(warm.r * fade, warm.g * fade, warm.b * fade);
-    }
+    const side: Corner[] = [
+      { p: a, extra: tint(1) },
+      { p: b, extra: tint(1) },
+      { p: fb, extra: tint(0.15) },
+      { p: fa, extra: tint(0.15) },
+    ];
+    fan(cutToRoom(side, clip), positions, colours);
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
@@ -224,10 +280,19 @@ function sunlight(W: number, H: number, sill: number): THREE.Group {
   const shaft = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.06, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false, fog: false }));
   shaft.userData.dynamic = true;
   shaft.renderOrder = 5;
+  const uvs = [
+    [0, 0],
+    [1, 0],
+    [1, 1],
+    [0, 1],
+  ];
+  const patchCorners = floor.map((v, i): Corner => ({ p: new THREE.Vector3(v.x, -sill + 0.006, v.z), extra: uvs[i] as number[] }));
+  const patchPositions: number[] = [];
+  const patchUvs: number[] = [];
+  fan(cutToRoom(patchCorners, clip), patchPositions, patchUvs);
   const patchGeometry = new THREE.BufferGeometry();
-  const f = floor.map((v) => [v.x, -sill + 0.006, v.z]);
-  patchGeometry.setAttribute('position', new THREE.Float32BufferAttribute([...f[0]!, ...f[1]!, ...f[2]!, ...f[0]!, ...f[2]!, ...f[3]!], 3));
-  patchGeometry.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1], 2));
+  patchGeometry.setAttribute('position', new THREE.Float32BufferAttribute(patchPositions, 3));
+  patchGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(patchUvs, 2));
   const patch = new THREE.Mesh(patchGeometry, new THREE.MeshBasicMaterial({ map: sunPatchTexture(), transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }));
   patch.userData.dynamic = true;
   patch.renderOrder = -1;
