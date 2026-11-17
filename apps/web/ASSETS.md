@@ -14,6 +14,8 @@ Créé pour PatchBay (pas de licence tierce) : logo PatchBay (`src/ui/brand.ts`,
 
 Fichiers réencodés en MP3 128 kb/s et normalisés à -18 LUFS. Aucune attribution n'est exigée par la licence.
 
+Chaque morceau sert une situation du jeu (`apps/web/src/music.ts`) : menus (Exploration Theme, Starfield Romance, First Light Particles), visite guidée (Contemplation, Calm Relax 1, Calm Ambient 2), câblage et configuration (Calm Ambient 1, 2 et 3), dépannage (Calm Ambient 3, Contemplation). Le morceau génératif du jeu (calme, sombre ou pressant) complète ces listes et joue seul la dernière minute.
+
 | Fichier | Titre | Auteur | Source |
 |---|---|---|---|
 | calm-ambient-1.mp3 | Calm Ambient 1 (Synthwave 4k) | cynicmusic | https://opengameart.org/content/calm-ambient-1-synthwave-4k |

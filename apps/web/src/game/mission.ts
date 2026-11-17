@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { buildLevel, canPlug, catalog, evaluate, type CableEnd, type CableType, type EthernetFrame, type L3Payload, type Level, type Network, type ObjectiveResult, type PortSpec } from '@patchbay/sim-core';
 import { sound } from '../audio.js';
+import { sceneOf } from '../music.js';
 import { t, tx } from '../i18n.js';
 import { Player, type MoveInput } from './player.js';
 import { Coach, type CoachView } from './coach.js';
@@ -203,6 +204,8 @@ export class Mission {
   private readonly parts = new Map<string, THREE.Object3D[]>();
   private shown = '';
   private lastTick = 0;
+  /** Frames until the music looks again at what the player is doing. */
+  private musicIn = 0;
   private readonly aicha: AskAicha;
   /** Sitting at the laptop: getting up when the console closes. */
   private seated = false;
@@ -1638,6 +1641,7 @@ export class Mission {
     if (this.paused) return;
     if (this.finished) return;
     this.twinkle(dt);
+    this.musicCue();
     if (this.tour) return;
     if (this.entrance > 0) {
       this.entrance -= real;
@@ -1655,6 +1659,20 @@ export class Mission {
       sound.play('tick');
     }
     if (this.remaining <= 0) this.finish(evaluate(this.net, this.level.objectives), true);
+  }
+
+  /** The music follows the moment: cabling or troubleshooting, a console open, the last minute (`music.ts`). */
+  private musicCue(): void {
+    if (--this.musicIn > 0) return;
+    this.musicIn = 8;
+    const { scene, focus } = sceneOf({
+      levelId: this.level.id,
+      tour: this.tour,
+      remaining: this.remaining,
+      clockRunning: this.entrance <= 0 && !this.coach?.active,
+      configuring: document.querySelector('.terminal, .host-settings') !== null,
+    });
+    sound.setScene(scene, focus);
   }
 
   /** The mission is on screen now: what it took to get ready does not count. */
@@ -2301,6 +2319,7 @@ export class Mission {
   private finish(evaluation: ReturnType<typeof evaluate>, timedOut: boolean): void {
     this.finished = true;
     sound.play(evaluation.complete ? 'success' : 'timeout');
+    sound.stinger(evaluation.complete ? 'win' : 'fail');
     this.coach?.dispose();
     this.coach = null;
     this.hud.showTooltip(null);

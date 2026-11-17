@@ -80,7 +80,7 @@ let stopShowcase: (() => void) | null = null;
 
 /** Behind the menus: the first level's gear on the bench, and a slow camera sweep across the room. */
 function showcase(): void {
-  sound.setMood('menu');
+  sound.setScene('menu');
   if (stopShowcase) return;
   mission?.dispose();
   mission = null;
@@ -175,7 +175,7 @@ function play(index: number, exam = false, guided = false): void {
   );
   loading.append(loadingTip(next.id));
   document.body.append(loading);
-  sound.setMood('mission');
+  sound.setScene(guided ? 'tour' : 'cabling');
   requestAnimationFrame(() => {
     setTimeout(() => {
       endShowcase();
