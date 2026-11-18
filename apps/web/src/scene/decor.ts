@@ -8,7 +8,7 @@ import { textTexture } from './textures.js';
 /**
  * What makes the room a working technical room rather than a set: storage, more cabinets, a technician's desk, wall
  * trunking, panels and signs. Nothing here can be used; the player walks around it (`game/player.ts` has the
- * footprints). Everything is built from simple shapes, with no download.
+ * footprints). The furniture is modelled in Blender (`art/blender/`), the signs are drawn here.
  */
 
 const lit = (color: string, roughness = 0.6, metalness = 0.1): THREE.MeshStandardMaterial => new THREE.MeshStandardMaterial({ color, roughness, metalness });
@@ -19,8 +19,6 @@ const M = {
   paintedGrey: lit('#94a3b8', 0.65, 0.2),
   white: lit('#e8ebef', 0.7),
   trunking: lit('#d6dae0', 0.6),
-  crate: lit('#334155', 0.6, 0.1),
-  crateLid: lit('#22418f', 0.5, 0.12),
   black: lit('#1b2028', 0.6, 0.25),
   plastic: lit('#20262f', 0.45),
   wood: new THREE.MeshStandardMaterial({ ...photo('plywood', 1, 0.5), roughness: 0.8 }),
@@ -79,16 +77,6 @@ function sign(w: number, h: number, background: string, color: string, lines: st
   return new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: texture, roughness: 0.75 }));
 }
 
-/** A spool of cable lying on its side. */
-function spool(colour: string, x: number, y: number, z: number): THREE.Group {
-  const g = new THREE.Group();
-  const cable = new THREE.MeshStandardMaterial({ color: colour, roughness: 0.55 });
-  g.add(cylinder(0.09, 0.09, cable, 0, 0, 0, 'z'));
-  g.add(cylinder(0.125, 0.008, M.plastic, 0, 0, 0.05, 'z'), cylinder(0.125, 0.008, M.plastic, 0, 0, -0.05, 'z'));
-  g.position.set(x, y + 0.125, z);
-  return g;
-}
-
 /** A coil of patch cable hanging on a hook, flat against a wall facing +z. */
 function coil(colour: string, x: number, y: number): THREE.Group {
   const g = new THREE.Group();
@@ -104,39 +92,14 @@ function coil(colour: string, x: number, y: number): THREE.Group {
   return g;
 }
 
-/** A labelled storage crate: all the same size and lined up, as in a kept stockroom. */
-function crate(x: number, y: number, z: number, label: string, w = 0.36, h = 0.26, d = 0.5): THREE.Group {
-  const g = new THREE.Group();
-  g.add(soft(w, h, d, M.crate, 0, h / 2, 0), soft(w + 0.012, 0.022, d + 0.012, M.crateLid, 0, h, 0, 0.008));
-  // A carrying handle on the end.
-  g.add(soft(0.012, 0.02, 0.12, M.steel, w / 2 + 0.004, h * 0.86, 0, 0.004));
-  const tag = sign(0.26, 0.09, '#f8fafc', '#0b1e3f', [label]);
-  tag.rotation.y = Math.PI / 2;
-  tag.position.set(w / 2 + 0.002, h * 0.55, 0);
-  g.add(tag);
-  g.position.set(x, y, z);
-  return g;
-}
-
-/** Steel shelving along the left wall: labelled crates in straight rows, spools and spare switches in their place. */
+/**
+ * Steel shelving along the left wall, modelled in Blender (`art/blender/shelving.py`): perforated angle posts, five
+ * shelves, X bracing, and the stock in straight rows (labelled crates, two reels of cable, spare switches in their boxes).
+ */
 function shelving(): THREE.Group {
   const g = new THREE.Group();
   const [x, z0, z1, depth] = [-3.24, 0.15, 2.05, 0.46];
-  const levels = [0.14, 0.62, 1.1, 1.58, 2.02];
-  for (const z of [z0, (z0 + z1) / 2, z1]) {
-    for (const dx of [-depth / 2, depth / 2]) g.add(box(0.035, 2.1, 0.035, M.steel, x + dx, 1.05, z));
-  }
-  for (const y of levels) g.add(box(depth, 0.025, z1 - z0, M.paintedGrey, x, y, (z0 + z1) / 2));
-  const on = (level: number): number => (levels[level] as number) + 0.0125;
-  const rows = [0.48, 1.1, 1.72];
-  const stock = [['RJ45 CAT6', 'PATCH 1 m', 'PATCH 2 m'], [], ['CONSOLE', 'SÉRIE V.35', 'SFP'], ['ÉTIQUETTES', 'COLLIERS', 'VIS DE BAIE']];
-  stock.forEach((labels, level) => labels.forEach((label, i) => g.add(crate(x, on(level), rows[i] as number, label))));
-  // Cable spools on the second shelf, and a spare switch on top of each other at the end of it.
-  g.add(spool('#2563eb', x, on(1), 0.48), spool('#f59e0b', x, on(1), 1.1));
-  for (let i = 0; i < 3; i++) {
-    g.add(box(0.33, 0.044, 0.44, M.darkSteel, x, on(1) + 0.024 + i * 0.047, 1.72));
-    for (let k = 0; k < 8; k++) g.add(box(0.002, 0.014, 0.018, M.black, x + 0.166, on(1) + 0.024 + i * 0.047, 1.58 + k * 0.04, false));
-  }
+  placeProp(g, 'shelving', { x, y: 0, z: (z0 + z1) / 2, turn: Math.PI / 2 });
   const shadow = contactShadow(depth + 0.3, z1 - z0 + 0.3, 0.55);
   shadow.position.set(x, 0.003, (z0 + z1) / 2);
   g.add(shadow);
@@ -228,17 +191,9 @@ function walls(): THREE.Group {
   g.add(box(0.03, 0.06, 5.6, M.trunking, FACE.left + 0.018, 0.42, 2.8, false));
   g.add(box(0.03, 0.06, 3.0, M.trunking, FACE.right - 0.018, 0.42, 4.2, false));
 
-  // Electrical panel on the left wall: a grey cabinet, a window on the breakers, a warning sign.
-  const lx = FACE.left + 0.03;
-  g.add(box(0.1, 0.8, 0.56, M.paintedGrey, lx, 1.45, -1.12));
-  g.add(box(0.004, 0.3, 0.42, M.black, lx + 0.052, 1.56, -1.12, false));
-  for (let i = 0; i < 9; i++) g.add(box(0.008, 0.08, 0.026, i % 4 === 3 ? M.red : M.white, lx + 0.056, 1.6, -1.27 + i * 0.037, false));
-  for (let i = 0; i < 9; i++) g.add(box(0.008, 0.08, 0.026, M.white, lx + 0.056, 1.48, -1.27 + i * 0.037, false));
-  const danger = sign(0.2, 0.12, '#fbbf24', '#0b0f17', ['DANGER', 'ÉLECTRIQUE']);
-  danger.rotation.y = Math.PI / 2;
-  danger.position.set(lx + 0.053, 1.22, -1.12);
-  g.add(danger);
-  g.add(cylinder(0.018, 0.75, M.trunking, lx, 2.25, -1.25), cylinder(0.018, 0.75, M.trunking, lx, 2.25, -1.0));
+  // Electrical panel on the left wall, modelled (`art/blender/electrical_panel.py`): breakers behind the door's window,
+  // the danger plate, the conduits up to the ceiling.
+  placeProp(g, 'electrical-panel', { x: FACE.left + 0.03, y: 1.05, z: -1.12, turn: Math.PI / 2 });
 
   // Pegboard above a low cupboard on the right wall: crimping tools, testers, coils of cable.
   const peg = new THREE.Group();
@@ -314,12 +269,8 @@ function floor(): THREE.Group {
   const tape = lit('#eab308', 0.7);
   g.add(box(0.05, 0.002, 2.2, tape, FACE.right - 0.9, 0.003, 0.62, false), box(0.05, 0.002, 1.1, tape, FACE.right - 1.3, 0.003, -1.05, false));
 
-  // The bench's lower shelf: three crates in a row, labels to the front.
-  ['OUTILLAGE', 'TESTEURS', 'CORDONS'].forEach((label, i) => {
-    const c = crate(-1.15 + i * 0.68, 0.17, 0.3, label, 0.5, 0.24, 0.42);
-    c.rotation.y = -Math.PI / 2;
-    g.add(c);
-  });
+  // The bench's lower shelf: three crates in a row, labels to the front (`art/blender/bench_crates.py`).
+  placeProp(g, 'bench-crates', { x: -0.47, y: 0.17, z: 0.3 });
   return g;
 }
 
