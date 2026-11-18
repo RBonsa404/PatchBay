@@ -320,10 +320,14 @@ function modelSocket(parent: THREE.Object3D, m: Materials, device: string, spec:
   return view;
 }
 
-/** Build a device from its Blender model: its meshes, then a socket at each `port:` marker. False if there is none. */
-function buildFromGear(name: GearName, id: string, model: DeviceModel, m: Materials, view: DeviceView, tag: string, tagColour = '#0f172a'): boolean {
+/**
+ * Build a device from its Blender model: its meshes, then a socket at each `port:` marker. Its other markers, by name,
+ * or null if there is no model. With `tagOnMarker`, the hostname goes exactly on the `tag` marker (a PC's tower front),
+ * rather than on the front of the whole box.
+ */
+function buildFromGear(name: GearName, id: string, model: DeviceModel, m: Materials, view: DeviceView, tag: string, tagColour = '#0f172a', tagOnMarker = false): Map<string, THREE.Object3D> | null {
   const source = gearModel(name);
-  if (!source) return false;
+  if (!source) return null;
   const copy = source.clone(true);
   view.root.add(copy);
   view.root.updateMatrixWorld(true);
@@ -332,7 +336,7 @@ function buildFromGear(name: GearName, id: string, model: DeviceModel, m: Materi
   const markers = new Map<string, THREE.Object3D>();
   copy.traverse((o) => {
     const label = (o.userData.name as string | undefined) ?? o.name;
-    if (label.startsWith('port:') || label.startsWith('led:') || label.startsWith('note:') || label === 'tag') markers.set(label, o);
+    if (label.startsWith('port:') || label.startsWith('led:') || label.startsWith('note:') || label === 'tag' || label === 'screen') markers.set(label, o);
     else if ((o as THREE.Mesh).isMesh) {
       o.castShadow = true;
       o.receiveShadow = true;
@@ -349,7 +353,24 @@ function buildFromGear(name: GearName, id: string, model: DeviceModel, m: Materi
   // The hostname on a printed tag, where the model marks it (else between the console and the ports).
   const spot = markers.get('tag');
   const at = spot ? local(spot) : new THREE.Vector3(-view.width / 2 + 0.13, view.height * 0.62, view.depth / 2);
-  label(view.root, tag, at.x, at.y, view.depth / 2, 0.07, 0.012, tagColour);
+  label(view.root, tag, at.x, at.y, tagOnMarker && spot ? at.z : view.depth / 2, tagOnMarker ? 0.06 : 0.07, tagOnMarker ? 0.01 : 0.012, tagColour);
+  return markers;
+}
+
+/**
+ * A PC or a laptop from its Blender model, with the picture the game draws on its screen where the model's `screen`
+ * marker stands, facing the way it faces. False if the model is not loaded.
+ */
+function hostFromGear(name: 'bench-pc' | 'laptop', id: string, model: DeviceModel, m: Materials, view: DeviceView, lines: string[], size: [number, number]): boolean {
+  const markers = buildFromGear(name, id, model, m, view, id, '#e2e8f0', true);
+  const spot = markers?.get('screen');
+  if (!markers || !spot) return markers !== null;
+  const screen = plane(size[0], size[1], screenTexture(lines), true);
+  const local = new THREE.Matrix4().copy(view.root.matrixWorld).invert().multiply(spot.matrixWorld);
+  const scale = new THREE.Vector3();
+  local.decompose(screen.position, screen.quaternion, scale);
+  view.root.add(screen);
+  view.body.push(screen);
   return true;
 }
 
@@ -434,7 +455,8 @@ function buildSwitch(id: string, model: DeviceModel, m: Materials, view: DeviceV
 }
 
 function buildDesktop(id: string, model: DeviceModel, m: Materials, view: DeviceView, caption: string): void {
-  // Tower on the right, monitor on the left; the tower's ports face the player.
+  if (hostFromGear('bench-pc', id, model, m, view, [caption, '', '> ipconfig'], [0.44, 0.262])) return;
+  // Without its model: tower on the right, monitor on the left; the tower's ports face the player.
   const tower = roundedChassis(0.17, 0.36, 0.34, m.panel);
   tower.position.set(0.2, 0.18, 0);
   const stripe = mesh(new THREE.BoxGeometry(0.004, 0.28, 0.002), new THREE.MeshStandardMaterial({ color: '#38bdf8', emissive: '#38bdf8', emissiveIntensity: 1.6 }), false);
@@ -479,6 +501,7 @@ function buildDesktop(id: string, model: DeviceModel, m: Materials, view: Device
 }
 
 function buildLaptop(id: string, model: DeviceModel, m: Materials, view: DeviceView, caption: string): void {
+  if (hostFromGear('laptop', id, model, m, view, [caption, '', 'Console série prête', '> _'], [0.3, 0.19])) return;
   const base = roundedChassis(0.33, 0.016, 0.23, m.chassis);
   base.position.y = 0.01;
   const deck = new THREE.Mesh(new THREE.PlaneGeometry(0.29, 0.105), new THREE.MeshStandardMaterial({ map: keys(), roughness: 0.55 }));

@@ -7,7 +7,7 @@ import { loadProp } from './props.js';
  * without measuring anything itself. A model that cannot be loaded leaves the device to its built-in shape.
  */
 
-const GEAR = ['switch-2960', 'router-2911', 'router-1841', 'patch-panel-24', 'workstation', 'ntu'] as const;
+const GEAR = ['switch-2960', 'router-2911', 'router-1841', 'patch-panel-24', 'workstation', 'ntu', 'bench-pc', 'laptop'] as const;
 export type GearName = (typeof GEAR)[number];
 
 const loaded = new Map<GearName, THREE.Object3D>();

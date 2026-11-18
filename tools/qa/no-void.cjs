@@ -10,7 +10,7 @@ async function start(page, n) {
   await page.goto(page.url().split('#')[0]);
   await page.waitForSelector('.menu-item');
   await page.click('.menu-item:has-text("Parcours")');
-  await wait(400);
+  await page.waitForSelector('.mission-row');
   const exists = await page.$(`.mission-row[data-mission="${n}"]`);
   if (!exists) return false;
   await page.click(`.mission-row[data-mission="${n}"]`);
@@ -64,6 +64,7 @@ async function start(page, n) {
   }
   const voids = errors.filter((e) => /never built/.test(e));
   console.log(`${missions} missions checked`);
+  if (missions === 0) failures.push({ error: 'no mission could be started' });
   if (failures.length || voids.length) {
     console.log(JSON.stringify(failures.slice(0, 20), null, 1), voids);
     await browser.close();
