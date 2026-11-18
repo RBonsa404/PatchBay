@@ -94,9 +94,12 @@ def apply_modifiers(obj):
         bpy.ops.object.modifier_apply(modifier=mod.name)
 
 
-def text(name, body, size, at, mat, align='CENTER', rotate_x=math.pi / 2, extrude=0.0):
-    """Flat lettering, turned into a mesh so that the game needs no font."""
+def text(name, body, size, at, mat, align='CENTER', rotate_x=math.pi / 2, extrude=0.0, resolution=None):
+    """Flat lettering, turned into a mesh so that the game needs no font (`resolution`: fewer points per curve, for
+    tiny print)."""
     curve = bpy.data.curves.new(name, 'FONT')
+    if resolution:
+        curve.resolution_u = resolution
     curve.body = body
     curve.size = size
     curve.align_x = align

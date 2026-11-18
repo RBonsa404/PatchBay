@@ -250,21 +250,6 @@ export function esdMatNormal(): THREE.CanvasTexture {
   return normalMap(256, 18, 6, 1.1, n);
 }
 
-/** Rack mounting rail: a steel strip with square cage-nut holes, three per rack unit. */
-export function rackRailTexture(): THREE.CanvasTexture {
-  const [c, g] = canvas(64, 512);
-  g.fillStyle = '#5b6574';
-  g.fillRect(0, 0, 64, 512);
-  g.fillStyle = '#0d1117';
-  const unit = 512 / 12;
-  for (let u = 0; u < 12; u++) {
-    for (const k of [0.17, 0.5, 0.83]) g.fillRect(22, u * unit + k * unit - 4, 20, 8);
-  }
-  g.fillStyle = 'rgba(255,255,255,0.15)';
-  g.fillRect(0, 0, 4, 512);
-  return texture(c, 1, 1);
-}
-
 /** Perforated steel (cabinet doors, side panels): a dense hexagonal grid of holes. */
 export function perforatedTexture(): THREE.CanvasTexture {
   const [c, g] = canvas(256, 256);

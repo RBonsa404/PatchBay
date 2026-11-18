@@ -5,7 +5,7 @@ import { bake } from './bake.js';
 import { DOOR_HEIGHT, DOORS, FACE, FLOOR_Y, LAB_Z, ROOMS, roomOrigin as originOf } from './building.js';
 import { zoneShell } from './structure.js';
 import { buildDecor } from './decor.js';
-import { contactShadow, esdMatNormal, esdMatTexture, paintTexture, perforatedTexture, photo, photoRelief, rackRailTexture } from './materials.js';
+import { contactShadow, esdMatNormal, esdMatTexture, paintTexture, perforatedTexture, photo, photoRelief } from './materials.js';
 import { placeProp } from './props.js';
 import { textTexture } from './textures.js';
 
@@ -141,7 +141,7 @@ export function buildRoom(): THREE.Group {
   return room;
 }
 
-/** Lab bench: steel frame, laminate top covered by an anti-static mat, a drawer unit and a lower shelf. */
+/** Lab bench: steel frame (modelled), laminate top covered by an anti-static mat, a drawer unit and a lower shelf. */
 function bench(): THREE.Group {
   const g = new THREE.Group();
   const [w, d, z] = [3.2, 1.1, 0.25];
@@ -156,35 +156,12 @@ function bench(): THREE.Group {
   stud.position.set(w / 2 - 0.12, BENCH_TOP + 0.002, z - d / 2 + 0.1);
   g.add(top, mat, stud);
 
-  const frame = steel('#475569', 0.45, 0.8);
-  for (const x of [-w / 2 + 0.05, w / 2 - 0.05]) {
-    for (const zz of [z - d / 2 + 0.06, z + d / 2 - 0.06]) {
-      const leg = box(0.045, BENCH_TOP - 0.04, 0.045, frame);
-      leg.position.set(x, (BENCH_TOP - 0.04) / 2, zz);
-      g.add(leg);
-    }
-    const rail = box(0.035, 0.035, d - 0.1, frame);
-    rail.position.set(x, 0.14, z);
-    g.add(rail);
-  }
-  const apron = box(w - 0.1, 0.06, 0.02, frame);
-  apron.position.set(0, BENCH_TOP - 0.07, z - d / 2 + 0.07);
+  // Legs on levelling feet, stretchers, aprons and the three-drawer pedestal: `art/blender/bench_frame.py`.
+  placeProp(g, 'bench-frame', { x: 0, y: 0, z });
   const shelf = box(w - 0.14, 0.02, d - 0.2, laminate);
   shelf.position.set(0, 0.16, z);
-  g.add(apron, shelf);
+  g.add(shelf);
 
-  // Drawer unit under the right-hand side, with handles.
-  const cabinetMaterial = steel('#64748b', 0.5, 0.5);
-  const drawers = box(0.45, 0.55, 0.6, cabinetMaterial);
-  drawers.position.set(1.1, 0.17 + 0.275, z + 0.1);
-  g.add(drawers);
-  for (let i = 0; i < 3; i++) {
-    const handle = box(0.16, 0.012, 0.02, steel('#cbd5e1', 0.25, 1), false);
-    handle.position.set(1.1, 0.62 - i * 0.18, z + 0.41);
-    const seam = box(0.44, 0.003, 0.002, steel('#334155', 0.6, 0.3), false);
-    seam.position.set(1.1, 0.53 - i * 0.18, z + 0.401);
-    g.add(handle, seam);
-  }
   const shadow = contactShadow(w + 0.3, d + 0.35, 0.45);
   shadow.position.set(0, 0.002, z);
   g.add(shadow);
@@ -192,76 +169,30 @@ function bench(): THREE.Group {
 }
 
 /**
- * Floor-standing rack, open at the front: corner posts, front rails with cage-nut holes, perforated sides, top and
- * plinth. The lower units hold a UPS and blanking panels; a patch panel and a cable manager sit at the top.
+ * Floor-standing rack, open at the front. Its frame is modelled in Blender (`art/blender/rack_frame.py`): folded corner
+ * posts, front and rear rails punched with cage-nut holes and numbered unit by unit, a roof with fans and a brush entry,
+ * a ventilated plinth on levelling feet, the vertical cable managers and a brush panel. Only the side panels' perforated
+ * sheets are drawn here (a texture for their thousands of holes). The UPS sits at the bottom, a patch panel at the top.
  */
 function rack(): THREE.Group {
   const g = new THREE.Group();
-  const { x, frontZ, depth, height, railX } = RACK;
-  const backZ = frontZ - depth;
+  const { x, frontZ, depth, height } = RACK;
   const midZ = frontZ - depth / 2;
-  const black = steel('#2a303a', 0.42, 0.65);
 
-  for (const px of [-0.29, 0.29]) {
-    for (const pz of [frontZ + 0.005, backZ + 0.015]) {
-      const post = box(0.03, height, 0.03, black);
-      post.position.set(x + px, height / 2, pz);
-      g.add(post);
-    }
-    const side = new THREE.Mesh(new THREE.BoxGeometry(0.008, height - 0.12, depth - 0.06), new THREE.MeshStandardMaterial({ map: perforatedTexture(), roughness: 0.6, metalness: 0.6 }));
-    side.position.set(x + px * 1.03, height / 2, midZ);
-    side.castShadow = true;
-    g.add(side);
-  }
-  const top = box(0.62, 0.04, depth, black);
-  top.position.set(x, height - 0.02, midZ);
-  const plinth = box(0.62, 0.06, depth, black);
-  plinth.position.set(x, 0.03, midZ);
-  g.add(top, plinth);
-
-  const railTex = rackRailTexture();
-  railTex.repeat.set(1, (height - 0.1) / 0.534);
-  const railMaterial = new THREE.MeshStandardMaterial({ map: railTex, roughness: 0.4, metalness: 0.8 });
+  placeProp(g, 'rack-frame', { x, y: 0, z: midZ });
+  // The side sheets, outside the posts and behind the cable managers, between the plinth and the roof.
+  const sheet = new THREE.MeshStandardMaterial({ map: perforatedTexture(), roughness: 0.6, metalness: 0.6 });
   for (const side of [-1, 1]) {
-    const rail = box(0.026, height - 0.1, 0.004, railMaterial);
-    rail.position.set(x + side * (railX + 0.003), height / 2, frontZ - 0.006);
-    g.add(rail);
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(0.004, height - 0.11, 0.515), sheet);
+    panel.position.set(x + side * 0.3075, 0.07 + (height - 0.11) / 2, midZ - 0.0125);
+    panel.castShadow = true;
+    g.add(panel);
   }
 
-  // The UPS at the bottom (`art/blender/ups.py`), its ears against the front rails; `rackFillers` closes the units the
-  // level's own gear leaves free.
-  const unit = RACK_UNIT;
+  // The UPS at the bottom (`art/blender/ups.py`) and the 24-port patch panel at the top (`art/blender/patch_panel.py`),
+  // their ears against the front rails; `rackFillers` closes the units the level's own gear leaves free.
   placeProp(g, 'ups', { x, y: 0.07, z: frontZ - 0.2265 });
-
-  // Vertical cable managers on both sides: a back and fingers, so cables run down the rack instead of across it.
-  const duct = steel('#111418', 0.6, 0.3);
-  for (const side of [-1, 1]) {
-    const back = box(MANAGER.width, height - 0.14, 0.006, duct);
-    back.position.set(x + side * MANAGER.x, height / 2, frontZ - 0.05);
-    const outer = box(0.004, height - 0.14, 0.06, duct, false);
-    outer.position.set(x + side * (MANAGER.x + MANAGER.width / 2), height / 2, frontZ - 0.02);
-    g.add(back, outer);
-    for (let y = 0.12; y < height - 0.08; y += 0.0445 * 2) {
-      const finger = box(0.012, 0.012, 0.06, duct, false);
-      finger.position.set(x + side * (MANAGER.x - MANAGER.width / 2), y, frontZ - 0.02);
-      g.add(finger);
-    }
-  }
-
-  // Patch panel (24 sockets) and a brush cable manager above the gear.
-  const patchY = 1.335;
-  const patch = box(0.465, unit - 0.003, 0.05, steel('#232a35', 0.45, 0.6));
-  patch.position.set(x, patchY + unit / 2, frontZ - 0.025);
-  g.add(patch);
-  const socketMaterial = new THREE.MeshBasicMaterial({ color: '#05070a' });
-  for (let i = 0; i < 24; i++) {
-    const s = new THREE.Mesh(new THREE.PlaneGeometry(0.012, 0.01), socketMaterial);
-    s.position.set(x - 0.19 + (i % 12) * 0.016 + (i >= 12 ? 0.19 : 0), patchY + unit / 2, frontZ + 0.0006);
-    g.add(s);
-  }
-  const brush = box(0.465, unit - 0.003, 0.03, steel('#1a1e25', 0.9, 0.1));
-  brush.position.set(x, patchY + unit * 1.5, frontZ - 0.015);
-  g.add(brush);
+  placeProp(g, 'gear/patch-panel-24', { x, y: 1.335, z: frontZ - 0.0424 });
 
   const shadow = contactShadow(0.85, depth + 0.25, 0.6);
   shadow.position.set(x, 0.003, midZ);
@@ -332,39 +263,18 @@ export function rackFillers(occupied: [number, number][], z = 0, y = 0): THREE.G
 function serverCabinet(): THREE.Group {
   const g = new THREE.Group();
   const [w, h, d] = [0.6, 2.0, 0.9];
-  const body = box(w, h, d, new THREE.MeshStandardMaterial({ ...photo('metal_plate', 1, 2), color: '#3a4250', metalness: 0.7, roughness: 0.8 }));
-  body.position.set(0, h / 2, 0);
-  g.add(body);
-  const inner = box(w - 0.06, h - 0.12, 0.01, steel('#05070a', 0.8, 0.2), false);
-  inner.position.set(0, h / 2, d / 2 - 0.05);
-  g.add(inner);
-  const ledColours = ['#22c55e', '#22c55e', '#38bdf8', '#fbbf24'];
-  for (let i = 0; i < 14; i++) {
-    const server = box(w - 0.1, 0.085, 0.02, steel('#1f2937', 0.45, 0.6), false);
-    const y = 0.15 + i * 0.12;
-    server.position.set(0, y, d / 2 - 0.035);
-    g.add(server);
-    for (let k = 0; k < 3; k++) {
-      const led = new THREE.Mesh(new THREE.CircleGeometry(0.004, 10), new THREE.MeshBasicMaterial({ color: ledColours[(i + k) % 4], toneMapped: false }));
-      led.position.set(0.17 + k * 0.018, y + 0.02, d / 2 - 0.024);
-      g.add(led);
-    }
-  }
+  // Carcass, door frame, handle, name plate and fourteen servers: `art/blender/server_cabinet.py`. The glass stays
+  // here, see-through, in the door's opening.
+  placeProp(g, 'server-cabinet', { x: 0, y: 0, z: 0 });
   const glass = new THREE.Mesh(
-    new THREE.BoxGeometry(w - 0.04, h - 0.08, 0.006),
-    new THREE.MeshStandardMaterial({ color: '#0b1220', transparent: true, opacity: 0.45, roughness: 0.05, metalness: 0.4 }),
+    new THREE.BoxGeometry(0.5, h - 0.3, 0.006),
+    new THREE.MeshStandardMaterial({ color: '#0b1220', transparent: true, opacity: 0.35, roughness: 0.05, metalness: 0.4, depthWrite: false }),
   );
-  glass.position.set(0, h / 2, d / 2 + 0.004);
-  const handle = box(0.02, 0.22, 0.03, steel('#cbd5e1', 0.25, 1), false);
-  handle.position.set(-w / 2 + 0.06, h * 0.55, d / 2 + 0.02);
-  const label = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.3, 0.06),
-    new THREE.MeshBasicMaterial({ map: textTexture('SRV-01 · IST', { width: 512, height: 100, color: '#e2e8f0', font: '600 48px "JetBrains Mono", monospace' }), transparent: true }),
-  );
-  label.position.set(0, h - 0.1, d / 2 + 0.008);
+  glass.position.set(0, 0.14 + (h - 0.3) / 2, d / 2 + 0.006);
+  g.add(glass);
   const shadow = contactShadow(w + 0.3, d + 0.3, 0.6);
   shadow.position.y = 0.003;
-  g.add(glass, handle, label, shadow);
+  g.add(shadow);
   g.position.set(ROOM.width / 2 - 0.75, 0, ROOM.back + d / 2 + 0.05);
   return g;
 }
