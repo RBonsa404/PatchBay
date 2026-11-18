@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { Cable, CableEnd, CableType, DeviceKind } from '@patchbay/sim-core';
 import { cableRole, cordLength, cordText, ROLE_COLOUR } from '../game/cabling.js';
 import type { PortView } from './devices.js';
@@ -231,6 +232,40 @@ function plug(type: CableType, colour = CABLE_STYLE[type].colour): THREE.Group {
   return g;
 }
 
+
+/** Distance between two cable ties on a run, and the most a run may bend between them for a tie to sit there. */
+const TIE_SPACING = 0.22;
+const TIE_STRAIGHT = 0.09;
+const TIE_MATERIAL = new THREE.MeshStandardMaterial({ color: '#111827', roughness: 0.8 });
+
+/**
+ * Hook-and-loop ties holding a run that is not lying on a surface: a straight stretch above the bench (up the rack's
+ * cable manager, the ladder, the wall trunking) is never left to hold itself, it is tied every so often. One merged
+ * mesh per cord; null where the cord lies on the bench or is all bends.
+ */
+function cableTies(curve: THREE.CatmullRomCurve3, radius: number): THREE.Mesh | null {
+  const length = curve.getLength();
+  const parts: THREE.BufferGeometry[] = [];
+  const up = new THREE.Vector3(0, 0, 1);
+  for (let d = TIE_SPACING * 0.6; d < length - 0.06 && parts.length < 8; d += TIE_SPACING) {
+    const u = d / length;
+    const p = curve.getPointAt(u);
+    if (p.y - roomOrigin(p.y, p.z).y < BENCH_TOP + 0.12) continue;
+    const t0 = curve.getTangentAt(Math.max(0, u - 0.04 / length));
+    const t1 = curve.getTangentAt(Math.min(1, u + 0.04 / length));
+    if (t0.angleTo(t1) > TIE_STRAIGHT) continue;
+    const tie = new THREE.TorusGeometry(radius + 0.0016, 0.0016, 5, 10);
+    tie.scale(1, 1, 2.2);
+    tie.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(up, curve.getTangentAt(u)));
+    tie.translate(p.x, p.y, p.z);
+    parts.push(tie);
+  }
+  if (parts.length === 0) return null;
+  const merged = mergeGeometries(parts);
+  for (const g of parts) g.dispose();
+  return merged ? new THREE.Mesh(merged, TIE_MATERIAL) : null;
+}
+
 const LABEL_STOCK = new THREE.MeshStandardMaterial({ color: '#f4f6f8', roughness: 0.7 });
 const labelInks = new Map<THREE.Texture, THREE.MeshStandardMaterial>();
 
@@ -437,12 +472,18 @@ export class CableLayer {
       tube.userData.dyed = 'glow';
       tube.castShadow = true;
       group.add(tube);
+      const ties = cableTies(curve, style.radius);
+      if (ties) {
+        ties.visible = false;
+        group.add(ties);
+      }
       const total = geometry.index ? geometry.index.count : 0;
       geometry.setDrawRange(0, 0);
       void this.stage
         .animate(0.55, (t) => geometry.setDrawRange(0, Math.floor(total * t)))
         .then(() => {
           pb.visible = true;
+          if (ties) ties.visible = true;
         });
     }
     return group;
