@@ -228,15 +228,10 @@ function rack(): THREE.Group {
     g.add(rail);
   }
 
-  // The UPS at the bottom; `rackFillers` closes the units the level's own gear leaves free.
+  // The UPS at the bottom (`art/blender/ups.py`), its ears against the front rails; `rackFillers` closes the units the
+  // level's own gear leaves free.
   const unit = RACK_UNIT;
-  const ups = box(0.44, unit * 3 - 0.002, 0.45, steel('#1f2937', 0.5, 0.4));
-  ups.position.set(x, 0.07 + (unit * 3) / 2, frontZ - 0.225);
-  const lcd = new THREE.Mesh(new THREE.PlaneGeometry(0.06, 0.025), new THREE.MeshBasicMaterial({ color: '#7dd3fc', toneMapped: false }));
-  lcd.position.set(x - 0.12, 0.07 + unit * 1.8, frontZ + 0.0005);
-  const upsLed = new THREE.Mesh(new THREE.CircleGeometry(0.003, 12), new THREE.MeshBasicMaterial({ color: '#22c55e', toneMapped: false }));
-  upsLed.position.set(x + 0.15, 0.07 + unit * 1.5, frontZ + 0.0005);
-  g.add(ups, lcd, upsLed);
+  placeProp(g, 'ups', { x, y: 0.07, z: frontZ - 0.2265 });
 
   // Vertical cable managers on both sides: a back and fingers, so cables run down the rack instead of across it.
   const duct = steel('#111418', 0.6, 0.3);
