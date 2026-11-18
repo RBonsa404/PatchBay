@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { FACE } from './building.js';
-import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { contactShadow, photo } from './materials.js';
 import { placeMany, placeProp } from './props.js';
 import { textTexture } from './textures.js';
@@ -31,15 +30,6 @@ function box(w: number, h: number, d: number, material: THREE.Material, x: numbe
   const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
   m.position.set(x, y, z);
   m.castShadow = shadow;
-  m.receiveShadow = true;
-  return m;
-}
-
-/** A box with softened edges: what makes an object look made rather than modelled. */
-function soft(w: number, h: number, d: number, material: THREE.Material, x: number, y: number, z: number, radius = 0.012): THREE.Mesh {
-  const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 2, Math.min(radius, h / 2.2, w / 2.2, d / 2.2)), material);
-  m.position.set(x, y, z);
-  m.castShadow = true;
   m.receiveShadow = true;
   return m;
 }
@@ -75,21 +65,6 @@ function sign(w: number, h: number, background: string, color: string, lines: st
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 4;
   return new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: texture, roughness: 0.75 }));
-}
-
-/** A coil of patch cable hanging on a hook, flat against a wall facing +z. */
-function coil(colour: string, x: number, y: number): THREE.Group {
-  const g = new THREE.Group();
-  const material = new THREE.MeshStandardMaterial({ color: colour, roughness: 0.5 });
-  for (let i = 0; i < 3; i++) {
-    const loop = new THREE.Mesh(new THREE.TorusGeometry(0.075 - i * 0.004, 0.0045, 8, 28), material);
-    loop.position.set((i - 1) * 0.004, -0.075, 0.012 + i * 0.006);
-    loop.castShadow = true;
-    g.add(loop);
-  }
-  g.add(cylinder(0.006, 0.04, M.steel, 0, 0, 0.02, 'z'));
-  g.position.set(x, y, 0);
-  return g;
 }
 
 /**
@@ -134,23 +109,18 @@ function desk(): THREE.Group {
   const g = new THREE.Group();
   // Against the front wall, under the window (as `building.ts` stops the player around it).
   // In the front left corner, clear of the second row of racks, under its window.
-  const [x, z, top] = [-4.5, 5.5, 0.74];
-  g.add(box(1.5, 0.035, 0.7, M.wood, x, top, z));
-  for (const dx of [-0.7, 0.7]) g.add(box(0.04, top, 0.62, M.steel, x + dx, top / 2, z));
-  g.add(box(0.42, 0.56, 0.55, M.paintedGrey, x + 0.48, 0.3, z));
-  for (let i = 0; i < 3; i++) g.add(box(0.1, 0.012, 0.012, M.steel, x + 0.48, 0.47 - i * 0.17, z - 0.282, false));
-  // Monitor turned towards the chair, with a dim terminal.
+  const [x, z, top] = [-4.5, FACE.front - 0.4, 0.74];
+  // Modelled (`art/blender/tech_desk.py`): laminate top on a C-leg frame, drawer pedestal on castors, monitor on its
+  // stand, keyboard and mouse, labelled binders. Turned so that the seat side faces the room.
+  placeProp(g, 'tech-desk', { x, y: 0, z, turn: Math.PI });
+  // The monitor's picture: a dim terminal, on the model's screen face.
   const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.52, 0.3), new THREE.MeshBasicMaterial({ map: textTexture('$ show running-config', { width: 512, height: 296, color: '#7dd3fc', font: '400 26px "JetBrains Mono", monospace' }), color: '#ffffff', transparent: true }));
-  const back = soft(0.55, 0.33, 0.025, M.black, x - 0.1, top + 0.3, z + 0.14, 0.01);
   screen.rotation.y = Math.PI;
-  screen.position.set(x - 0.1, top + 0.3, z + 0.121);
+  screen.position.set(x - 0.1, top + 0.305, z + 0.124);
   const screenBase = new THREE.Mesh(new THREE.PlaneGeometry(0.52, 0.3), new THREE.MeshBasicMaterial({ color: '#07111f' }));
   screenBase.rotation.y = Math.PI;
-  screenBase.position.set(x - 0.1, top + 0.3, z + 0.124);
-  g.add(back, screenBase, screen, box(0.05, 0.14, 0.05, M.black, x - 0.1, top + 0.08, z + 0.16), box(0.2, 0.012, 0.16, M.black, x - 0.1, top + 0.024, z + 0.16));
-  g.add(box(0.4, 0.016, 0.13, M.plastic, x - 0.1, top + 0.026, z - 0.12), box(0.06, 0.02, 0.09, M.plastic, x + 0.17, top + 0.028, z - 0.12));
-  const binders = ['#1d4ed8', '#fbbf24', '#0b1e3f', '#1d4ed8', '#94a3b8'];
-  binders.forEach((colour, i) => g.add(box(0.05, 0.28, 0.2, lit(colour, 0.7), x + 0.42 + i * 0.056, top + 0.158, z + 0.2)));
+  screenBase.position.set(x - 0.1, top + 0.305, z + 0.126);
+  g.add(screenBase, screen);
   placeProp(g, 'clipboard', { x: x + 0.34, y: top + 0.018, z: z - 0.1, turn: 0.2 });
   placeProp(g, 'desk_lamp_arm_01', { x: x - 0.55, y: top + 0.1, z: z + 0.16, turn: 0.6, scale: 0.75 });
 
@@ -181,22 +151,12 @@ function walls(): THREE.Group {
   // the danger plate, the conduits up to the ceiling.
   placeProp(g, 'electrical-panel', { x: FACE.left + 0.03, y: 1.05, z: -1.12, turn: Math.PI / 2 });
 
-  // Pegboard above a low cupboard on the right wall: crimping tools, testers, coils of cable.
-  const peg = new THREE.Group();
-  peg.add(box(1.25, 0.8, 0.012, lit('#3b4757', 0.8), 0, 1.65, 0, false));
-  peg.add(coil('#2563eb', -0.42, 1.92), coil('#f59e0b', -0.18, 1.92), coil('#7dd3fc', 0.06, 1.92));
-  // A crimper, a tester and pliers: their shapes against the board.
-  peg.add(box(0.035, 0.2, 0.018, M.red, 0.28, 1.72, 0.015), box(0.035, 0.2, 0.018, M.red, 0.33, 1.72, 0.015), box(0.07, 0.07, 0.022, M.steel, 0.305, 1.84, 0.018));
-  peg.add(box(0.1, 0.16, 0.03, M.amber, 0.5, 1.76, 0.02), box(0.07, 0.05, 0.002, M.black, 0.5, 1.8, 0.036, false));
-  peg.add(box(0.13, 0.03, 0.015, M.blue, -0.3, 1.45, 0.012), box(0.03, 0.03, 0.02, M.steel, -0.22, 1.45, 0.014), box(0.16, 0.022, 0.015, M.amber, 0.02, 1.45, 0.012), box(0.14, 0.022, 0.015, M.red, 0.26, 1.45, 0.012));
-  peg.rotation.y = -Math.PI / 2;
+  // The tool wall on the right wall, modelled (`art/blender/tool_wall.py`): a low steel cupboard with two doors under a
+  // pegboard on stand-offs, the cabling tools on their hooks (coils of cable, crimper, tester, cutters, punch-down
+  // tool, screwdrivers). The cupboard's wooden top is drawn here, with the bench's plywood.
   const rx = FACE.right - 3.5;
-  peg.position.set(3.487 + rx, 0, 2.6);
-  g.add(peg);
-  g.add(box(0.45, 0.85, 1.25, M.paintedGrey, 3.26 + rx, 0.425, 2.6));
+  placeProp(g, 'tool-wall', { x: FACE.right, y: 0, z: 2.6, turn: -Math.PI / 2 });
   g.add(box(0.46, 0.03, 1.28, M.wood, 3.25 + rx, 0.865, 2.6));
-  g.add(box(0.004, 0.75, 0.003, M.black, 3.031 + rx, 0.42, 2.6, false));
-  for (const dz of [-0.06, 0.06]) g.add(box(0.016, 0.12, 0.016, M.steel, 3.025 + rx, 0.5, 2.6 + dz, false));
   // A real toolbox and a multimeter on the cupboard.
   placeProp(g, 'metal_toolbox', { x: 3.25 + rx, y: 0.88, z: 2.25, turn: -Math.PI / 2 });
   placeProp(g, 'retro_multimeter', { x: 3.25 + rx, y: 0.88, z: 2.95, turn: -Math.PI / 2 - 0.25, scale: 0.8 });
@@ -244,12 +204,11 @@ function walls(): THREE.Group {
 /** The floor stays clear: only the safety tape, a bin beside the desk, and tidy crates on the bench's lower shelf. */
 function floor(): THREE.Group {
   const g = new THREE.Group();
-  const bin = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.12, 0.38, 20), M.darkSteel);
-  bin.position.set(-3.35, 0.19, FACE.front - 0.3);
-  bin.castShadow = true;
+  // The office bin, modelled (`art/blender/wastebin.py`): rolled rim, liner folded over it, crumpled paper inside.
+  placeProp(g, 'wastebin', { x: -3.35, y: 0, z: FACE.front - 0.3 });
   const binShadow = contactShadow(0.5, 0.5, 0.5);
   binShadow.position.set(-3.35, 0.003, FACE.front - 0.3);
-  g.add(bin, binShadow);
+  g.add(binShadow);
 
   // Yellow floor tape marking the clearance in front of the cabinets.
   const tape = lit('#eab308', 0.7);
@@ -260,10 +219,9 @@ function floor(): THREE.Group {
   return g;
 }
 
-/** How far the room's walls moved out from where these pieces were first laid out (3.5 m either side, 3.6 m ahead). */
+/** How far the room's walls moved out from where these pieces were first laid out (3.5 m either side). */
 const LEFT = FACE.left + 3.5;
 const RIGHT = FACE.right - 3.5;
-const AHEAD = FACE.front - 3.6;
 
 export function buildDecor(): THREE.Group {
   const g = new THREE.Group();
@@ -272,7 +230,6 @@ export function buildDecor(): THREE.Group {
   const right = cabinetRow();
   right.position.x = RIGHT;
   const front = desk();
-  front.position.z = AHEAD;
   g.add(left, right, front, walls(), floor(), rackRow());
   return g;
 }
