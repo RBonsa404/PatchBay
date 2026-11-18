@@ -34,6 +34,11 @@ export class Player {
   private phase = 0;
   /** Where the player may go: the technical room alone, or the building (and upstairs). */
   private allowed = new Set<ZoneName>(['room']);
+  /**
+   * The people in the way (colleagues, set by the mission each frame): the player walks around them, never through
+   * them. `r` is the distance kept between the two centres.
+   */
+  people: readonly { x: number; y: number; z: number; r: number }[] = [];
 
   /** Open the building to the player (otherwise, the technical room only); `stairs` adds the first floor. */
   enterBuilding(stairs: boolean): void {
@@ -107,7 +112,21 @@ export class Player {
     const g = groundAt(x, z, this.y);
     if (g === null) return null;
     if (!this.allowed.has(zoneOf(x, g + 0.1, z))) return null;
+    if (this.bumps(x, z, g)) return null;
     return blockedAt(x, z, g) ? null : g;
+  }
+
+  /**
+   * Whether stepping to (x, z) walks into someone. Only a step that brings the player closer counts: someone who walked
+   * into the player (or stood up next to them) never leaves them stuck.
+   */
+  private bumps(x: number, z: number, y: number): boolean {
+    for (const p of this.people) {
+      if (Math.abs(p.y - y) > 1) continue;
+      const after = Math.hypot(x - p.x, z - p.z);
+      if (after < p.r && after < Math.hypot(this.x - p.x, this.z - p.z)) return true;
+    }
+    return false;
   }
 
   /**

@@ -1014,7 +1014,7 @@ export class Mission {
   private travelling = false;
   /** The student the player walks as, seen from behind; the colleagues in the buildings. */
   private avatar: Person | null = null;
-  private readonly people: { person: Person; who: Colleague; leg: number; talking: number; line: number }[] = [];
+  private readonly people: { person: Person; who: Colleague; leg: number; talking: number; line: number; waiting: boolean }[] = [];
   private lastFoot = new THREE.Vector3();
   private climb = 0;
   private talkBubble: HTMLElement | null = null;
@@ -1035,7 +1035,7 @@ export class Mission {
       person.root.rotation.y = who.at.yaw;
       person.play(who.motion, 0);
       this.stage.level.add(person.root);
-      this.people.push({ person, who, leg: 0, talking: 0, line: 0 });
+      this.people.push({ person, who, leg: 0, talking: 0, line: 0, waiting: false });
     }
     this.showPeople();
   }
@@ -1084,7 +1084,15 @@ export class Mission {
         const dx = target[0] - root.position.x;
         const dz = target[1] - root.position.z;
         const dist = Math.hypot(dx, dz);
-        if (dist < 0.2) p.leg++;
+        // Someone walking stops in front of the player standing in the way, and goes on once the way is free.
+        const ahead = (this.player.x - root.position.x) * (dx / dist) + (this.player.z - root.position.z) * (dz / dist);
+        const way = sameFloor && ahead > 0 && ahead < 0.95 && d < 0.95;
+        if (way !== p.waiting) {
+          p.waiting = way;
+          p.person.play(way ? 'Idle_Loop' : p.who.motion);
+        }
+        if (way) turn(root, Math.atan2(dx, dz));
+        else if (dist < 0.2) p.leg++;
         else {
           const step = Math.min(dist, dt * 1.25);
           root.position.x += (dx / dist) * step;
@@ -1103,6 +1111,10 @@ export class Mission {
         near = p;
       }
     }
+    // The player walks around the colleagues shown here, never through them (a seated one takes less room).
+    this.player.people = this.people
+      .filter((p) => p.person.root.visible)
+      .map((p) => ({ x: p.person.root.position.x, y: p.person.root.position.y, z: p.person.root.position.z, r: p.who.motion.startsWith('Sitting') ? 0.5 : 0.55 }));
     this.hud.setTalkHint(near ? t('people.talkHint', { name: near.who.name }) : null);
     this.nearPerson = near;
   }
