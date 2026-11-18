@@ -37,15 +37,20 @@ export function withoutTransmission<T extends THREE.Object3D>(root: T): T {
   return root;
 }
 
-/** Foliage painted on cards ('leaves'): the picture's alpha cuts the leaves out, seen from both sides. */
+/** Foliage painted on cards ('leaves') and perforated steel ('perforated'): the picture's alpha cuts the leaves or the
+ * holes out, seen from both sides. */
 function cutOutLeaves<T extends THREE.Object3D>(root: T): T {
   root.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh) return;
     for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
-      if (material.name !== 'leaves') continue;
+      if (material.name !== 'leaves' && material.name !== 'perforated') continue;
       material.transparent = false;
-      material.alphaTest = 0.5;
+      // Perforated steel: the holes become multisample coverage, so that from afar the door reads as half see-through
+      // (the LEDs behind it still twinkle) instead of snapping to solid black once the holes are smaller than a pixel.
+      const holes = material.name === 'perforated';
+      material.alphaTest = holes ? 0 : 0.5;
+      material.alphaToCoverage = holes;
       material.depthWrite = true;
       material.side = THREE.DoubleSide;
       material.needsUpdate = true;

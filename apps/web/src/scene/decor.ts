@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { FACE } from './building.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { contactShadow, photo } from './materials.js';
-import { placeProp } from './props.js';
+import { placeMany, placeProp } from './props.js';
 import { textTexture } from './textures.js';
 
 /**
@@ -106,39 +106,25 @@ function shelving(): THREE.Group {
   return g;
 }
 
-/** A row of closed cabinets along the right wall, facing the room, with a few live LEDs behind the mesh. */
+/**
+ * Three closed network cabinets bayed against the right wall, facing the room, modelled in Blender
+ * (`art/blender/network_cabinet.py`, the 650 mm deep variant): perforated door through which the patch panels, the
+ * cabled switches, the servers and the UPS show with their LEDs lit; the bay's name plate on the door's top band.
+ */
 function cabinetRow(): THREE.Group {
   const g = new THREE.Group();
-  const leds = ['#22c55e', '#38bdf8', '#22c55e', '#fbbf24'];
-  [-0.05, 0.62, 1.29].forEach((z, n) => {
-    const [w, h, d] = [0.66, 2.05, 0.65];
-    const x = 3.5 - w / 2 - 0.02;
-    g.add(box(w, h, d, M.black, x, h / 2, z));
-    const door = box(0.006, h - 0.1, d - 0.06, M.darkSteel, x - w / 2 - 0.003, h / 2, z);
-    g.add(door);
-    // Perforated front: rows of dark slots, and the machines' LEDs through them.
-    for (let i = 0; i < 28; i++) {
-      const slot = new THREE.Mesh(new THREE.PlaneGeometry(d - 0.16, 0.026), new THREE.MeshBasicMaterial({ color: '#05070a' }));
-      slot.rotation.y = -Math.PI / 2;
-      slot.position.set(x - w / 2 - 0.0065, 0.2 + i * 0.062, z);
-      g.add(slot);
-      if ((i + n) % 3 === 0) {
-        for (let k = 0; k < 2; k++) {
-          const led = new THREE.Mesh(new THREE.CircleGeometry(0.004, 8), new THREE.MeshBasicMaterial({ color: leds[(i + k + n) % 4], toneMapped: false }));
-          led.rotation.y = -Math.PI / 2;
-          led.position.set(x - w / 2 - 0.007, 0.2 + i * 0.062, z + 0.17 + k * 0.02);
-          g.add(led);
-        }
-      }
-    }
-    g.add(box(0.03, 0.2, 0.025, M.steel, x - w / 2 - 0.018, 1.1, z - d / 2 + 0.06, false));
+  const [w, d] = [0.6, 0.65];
+  const x = 3.5 - d / 2 - 0.02;
+  const bays = [0.02, 0.62, 1.22];
+  placeMany(g, 'network-cabinet-wall', bays.map((z) => ({ x, y: 0, z, turn: -Math.PI / 2 })));
+  bays.forEach((z, n) => {
     const tag = sign(0.2, 0.05, '#0b1e3f', '#e2e8f0', [`BAIE-0${n + 2}`]);
     tag.rotation.y = -Math.PI / 2;
-    tag.position.set(x - w / 2 - 0.007, 1.92, z);
+    tag.position.set(x - d / 2 - 0.021, 1.898, z);
     g.add(tag);
   });
-  const shadow = contactShadow(1.0, 2.3, 0.6);
-  shadow.position.set(3.1, 0.003, 0.62);
+  const shadow = contactShadow(d + 0.35, bays.length * w + 0.3, 0.6);
+  shadow.position.set(x, 0.003, 0.62);
   g.add(shadow);
   return g;
 }
@@ -292,53 +278,21 @@ export function buildDecor(): THREE.Group {
 }
 
 /**
- * A second row of racks across the room, as in a real network room: closed cabinets with their blanking panels,
- * patch fields and servers' LEDs behind perforated doors, labelled, with a cold-aisle tape on the floor.
+ * A second row of racks across the room, as in a real network room: ten closed cabinets bayed side by side, modelled in
+ * Blender (`art/blender/network_cabinet.py`): perforated front and rear doors, patch fields cabled to the switches,
+ * servers and UPS with their LEDs behind them, the power strips at the back. One draw call per material for the row.
  */
 export function rackRow(): THREE.Group {
   const g = new THREE.Group();
-  const leds = ['#22c55e', '#38bdf8', '#22c55e', '#fbbf24'];
-  const [w, h, d, z] = [0.6, 2.0, 0.9, 3.7];
-  for (let n = 0; n < 9; n++) {
-    const x = -2.7 + n * 0.675;
-    g.add(box(w - 0.01, h, d, M.black, x, h / 2, z));
-    // The perforated front door, with the handle, and the machines behind it.
-    g.add(box(w - 0.05, h - 0.12, 0.006, M.darkSteel, x, h / 2, z - d / 2 - 0.004));
-    for (let i = 0; i < 30; i++) {
-      const slot = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.14, 0.024), new THREE.MeshBasicMaterial({ color: '#05070a' }));
-      slot.rotation.y = Math.PI;
-      slot.position.set(x, 0.16 + i * 0.058, z - d / 2 - 0.0075);
-      g.add(slot);
-      if ((i + n) % 3 === 0) {
-        for (let k = 0; k < 3; k++) {
-          const led = new THREE.Mesh(new THREE.CircleGeometry(0.0045, 8), new THREE.MeshBasicMaterial({ color: leds[(i + k + n) % 4], toneMapped: false }));
-          led.rotation.y = Math.PI;
-          led.position.set(x - 0.17 + k * 0.025, 0.16 + i * 0.058, z - d / 2 - 0.008);
-          g.add(led);
-        }
-      }
-    }
-    g.add(box(0.025, 0.22, 0.03, M.steel, x + w / 2 - 0.06, 1.1, z - d / 2 - 0.02, false));
-    // The rear door, perforated too, with the power strips' lights behind it.
-    g.add(box(w - 0.05, h - 0.12, 0.006, M.darkSteel, x, h / 2, z + d / 2 + 0.004));
-    for (let i = 0; i < 30; i++) {
-      const slot = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.14, 0.024), new THREE.MeshBasicMaterial({ color: '#05070a' }));
-      slot.position.set(x, 0.16 + i * 0.058, z + d / 2 + 0.0075);
-      g.add(slot);
-    }
-    for (const dx of [-0.2, 0.2]) {
-      const strip = new THREE.Mesh(new THREE.PlaneGeometry(0.012, 1.6), new THREE.MeshBasicMaterial({ color: '#1e3a5f' }));
-      strip.position.set(x + dx, 1.0, z + d / 2 + 0.008);
-      g.add(strip);
-      const power = new THREE.Mesh(new THREE.CircleGeometry(0.005, 8), new THREE.MeshBasicMaterial({ color: '#22c55e', toneMapped: false }));
-      power.position.set(x + dx, 1.82, z + d / 2 + 0.009);
-      g.add(power);
-    }
+  const [w, d, z] = [0.6, 0.9, 3.7];
+  const xs = Array.from({ length: 10 }, (_, n) => -2.7 + n * w);
+  placeMany(g, 'network-cabinet', xs.map((x) => ({ x, y: 0, z, turn: Math.PI })));
+  xs.forEach((x, n) => {
     const tag = sign(0.24, 0.06, '#0b1e3f', '#e2e8f0', [`BAIE-${String(n + 5).padStart(2, '0')}`]);
     tag.rotation.y = Math.PI;
-    tag.position.set(x, 1.93, z - d / 2 - 0.009);
+    tag.position.set(x, 1.898, z - d / 2 - 0.021);
     g.add(tag);
-  }
+  });
   // A cable tray over the row, the cold aisle's yellow tape in front of it.
   g.add(box(6.1, 0.06, 0.4, lit('#fbbf24', 0.6, 0.3), 0, 2.35, z));
   const tape = lit('#eab308', 0.7);
